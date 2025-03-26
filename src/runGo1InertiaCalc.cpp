@@ -179,7 +179,7 @@ void transformInertiaTrunkFrame(Eigen::Matrix3d& tempInertiaMat, double& tempMas
 }
 
 int main() {
-    std::string xmlFile = "/home/memento/go1_cpp_cmake/models/go1.xml"; // remember to make this relative in the end
+    std::string xmlFile = "../models/go1.xml";
     std::map<std::string, Link> totalLinkMap = parseXML(xmlFile);
 
     // Print all links and joints

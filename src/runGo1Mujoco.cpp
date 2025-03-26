@@ -5,6 +5,7 @@
 #include <vector>
 #include <chrono>
 #include <thread>
+#include <filesystem>
 
 // #include "go1_cpp_humble/go1GRFMPC.h"
 #include "go1_cpp_cmake/go1StanceMPC.h"
@@ -262,7 +263,8 @@ int main(void) {
 
     // Load MuJoCo model
     char error[1000] = "";
-    std::string model_path = "/home/memento/go1_cpp_cmake/models/go1.xml"; // remember to make this relative in the end
+    std::filesystem::path relative_model_path("../models/go1.xml");
+    std::string model_path = std::filesystem::absolute(relative_model_path);
 
     mjVFS vfs;
     mj_defaultVFS(&vfs);
@@ -327,7 +329,7 @@ int main(void) {
     mujoco_go1_estimator.simpleKalmanFilterMujoco(mujoco_go1_state, lin_acc_meas);
 
     // Write header only once
-    std::string filename = "/home/memento/go1_cpp_cmake/data/go1_mujoco_data.csv"; // remember to make this relative in the end
+    std::string filename = "../data/go1_mujoco_data.csv";
     std::cout << "Writing data to: " << filename << std::endl;
     std::ofstream file(filename, std::ios::trunc);
     writeCSVHeader(file);
