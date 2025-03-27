@@ -57,10 +57,20 @@ add_executable(example_stand example/example_stand.cpp)
 target_link_libraries(example_stand ${EXTRA_LIBS})
 target_link_options(example_stand PRIVATE -no-pie)
 
+add_executable(example_position_relay example/example_position_relay.cpp)
+target_link_libraries(example_position_relay ${EXTRA_LIBS})
+target_link_options(example_position_relay PRIVATE -no-pie)
+
 
 # install
 install(TARGETS
-  example_position example_velocity example_torque example_walk example_joystick example_stand
+  example_position 
+  example_velocity 
+  example_torque 
+  example_walk 
+  example_joystick 
+  example_stand 
+  example_position_relay
   DESTINATION bin/unitree)
 install(DIRECTORY lib/cpp/${ARCH}/
   DESTINATION lib/unitree
