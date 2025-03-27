@@ -97,12 +97,21 @@ target_link_libraries(run_go1MujocoSim
     ${OPENGL_LIBRARIES}
 )
 
+add_executable(run_go1Stand src/runGo1StartupMujoco.cpp)
+target_link_libraries(run_go1Stand
+    go1_main_lib
+    glfw
+    ${GLEW_LIBRARIES}
+    ${OPENGL_LIBRARIES}
+)
+
 # Install libraries and executables
 install(TARGETS
     go1_main_lib
     run_go1Tests
     run_go1MujocoSim
     run_go1InertiaCalc
+    run_go1Stand
     DESTINATION lib/${PROJECT_NAME}
 )
 

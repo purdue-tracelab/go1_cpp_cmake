@@ -37,18 +37,17 @@ void Custom::UDPRecv()
 void Custom::RobotControl()
 {
   udp.GetRecv(state);
-  printf("%f  %f  %f\n", state.motorState[FR_0].q, state.motorState[FR_1].q, state.motorState[FR_2].q);
-  printf("%f  %f  %f\n", state.motorState[FL_0].q, state.motorState[FL_1].q, state.motorState[FL_2].q);
-  printf("%f  %f  %f\n", state.motorState[RR_0].q, state.motorState[RR_1].q, state.motorState[RR_2].q);
-  printf("%f  %f  %f\n", state.motorState[RL_0].q, state.motorState[RL_1].q, state.motorState[RL_2].q);
-  printf("%f  %f  %f\n", state.imu.accelerometer[0], state.imu.accelerometer[1], state.imu.accelerometer[2]);
-  printf("%f  %f  %f\n", state.imu.gyroscope[0], state.imu.gyroscope[1], state.imu.gyroscope[2]);
+  printf("FR_0: %f, FR_1: %f, FR_2: %f\n", state.motorState[FR_0].q, state.motorState[FR_1].q, state.motorState[FR_2].q);
+  printf("FL_0: %f, FL_1: %f, FL_2: %f\n", state.motorState[FL_0].q, state.motorState[FL_1].q, state.motorState[FL_2].q);
+  printf("RR_0: %f, RR_1: %f, RR_2: %f\n", state.motorState[RR_0].q, state.motorState[RR_1].q, state.motorState[RR_2].q);
+  printf("RL_0: %f, RL_1: %f, RL_2: %f\n", state.motorState[RL_0].q, state.motorState[RL_1].q, state.motorState[RL_2].q);
+  printf("ACC_X: %f, ACC_Y: %f, ACC_Z: %f\n", state.imu.accelerometer[0], state.imu.accelerometer[1], state.imu.accelerometer[2]);
+  printf("GYR_X: %f, GRY_Y: %f, GYR_Z: %f\n", state.imu.gyroscope[0], state.imu.gyroscope[1], state.imu.gyroscope[2]);
+  printf("FR_atm: %u, FL_atm: %u, RR_atm: %u, RL_atm: %u\n", state.footForce[0], state.footForce[1], state.footForce[2], state.footForce[3]);
 
   std::cout << "###############################################" << std::endl
             << "Output break afer one timestamp for all motors." << std::endl
             << "###############################################" << std::endl;
-
-  
 
 }
 

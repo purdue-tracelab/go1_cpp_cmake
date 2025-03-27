@@ -40,8 +40,8 @@ constexpr double FZ_MAX = 500.0;
 constexpr int FRIC_PYR = 6;
 constexpr int MPC_REF_DIM = 13 * MPC_HORIZON;
 constexpr int MPC_INPUT_DIM = 3 * NUM_LEG * MPC_HORIZON;
-constexpr double ALEPH = 1.0; //0.2;
-constexpr double BETTA = 1.0; //0.2;
+constexpr double ALEPH = 0.2; //1.0; //
+constexpr double BETTA = 0.2; //1.0; //
 
 ///////////////////////////////////////////////
 // Inertia sets (only use one set at a time) //

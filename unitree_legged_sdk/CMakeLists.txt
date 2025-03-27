@@ -61,7 +61,6 @@ add_executable(example_position_relay example/example_position_relay.cpp)
 target_link_libraries(example_position_relay ${EXTRA_LIBS})
 target_link_options(example_position_relay PRIVATE -no-pie)
 
-
 # install
 install(TARGETS
   example_position 
@@ -72,6 +71,7 @@ install(TARGETS
   example_stand 
   example_position_relay
   DESTINATION bin/unitree)
+  
 install(DIRECTORY lib/cpp/${ARCH}/
   DESTINATION lib/unitree
   USE_SOURCE_PERMISSIONS)
