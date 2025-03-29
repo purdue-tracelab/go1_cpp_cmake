@@ -105,6 +105,15 @@ target_link_libraries(run_go1Stand
     ${OPENGL_LIBRARIES}
 )
 
+# Add hardware control executables
+add_executable(run_go1HardwareControl src/runGo1HardwareControl.cpp)
+target_include_directories(run_go1HardwareControl PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/include")
+target_link_libraries(run_go1HardwareControl
+    go1_main_lib
+    "${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/lib/cpp/amd64/libunitree_legged_sdk.a"
+)
+target_link_options(run_go1HardwareControl PRIVATE -no-pie)
+
 # Install libraries and executables
 install(TARGETS
     go1_main_lib
@@ -112,6 +121,7 @@ install(TARGETS
     run_go1MujocoSim
     run_go1InertiaCalc
     run_go1Stand
+    run_go1HardwareControl
     DESTINATION lib/${PROJECT_NAME}
 )
 
