@@ -9,17 +9,16 @@
 
 using namespace UNITREE_LEGGED_SDK;
 
-class Custom
-{
+class Custom {
 public:
   Custom(uint8_t level) : safe(LeggedType::Go1),
                           udp(level, 8090, "192.168.123.10", 8007)
   {
     udp.InitCmdData(cmd);
   }
-  void UDPSend();
-  void UDPRecv();
-  void RobotControl();
+  void UDPSend(); // handle sending joint commands
+  void UDPRecv(); // handle state receive + estimation
+  void RobotControl(); // maybe split into two functions: go1UpdatePlan() and go1UpdateMPC(), requires hardware design of go1State
 
   Safety safe;
   UDP udp;
@@ -29,18 +28,19 @@ public:
   float dt = 0.002; // 0.001~0.01
 };
 
-void Custom::UDPRecv()
-{
+void Custom::UDPRecv() {
   udp.Recv();
+  // after receiving, send joint positions states and IMU data to state estimator (KF or EKF)
+  // then send estimations from filter to go1State object
+  // then use estimations to calculate hip pos and foot positions (if not calculated already)
+  // 
 }
 
-void Custom::UDPSend()
-{
+void Custom::UDPSend() {
   udp.Send();
 }
 
-void Custom::RobotControl()
-{
+void Custom::RobotControl() {
   motiontime++;
   udp.GetRecv(state);
   // gravity compensation
@@ -70,8 +70,7 @@ void Custom::RobotControl()
   udp.SetSend(cmd);
 }
 
-int main(void)
-{
+int main(void) {
   std::cout << "Communication level is set to LOW-level." << std::endl
             << "WARNING: Make sure the robot is hung up." << std::endl
             << "NOTE: The robot also needs to be set to LOW-level mode, otherwise it will make strange noises and this example will not run successfully! " << std::endl

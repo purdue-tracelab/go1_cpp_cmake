@@ -34,6 +34,8 @@ public:
   LowCmd cmd = {0};
   LowState state = {0};
   float dt = 0.002; // 0.001~0.01
+  std::vector<std::vector<std::string>> torqueMatrix; 
+  int rowCounter = 1;
 };
 
 void Custom::UDPRecv()
@@ -83,6 +85,23 @@ std::vector<std::vector<std::string>> torqueFile(std::string fileName) {
 void Custom::RobotControl()
 {
   udp.GetRecv(state);
+  std::vector<int> legIndices = {FR_0, FR_1, FR_2, FL_0, FL_1, FL_2, RR_0, RR_1, RR_2, RL_0, RL_1, RL_2}; // leg indices for easier access
+  try {
+    for(int j = 0; j < torqueMatrix[rowCounter].size(); j++) {
+      cmd.motorCmd[legIndices[j]].q = PosStopF;
+      cmd.motorCmd[legIndices[j]].dq = VelStopF;
+      cmd.motorCmd[legIndices[j]].Kp = 0;
+      cmd.motorCmd[legIndices[j]].Kd = 0;
+      cmd.motorCmd[legIndices[j]].tau = std::stof(torqueMatrix[rowCounter][j]);  // Convert string to float
+      // std::cout << std::stof(torqueMatrix[rowCounter][j]) << std::endl;
+
+    }
+  } catch (const std::invalid_argument& e) {
+    std::cerr << "Invalid argument: not a number." << std::endl;
+  } catch (const std::out_of_range& e) {
+    std::cerr << "Out of range error." << std::endl;
+  }
+  rowCounter++;
   udp.SetSend(cmd);
 }
 
@@ -94,29 +113,25 @@ int main(void)
             << "Press Enter to continue..." << std::endl;
   std::cin.ignore();
 
-//   Custom custom(LOWLEVEL);
+  Custom custom(LOWLEVEL);
 
-//   LoopFunc loop_control("control_loop", custom.dt, boost::bind(&Custom::RobotControl, &custom));
-//   LoopFunc loop_udpSend("udp_send", custom.dt, 3, boost::bind(&Custom::UDPSend, &custom));
-//   LoopFunc loop_udpRecv("udp_recv", custom.dt, 3, boost::bind(&Custom::UDPRecv, &custom));
+  // Read File and populate matrix
+  custom.torqueMatrix = torqueFile("../data/go1_mujoco_data.csv");
 
-//   loop_udpSend.start();
-//   loop_udpRecv.start();
-//   loop_control.start();
+  LoopFunc loop_control("control_loop", custom.dt, boost::bind(&Custom::RobotControl, &custom));
+  LoopFunc loop_udpSend("udp_send", custom.dt, 3, boost::bind(&Custom::UDPSend, &custom));
+  LoopFunc loop_udpRecv("udp_recv", custom.dt, 3, boost::bind(&Custom::UDPRecv, &custom));
 
-//   while (1)
-//   {
-//     sleep(10);
-//   };
+  loop_udpSend.start();
+  loop_udpRecv.start();
+  loop_control.start();
 
-    std::vector<std::vector<std::string>> matrix = torqueFile("../data/go1_mujoco_data.csv");
-    for(int i = 0; i < matrix.size(); i++) {
-        for(int j = 0; j < matrix[i].size(); j++) {
-            std::cout << matrix[i][j] << " ";
-        }
-        std::cout << std::endl;
-    }
-    std::cout << typeid(matrix[2][2]).name() << std::endl;
+  while (1)
+  {
+    sleep(10);
+  };
+
+
 
   return 0;
 }
