@@ -7,6 +7,9 @@
 #include <iostream>
 #include <unistd.h>
 
+// Package-specific header files
+#include "go1_cpp_cmake/go1StanceMPC.h"
+
 using namespace UNITREE_LEGGED_SDK;
 
 class Custom {
@@ -16,24 +19,22 @@ public:
   {
     udp.InitCmdData(cmd);
   }
-  void UDPSend(); // handle sending joint commands
-  void UDPRecv(); // handle state receive + estimation
-  void RobotControl(); // maybe split into two functions: go1UpdatePlan() and go1UpdateMPC(), requires hardware design of go1State
+  void UDPSend();
+  void UDPRecv();
+  void RobotControl(); // where all of our code will go, maybe split into swing PD and stance MPC for different loop rates
 
   Safety safe;
   UDP udp;
   LowCmd cmd = {0};
   LowState state = {0};
   int motiontime = 0;
-  float dt = 0.002; // 0.001~0.01
+  float dt = 0.002; // 0.001~0.
+  go1State hardware_go1_state;
+
 };
 
 void Custom::UDPRecv() {
   udp.Recv();
-  // after receiving, send joint positions states and IMU data to state estimator (KF or EKF)
-  // then send estimations from filter to go1State object
-  // then use estimations to calculate hip pos and foot positions (if not calculated already)
-  // 
 }
 
 void Custom::UDPSend() {
@@ -43,29 +44,36 @@ void Custom::UDPSend() {
 void Custom::RobotControl() {
   motiontime++;
   udp.GetRecv(state);
-  // gravity compensation
-  cmd.motorCmd[FR_0].tau = -0.65f;
-  cmd.motorCmd[FL_0].tau = +0.65f;
-  cmd.motorCmd[RR_0].tau = -0.65f;
-  cmd.motorCmd[RL_0].tau = +0.65f;
 
-  if (motiontime >= 500)
-  {
-    float torque = (0 - state.motorState[FR_1].q) * 10.0f + (0 - state.motorState[FR_1].dq) * 1.0f;
-    if (torque > 5.0f)
-      torque = 5.0f;
-    if (torque < -5.0f)
-      torque = -5.0f;
+  if (hardware_go1_state.walking_mode) {
+    //get the desired state of the robot for x
+    //run with velocity and time
+    hardware_go1_state.root_lin_vel_d << 0.2, 0, 0;
+    hardware_go1_state.root_pos_d << hardware_go1_state.root_pos.x() + hardware_go1_state.root_lin_vel_d.x() * (SWING_PHASE_MAX + 1) * DT_CTRL, 0, WALK_HEIGHT;
+    
+    //get desired state of the robot for y
+    //run with velocity and time
+    //hardware_go1_state.root_lin_vel_d << 0, 0.1, 0;
+    //hardware_go1_state.root_pos_d << hardware_go1_state.root_pos.y() + hardware_go1_state.root_lin_vel_d.y() * (SWING_PHASE_MAX + 1) * DT_CTRL, 0, WALK_HEIGHT;
 
-    cmd.motorCmd[FR_1].q = PosStopF;
-    cmd.motorCmd[FR_1].dq = VelStopF;
-    cmd.motorCmd[FR_1].Kp = 0;
-    cmd.motorCmd[FR_1].Kd = 0;
-    cmd.motorCmd[FR_1].tau = torque;
+
+    //get the desired state of the robot for xy
+    //run with velocity and time
+ 
+  } else {
+    //stand. **Add this**
   }
-  int res = safe.PowerProtect(cmd, state, 1);
-  if (res < 0)
-    exit(-1);
+
+  //move to position for x, y, or xy
+
+  //get the joint position
+
+  //update go1 state
+
+  //update mpc controller
+
+  //convert foot forces to torques
+
 
   udp.SetSend(cmd);
 }

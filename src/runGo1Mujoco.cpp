@@ -347,9 +347,10 @@ int main(void) {
     while (running && !glfwWindowShouldClose(window)) {
         std::cout << "Simulation time: " << data->time << std::endl;
 
-        // // Desired states (walk in x-direction)
-        // mujoco_go1_state.root_lin_vel_d << 0.5, 0, 0;
-        // mujoco_go1_state.root_pos_d << 0.5*data->time, 0, WALK_HEIGHT;
+        // Desired states (walk in x-direction)
+        mujoco_go1_state.root_lin_vel_d << 0.2, 0, 0;
+        // mujoco_go1_state.root_pos_d << mujoco_go1_state.root_pos.x() + mujoco_go1_state.root_lin_vel_d.x() * (SWING_PHASE_MAX + 1) * DT_CTRL, 0, WALK_HEIGHT;
+        mujoco_go1_state.root_pos_d << 0.2*data->time/((SWING_PHASE_MAX + 1)*DT_CTRL), 0, WALK_HEIGHT;
 
         // // Desired states (walk in y-direction)
         // mujoco_go1_state.root_lin_vel_d << 0, 0.1, 0;

@@ -40,30 +40,30 @@ constexpr double FZ_MAX = 500.0;
 constexpr int FRIC_PYR = 6;
 constexpr int MPC_REF_DIM = 13 * MPC_HORIZON;
 constexpr int MPC_INPUT_DIM = 3 * NUM_LEG * MPC_HORIZON;
-constexpr double ALEPH = 0.1; //1.0; //
-constexpr double BETTA = 0.1; //1.0; //
+constexpr double ALEPH = 0.1; // ranges from 0 to 1, 0.1 is slow, 0.8 is fast (use slow for standing)
+constexpr double BETTA = 0.1; // ranges from 0 to 1, 0.1 is slow, 0.8 is fast (use slow for standing)
 
 ///////////////////////////////////////////////
 // Inertia sets (only use one set at a time) //
 ///////////////////////////////////////////////
 
-// MuJoCo go1.xml model w/o calf
-constexpr double ROBOT_MASS = 12.743448;
-constexpr double GO1_LUMPED_INERTIA_XX = 0.0718165;
-constexpr double GO1_LUMPED_INERTIA_XY = 0.0009962;
-constexpr double GO1_LUMPED_INERTIA_XZ = 0.0089032;
-constexpr double GO1_LUMPED_INERTIA_YY = 0.329118;
-constexpr double GO1_LUMPED_INERTIA_YZ = -0.000753;
-constexpr double GO1_LUMPED_INERTIA_ZZ = 0.372901;
+// // MuJoCo go1.xml model w/o calf
+// constexpr double ROBOT_MASS = 12.743448;
+// constexpr double GO1_LUMPED_INERTIA_XX = 0.0718165;
+// constexpr double GO1_LUMPED_INERTIA_XY = 0.0009962;
+// constexpr double GO1_LUMPED_INERTIA_XZ = 0.0089032;
+// constexpr double GO1_LUMPED_INERTIA_YY = 0.329118;
+// constexpr double GO1_LUMPED_INERTIA_YZ = -0.000753;
+// constexpr double GO1_LUMPED_INERTIA_ZZ = 0.372901;
 
-// // MATLAB
-// constexpr double ROBOT_MASS = 11.8;
-// constexpr double GO1_LUMPED_INERTIA_XX = 0.1192;
-// constexpr double GO1_LUMPED_INERTIA_XY = 0.0007;
-// constexpr double GO1_LUMPED_INERTIA_XZ = -0.0008;
-// constexpr double GO1_LUMPED_INERTIA_YY = 0.3328;
-// constexpr double GO1_LUMPED_INERTIA_YZ = 0.0154;
-// constexpr double GO1_LUMPED_INERTIA_ZZ = 0.3820;
+// MATLAB
+constexpr double ROBOT_MASS = 11.8;
+constexpr double GO1_LUMPED_INERTIA_XX = 0.1192;
+constexpr double GO1_LUMPED_INERTIA_XY = 0.0007;
+constexpr double GO1_LUMPED_INERTIA_XZ = -0.0008;
+constexpr double GO1_LUMPED_INERTIA_YY = 0.3328;
+constexpr double GO1_LUMPED_INERTIA_YZ = 0.0154;
+constexpr double GO1_LUMPED_INERTIA_ZZ = 0.3820;
 
 // // MATLAB w/o calf links
 // constexpr double ROBOT_MASS = 11.8;
@@ -97,12 +97,12 @@ constexpr double GO1_LUMPED_INERTIA_ZZ = 0.372901;
 /////////////////////
 
 // // Experimental
-// constexpr double q_weight_1 = 1000;
-// constexpr double q_weight_2 = 1000;
-// constexpr double q_weight_3 = 1000;
+// constexpr double q_weight_1 = 8000;
+// constexpr double q_weight_2 = 8000;
+// constexpr double q_weight_3 = 500;
 // constexpr double q_weight_4 = 1000;
 // constexpr double q_weight_5 = 1000;
-// constexpr double q_weight_6 = 500;
+// constexpr double q_weight_6 = 1000;
 // constexpr double q_weight_7 = 0.1;
 // constexpr double q_weight_8 = 0.1;
 // constexpr double q_weight_9 = 1;
@@ -113,7 +113,7 @@ constexpr double GO1_LUMPED_INERTIA_ZZ = 0.372901;
 
 // current default
 constexpr double q_weight_1 = 500;
-constexpr double q_weight_2 = 8000;
+constexpr double q_weight_2 = 500;
 constexpr double q_weight_3 = 500;
 constexpr double q_weight_4 = 1000;
 constexpr double q_weight_5 = 1000;
