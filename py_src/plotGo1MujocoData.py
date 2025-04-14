@@ -4,8 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 # from mpl_toolkits.mplot3d import Axes3D
 
-def plot_state_data(csv_file):
-
+def plot_state_data(csv_file, absolute=False):
     # Load data
     df = pd.read_csv(csv_file)
     data_length = len(df)
@@ -24,9 +23,11 @@ def plot_state_data(csv_file):
     root_lin_vel_est = df[['root_lin_vel_est_x', 'root_lin_vel_est_y', 'root_lin_vel_est_z']].values
 
     root_lin_acc_est = df[['root_lin_acc_est_x', 'root_lin_acc_est_y', 'root_lin_acc_est_z']].values
+    root_lin_acc_meas = df[['root_lin_acc_meas_x', 'root_lin_acc_meas_y', 'root_lin_acc_meas_z']].values
 
     root_ang_vel = df[['root_ang_vel_x', 'root_ang_vel_y', 'root_ang_vel_z']].values
     root_ang_vel_d = df[['root_ang_vel_d_x', 'root_ang_vel_d_y', 'root_ang_vel_d_z']].values
+    root_ang_vel_meas = df[['root_ang_vel_meas_x', 'root_ang_vel_meas_y', 'root_ang_vel_meas_z']].values
 
     foot_pos_FR = df[['foot_pos_FR_x', 'foot_pos_FR_y', 'foot_pos_FR_z']].values
     foot_pos_FL = df[['foot_pos_FL_x', 'foot_pos_FL_y', 'foot_pos_FL_z']].values
@@ -81,7 +82,7 @@ def plot_state_data(csv_file):
     plt.subplot(3, 2, 1)
     plt.plot(time, root_pos[:, 0], label="Actual x pos", color='r')
     plt.plot(time, root_pos_d[:, 0], label="Desired x pos", color='b')
-    # plt.plot(time, root_pos_est[:, 0], label="Estimated x pos", color='g')
+    plt.plot(time, root_pos_est[:, 0], label="Estimated x pos", color='g')
     plt.title("Root position x")
     plt.xlabel("Time (s)")
     plt.ylabel("X position (m)")
@@ -90,7 +91,7 @@ def plot_state_data(csv_file):
     plt.subplot(3, 2, 2)
     plt.plot(time, root_pos[:, 1], label="Actual y pos", color='r')
     plt.plot(time, root_pos_d[:, 1], label="Desired y pos", color='b')
-    # plt.plot(time, root_pos_est[:, 1], label="Estimated y pos", color='g')
+    plt.plot(time, root_pos_est[:, 1], label="Estimated y pos", color='g')
     plt.title("Root position y")
     plt.xlabel("Time (s)")
     plt.ylabel("Y position (m)")
@@ -99,7 +100,7 @@ def plot_state_data(csv_file):
     plt.subplot(3, 2, 3)
     plt.plot(time, root_pos[:, 2], label="Actual z pos", color='r')
     plt.plot(time, root_pos_d[:, 2], label="Desired z pos", color='b')
-    # plt.plot(time, root_pos_est[:, 2], label="Estimated z pos", color='g')
+    plt.plot(time, root_pos_est[:, 2], label="Estimated z pos", color='g')
     plt.title("Root position z")
     plt.xlabel("Time (s)")
     plt.ylabel("Z position (m)")
@@ -144,7 +145,7 @@ def plot_state_data(csv_file):
     plt.subplot(3, 2, 1)
     plt.plot(time, root_lin_vel[:, 0], label="Actual x vel", color='r')
     plt.plot(time, root_lin_vel_d[:, 0], label="Desired x vel", color='b')
-    # plt.plot(time, root_lin_vel_est[:, 0], label="Estimated x vel", color='g')
+    plt.plot(time, root_lin_vel_est[:, 0], label="Estimated x vel", color='g')
     plt.title("Root linear velocity x")
     plt.xlabel("Time (s)")
     plt.ylabel("X linear velocity (m/s)")
@@ -153,7 +154,7 @@ def plot_state_data(csv_file):
     plt.subplot(3, 2, 2)
     plt.plot(time, root_lin_vel[:, 1], label="Actual y vel", color='r')
     plt.plot(time, root_lin_vel_d[:, 1], label="Desired y vel", color='b')
-    # plt.plot(time, root_lin_vel_est[:, 1], label="Estimated y vel", color='g')
+    plt.plot(time, root_lin_vel_est[:, 1], label="Estimated y vel", color='g')
     plt.title("Root linear velocity y")
     plt.xlabel("Time (s)")
     plt.ylabel("Y linear velocity (m/s)")
@@ -162,7 +163,7 @@ def plot_state_data(csv_file):
     plt.subplot(3, 2, 3)
     plt.plot(time, root_lin_vel[:, 2], label="Actual z vel", color='r')
     plt.plot(time, root_lin_vel_d[:, 2], label="Desired z vel", color='b')
-    # plt.plot(time, root_lin_vel_est[:, 2], label="Estimated z vel", color='g')
+    plt.plot(time, root_lin_vel_est[:, 2], label="Estimated z vel", color='g')
     plt.title("Root linear velocity z")
     plt.xlabel("Time (s)")
     plt.ylabel("Z linear velocity (m/s)")
@@ -171,6 +172,7 @@ def plot_state_data(csv_file):
     plt.subplot(3, 2, 4)
     plt.plot(time, root_ang_vel[:, 0], label="Actual roll rate", color='r')
     plt.plot(time, root_ang_vel_d[:, 0], label="Desired roll rate", color='b')
+    plt.plot(time, root_ang_vel_meas[:, 0], label="Estimated roll rate", color='g')
     plt.title("Root angular velocity x")
     plt.xlabel("Time (s)")
     plt.ylabel("X angular velocity (rad/s)")
@@ -179,6 +181,7 @@ def plot_state_data(csv_file):
     plt.subplot(3, 2, 5)
     plt.plot(time, root_ang_vel[:, 1], label="Actual pitch rate", color='r')
     plt.plot(time, root_ang_vel_d[:, 1], label="Desired pitch rate", color='b')
+    plt.plot(time, root_ang_vel_meas[:, 1], label="Estimated pitch rate", color='g')
     plt.title("Root angular velocity y")
     plt.xlabel("Time (s)")
     plt.ylabel("Y angular velocity (rad/s)")
@@ -187,6 +190,7 @@ def plot_state_data(csv_file):
     plt.subplot(3, 2, 6)
     plt.plot(time, root_ang_vel[:, 2], label="Actual yaw rate", color='r')
     plt.plot(time, root_ang_vel_d[:, 2], label="Desired yaw rate", color='b')
+    plt.plot(time, root_ang_vel_meas[:, 2], label="Estimated yaw rate", color='g')
     plt.title("Root angular velocity z")
     plt.xlabel("Time (s)")
     plt.ylabel("Z angular velocity (rad/s)")
@@ -310,97 +314,145 @@ def plot_state_data(csv_file):
     foot_pos_plot = plt.figure(5, figsize=(16, 9))
 
     plt.subplot(4, 3, 1)
-    plt.plot(time, foot_pos_abs_FR[:, 0], label="Actual FR pos x", color='r')
+    if absolute:
+        plt.plot(time, foot_pos_abs_FR[:, 0], label="Actual FR pos x", color='r')
+        plt.title("FR foot x pos (abs frame)")
+    else:
+        plt.plot(time, foot_pos_FR[:, 0], label="Actual FR pos x", color='r')
+        plt.title("FR foot x pos (rel frame)")
     plt.plot(time, foot_pos_d_FR[:, 0], label="Desired FR pos x", color='b')
-    plt.title("FR foot x pos (abs frame)")
     plt.xlabel("Time (s)")
     plt.ylabel("Foot pos x (m)")
     plt.legend()
 
     plt.subplot(4, 3, 2)
-    plt.plot(time, foot_pos_abs_FR[:, 1], label="Actual FR pos y", color='r')
+    if absolute:
+        plt.plot(time, foot_pos_abs_FR[:, 1], label="Actual FR pos y", color='r')
+        plt.title("FR foot y pos (abs frame)")
+    else:
+        plt.plot(time, foot_pos_FR[:, 1], label="Actual FR pos y", color='r')
+        plt.title("FR foot y pos (rel frame)")
     plt.plot(time, foot_pos_d_FR[:, 1], label="Desired FR pos y", color='b')
-    plt.title("FR foot y pos (abs frame)")
     plt.xlabel("Time (s)")
     plt.ylabel("Foot pos y (m)")
     plt.legend()
 
     plt.subplot(4, 3, 3)
-    plt.plot(time, foot_pos_abs_FR[:, 2], label="Actual FR pos z", color='r')
+    if absolute:
+        plt.plot(time, foot_pos_abs_FR[:, 2], label="Actual FR pos z", color='r')
+        plt.title("FR foot z pos (abs frame)")
+    else:
+        plt.plot(time, foot_pos_FR[:, 2], label="Actual FR pos z", color='r')
+        plt.title("FR foot z pos (rel frame)")
     plt.plot(time, foot_pos_d_FR[:, 2], label="Desired FR pos z", color='b')
-    plt.title("FR foot z pos (abs frame)")
     plt.xlabel("Time (s)")
     plt.ylabel("Foot pos z (m)")
     plt.legend()
 
     plt.subplot(4, 3, 4)
-    plt.plot(time, foot_pos_abs_FL[:, 0], label="Actual FL pos x", color='r')
+    if absolute:
+        plt.plot(time, foot_pos_abs_FL[:, 0], label="Actual FL pos x", color='r')
+        plt.title("FL foot x pos (abs frame)")
+    else:
+        plt.plot(time, foot_pos_FL[:, 0], label="Actual FL pos x", color='r')
+        plt.title("FL foot x pos (rel frame)")
     plt.plot(time, foot_pos_d_FL[:, 0], label="Desired FR pos x", color='b')
-    plt.title("FL foot x pos (abs frame)")
     plt.xlabel("Time (s)")
     plt.ylabel("Foot pos x (m)")
     plt.legend()
 
     plt.subplot(4, 3, 5)
-    plt.plot(time, foot_pos_abs_FL[:, 1], label="Actual FL pos y", color='r')
+    if absolute:
+        plt.plot(time, foot_pos_abs_FL[:, 1], label="Actual FL pos y", color='r')
+        plt.title("FL foot y pos (abs frame)")
+    else:
+        plt.plot(time, foot_pos_FL[:, 1], label="Actual FL pos y", color='r')
+        plt.title("FL foot y pos (rel frame)")
     plt.plot(time, foot_pos_d_FL[:, 1], label="Desired FL pos y", color='b')
-    plt.title("FL foot y pos (abs frame)")
     plt.xlabel("Time (s)")
     plt.ylabel("Foot pos y (m)")
     plt.legend()
 
     plt.subplot(4, 3, 6)
-    plt.plot(time, foot_pos_abs_FL[:, 2], label="Actual FL pos z", color='r')
+    if absolute:
+        plt.plot(time, foot_pos_abs_FL[:, 2], label="Actual FL pos z", color='r')
+        plt.title("FL foot z pos (abs frame)")
+    else:
+        plt.plot(time, foot_pos_FL[:, 2], label="Actual FL pos z", color='r')
+        plt.title("FL foot z pos (rel frame)")
     plt.plot(time, foot_pos_d_FL[:, 2], label="Desired FL pos z", color='b')
-    plt.title("FL foot z pos (abs frame)")
     plt.xlabel("Time (s)")
     plt.ylabel("Foot pos z (m)")
     plt.legend()
 
     plt.subplot(4, 3, 7)
-    plt.plot(time, foot_pos_abs_RR[:, 0], label="Actual RR pos x", color='r')
+    if absolute:
+        plt.plot(time, foot_pos_abs_RR[:, 0], label="Actual RR pos x", color='r')
+        plt.title("RR foot x pos (abs frame)")
+    else:
+        plt.plot(time, foot_pos_RR[:, 0], label="Actual RR pos x", color='r')
+        plt.title("RR foot x pos (rel frame)")
     plt.plot(time, foot_pos_d_RR[:, 0], label="Desired RR pos x", color='b')
-    plt.title("RR foot x pos (abs frame)")
     plt.xlabel("Time (s)")
     plt.ylabel("Foot pos x (m)")
     plt.legend()
 
     plt.subplot(4, 3, 8)
-    plt.plot(time, foot_pos_abs_RR[:, 1], label="Actual RR pos y", color='r')
+    if absolute:
+        plt.plot(time, foot_pos_abs_RR[:, 1], label="Actual RR pos y", color='r')
+        plt.title("RR foot y pos (abs frame)")
+    else:
+        plt.plot(time, foot_pos_RR[:, 1], label="Actual RR pos y", color='r')
+        plt.title("RR foot y pos (rel frame)")
     plt.plot(time, foot_pos_d_RR[:, 1], label="Desired RR pos y", color='b')
-    plt.title("RR foot y pos (abs frame)")
     plt.xlabel("Time (s)")
     plt.ylabel("Foot pos y (m)")
     plt.legend()
 
     plt.subplot(4, 3, 9)
-    plt.plot(time, foot_pos_abs_RR[:, 2], label="Actual RR pos z", color='r')
+    if absolute:
+        plt.plot(time, foot_pos_abs_RR[:, 2], label="Actual RR pos z", color='r')
+        plt.title("RR foot z pos (abs frame)")
+    else:
+        plt.plot(time, foot_pos_RR[:, 2], label="Actual RR pos z", color='r')
+        plt.title("RR foot z pos (rel frame)")
     plt.plot(time, foot_pos_d_RR[:, 2], label="Desired RR pos z", color='b')
-    plt.title("RR foot z pos (abs frame)")
     plt.xlabel("Time (s)")
     plt.ylabel("Foot pos z (m)")
     plt.legend()
 
     plt.subplot(4, 3, 10)
-    plt.plot(time, foot_pos_abs_RL[:, 0], label="Actual RL pos x", color='r')
+    if absolute:
+        plt.plot(time, foot_pos_abs_RL[:, 0], label="Actual RL pos x", color='r')
+        plt.title("RL foot x pos (abs frame)")
+    else:
+        plt.plot(time, foot_pos_RL[:, 0], label="Actual RL pos x", color='r')
+        plt.title("RL foot x pos (rel frame)")
     plt.plot(time, foot_pos_d_RL[:, 0], label="Desired RL pos x", color='b')
-    plt.title("RL foot x pos (abs frame)")
     plt.xlabel("Time (s)")
     plt.ylabel("Foot pos x (m)")
     plt.legend()
 
     plt.subplot(4, 3, 11)
-    plt.plot(time, foot_pos_abs_RL[:, 1], label="Actual RL pos y", color='r')
+    if absolute:
+        plt.plot(time, foot_pos_abs_RL[:, 1], label="Actual RL pos y", color='r')
+        plt.title("RL foot y pos (abs frame)")
+    else:
+        plt.plot(time, foot_pos_RL[:, 1], label="Actual RL pos y", color='r')
+        plt.title("RL foot y pos (rel frame)")
     plt.plot(time, foot_pos_d_RL[:, 1], label="Desired RL pos y", color='b')
-    plt.title("RL foot y pos (abs frame)")
     plt.xlabel("Time (s)")
     plt.ylabel("Foot pos y (m)")
     plt.legend()
 
     plt.subplot(4, 3, 12)
-    plt.plot(time, foot_pos_abs_RL[:, 2], label="Actual RL pos z", color='r')
+    if absolute:
+        plt.plot(time, foot_pos_abs_RL[:, 2], label="Actual RL pos z", color='r')
+        plt.title("RL foot z pos (abs frame)")
+    else:
+        plt.plot(time, foot_pos_RL[:, 2], label="Actual RL pos z", color='r')
+        plt.title("RL foot z pos (rel frame)")
     plt.plot(time, foot_pos_d_RL[:, 2], label="Desired RL pos z", color='b')
-    plt.title("RL foot z pos (abs frame)")
     plt.xlabel("Time (s)")
     plt.ylabel("Foot pos z (m)")
     plt.legend()

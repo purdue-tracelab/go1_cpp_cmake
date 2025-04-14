@@ -39,7 +39,7 @@ int go1TestFunctions::testZeroPosErrorGRF() {
     std::memcpy(tester_joint_velocities, temp_joint_velocities, sizeof(temp_joint_velocities));
     Eigen::Vector3d tester_lin_acc (0.0, 0.0, -9.81);
 
-    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc, true);
+    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc);
     tester_state.root_pos_d << 0, 0, 0.27;
 
     int subtestsPassed = 0;
@@ -69,7 +69,7 @@ int go1TestFunctions::testZeroPosErrorGRF() {
 
     std::cout << "\nMATLAB GRF:\n" << matlabForces << std::endl;
 
-    tester_state.convertForcesToTorques(tester_joint_angles);
+    tester_state.convertForcesToTorquesMujoco(tester_joint_angles);
 
     std::cout << "\nC++ torques:\n" << tester_state.joint_torques << std::endl;
 
@@ -105,7 +105,7 @@ int go1TestFunctions::testZeroPosErrorGRF() {
     std::cout << "\n-- Subtest 2: No feet on ground --" << std::endl;
 
     tester_state.resetState();
-    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc, true);
+    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc);
     tester_state.root_pos_d << 0, 0, 0.335;
 
     for (int i = 0; i < NUM_LEG; ++i) {
@@ -132,7 +132,7 @@ int go1TestFunctions::testZeroPosErrorGRF() {
 
     std::cout << "\nMATLAB GRF:\n" << matlabForces << std::endl;
 
-    tester_state.convertForcesToTorques(tester_joint_angles);
+    tester_state.convertForcesToTorquesMujoco(tester_joint_angles);
 
     std::cout << "\nC++ torques:\n" << tester_state.joint_torques << std::endl;
 
@@ -168,7 +168,7 @@ int go1TestFunctions::testZeroPosErrorGRF() {
     std::cout << "\n-- Subtest 3: FL + RR --" << std::endl;
 
     tester_state.resetState();
-    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc, true);
+    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc);
     tester_state.root_pos_d << 0, 0, 0.335;
 
     tester_state.contacts[0] = false;
@@ -194,7 +194,7 @@ int go1TestFunctions::testZeroPosErrorGRF() {
 
     std::cout << "\nMATLAB GRF:\n" << matlabForces << std::endl;
 
-    tester_state.convertForcesToTorques(tester_joint_angles);
+    tester_state.convertForcesToTorquesMujoco(tester_joint_angles);
 
     std::cout << "\nC++ torques:\n" << tester_state.joint_torques << std::endl;
 
@@ -230,7 +230,7 @@ int go1TestFunctions::testZeroPosErrorGRF() {
     std::cout << "\n-- Subtest 4: FR + RL --" << std::endl;
 
     tester_state.resetState();
-    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc, true);
+    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc);
     tester_state.root_pos_d << 0, 0, 0.335;
 
     tester_state.contacts[1] = false;
@@ -256,7 +256,7 @@ int go1TestFunctions::testZeroPosErrorGRF() {
 
     std::cout << "\nMATLAB GRF:\n" << matlabForces << std::endl;
 
-    tester_state.convertForcesToTorques(tester_joint_angles);
+    tester_state.convertForcesToTorquesMujoco(tester_joint_angles);
 
     std::cout << "\nC++ torques:\n" << tester_state.joint_torques << std::endl;
 
@@ -317,7 +317,7 @@ int go1TestFunctions::testNonzeroPosErrorGRF() {
     std::memcpy(tester_joint_velocities, temp_joint_velocities, sizeof(temp_joint_velocities));
     Eigen::Vector3d tester_lin_acc (0.0, 0.0, -9.81);
 
-    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc, true);
+    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc);
     tester_state.root_pos_d = temp_desired_pos;
 
     int subtestsPassed = 0;
@@ -348,7 +348,7 @@ int go1TestFunctions::testNonzeroPosErrorGRF() {
 
     std::cout << "\nMATLAB GRF:\n" << matlabForces << std::endl;
 
-    tester_state.convertForcesToTorques(tester_joint_angles);
+    tester_state.convertForcesToTorquesMujoco(tester_joint_angles);
 
     std::cout << "\nC++ torques:\n" << tester_state.joint_torques << std::endl;
 
@@ -384,7 +384,7 @@ int go1TestFunctions::testNonzeroPosErrorGRF() {
     std::cout << "\n-- Subtest 2: No feet on ground --" << std::endl;
 
     tester_state.resetState();
-    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc, true);
+    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc);
     tester_state.root_pos_d = temp_desired_pos;
 
     for (int i = 0; i < NUM_LEG; ++i) {
@@ -411,7 +411,7 @@ int go1TestFunctions::testNonzeroPosErrorGRF() {
 
     std::cout << "\nMATLAB GRF:\n" << matlabForces << std::endl;
 
-    tester_state.convertForcesToTorques(tester_joint_angles);
+    tester_state.convertForcesToTorquesMujoco(tester_joint_angles);
 
     std::cout << "\nC++ torques:\n" << tester_state.joint_torques << std::endl;
 
@@ -447,7 +447,7 @@ int go1TestFunctions::testNonzeroPosErrorGRF() {
     std::cout << "\n-- Subtest 3: FL + RR --" << std::endl;
 
     tester_state.resetState();
-    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc, true);
+    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc);
     tester_state.root_pos_d = temp_desired_pos;
 
     tester_state.contacts[0] = false;
@@ -473,7 +473,7 @@ int go1TestFunctions::testNonzeroPosErrorGRF() {
 
     std::cout << "\nMATLAB GRF:\n" << matlabForces << std::endl;
 
-    tester_state.convertForcesToTorques(tester_joint_angles);
+    tester_state.convertForcesToTorquesMujoco(tester_joint_angles);
 
     std::cout << "\nC++ torques:\n" << tester_state.joint_torques << std::endl;
 
@@ -509,7 +509,7 @@ int go1TestFunctions::testNonzeroPosErrorGRF() {
     std::cout << "\n-- Subtest 4: FR + RL --" << std::endl;
 
     tester_state.resetState();
-    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc, true);
+    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc);
     tester_state.root_pos_d = temp_desired_pos;
 
     tester_state.contacts[1] = false;
@@ -535,7 +535,7 @@ int go1TestFunctions::testNonzeroPosErrorGRF() {
 
     std::cout << "\nMATLAB GRF:\n" << matlabForces << std::endl;
 
-    tester_state.convertForcesToTorques(tester_joint_angles);
+    tester_state.convertForcesToTorquesMujoco(tester_joint_angles);
 
     std::cout << "\nC++ torques:\n" << tester_state.joint_torques << std::endl;
 
@@ -586,6 +586,7 @@ int go1TestFunctions::testZeroPosErrorWalk() {
     // initialize current tester state
     tester_state.resetState();
     tester_state.walking_mode = true;
+    go1MPC tester_go1_stance_proctor;
 
     mjtNum temp_joint_angles[19] = {0.0, 0.0, 0.27, 1.0, 0.0, 0.0, 0.0, 0.0, 0.9, -1.8, 0.0, 0.9, -1.8, 0.0, 0.9, -1.8, 0.0, 0.9, -1.8};
     mjtNum temp_joint_velocities[18] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
@@ -602,18 +603,19 @@ int go1TestFunctions::testZeroPosErrorWalk() {
     std::cout << "###################################################################" << std::endl;
     std::cout << "-- Subtest 1: FR + RL stance, FL + RR swing --" << std::endl;
 
-    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc, true);
-
-    // // grfMPC class method (retired until further notice)
-    // mpc_proctor.reset();
-    // mpc_proctor.calculateA(tester_state.root_rpy);
-    // mpc_proctor.calculateB(tester_state.go1_lumped_inertia, tester_state.root_rpy, tester_state.foot_pos);
-    // mpc_proctor.calculateMPCStates(tester_state);
-    // mpc_proctor.calculateQPMats(tester_state);
-    // mpc_proctor.solveMPC(tester_state);
+    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc);
 
     // single-run script method
-    go1StanceMPC(tester_state);
+    // go1StanceMPC(tester_state);
+    // tester_go1_stance_proctor.updateRigidBodyModel(tester_state.root_rpy, tester_state.go1_lumped_inertia, tester_state.foot_pos);
+    // tester_go1_stance_proctor.updateMPCStates(tester_state.root_pos, tester_state.root_pos_d,
+    //                                         tester_state.root_rpy, tester_state.root_rpy_d,
+    //                                         tester_state.root_lin_vel, tester_state.root_lin_vel_d,
+    //                                         tester_state.root_ang_vel, tester_state.root_ang_vel_d);
+    // tester_state.foot_forces_grf = tester_go1_stance_proctor.solveMPCForces(tester_state.swing_phase, tester_state.swing_phase);
+    tester_go1_stance_proctor.updateRigidBodyModel(tester_state);
+    tester_go1_stance_proctor.updateMPCStates(tester_state);
+    tester_go1_stance_proctor.solveMPCForces(tester_state);
 
     std::cout << "\nC++ GRF:\n" << tester_state.foot_forces_grf << std::endl;
     std::cout << "\nC++ swing forces:\n" << tester_state.foot_forces_swing << std::endl;
@@ -625,7 +627,7 @@ int go1TestFunctions::testZeroPosErrorWalk() {
 
     std::cout << "\nMATLAB forces:\n" << matlabForces << std::endl;
 
-    tester_state.convertForcesToTorques(tester_joint_angles);
+    tester_state.convertForcesToTorquesMujoco(tester_joint_angles);
 
     std::cout << "\nC++ torques:\n" << tester_state.joint_torques << std::endl;
 
@@ -663,21 +665,22 @@ int go1TestFunctions::testZeroPosErrorWalk() {
     tester_state.resetState();
     tester_state.walking_mode = true;
     tester_state.swing_phase = SWING_PHASE_MAX/2 + 1;
-    tester_state.root_pos_d << 0, 0, 0.32;
+    tester_state.root_pos_d << 0, 0, 0.27;
+    go1MPC tester_go1_stance_proctor2;
 
-    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc, true);
-
-    // // grfMPC class method (retired until further notice)
-    // mpc_proctor.reset();
-    // mpc_proctor.calculateA(tester_state.root_rpy);
-    // mpc_proctor.calculateB(tester_state.go1_lumped_inertia, tester_state.root_rpy, tester_state.foot_pos);
-    // mpc_proctor.calculateMPCStates(tester_state);
-    // mpc_proctor.calculateQPMats(tester_state);
-    // mpc_proctor.solveMPC(tester_state);
+    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc);
 
     // single-run script method
-    go1StanceMPC(tester_state);
-
+    // go1StanceMPC(tester_state);
+    // tester_go1_stance_proctor.updateRigidBodyModel(tester_state.root_rpy, tester_state.go1_lumped_inertia, tester_state.foot_pos);
+    // tester_go1_stance_proctor.updateMPCStates(tester_state.root_pos, tester_state.root_pos_d,
+    //                                         tester_state.root_rpy, tester_state.root_rpy_d,
+    //                                         tester_state.root_lin_vel, tester_state.root_lin_vel_d,
+    //                                         tester_state.root_ang_vel, tester_state.root_ang_vel_d);
+    // tester_state.foot_forces_grf = tester_go1_stance_proctor.solveMPCForces(tester_state.swing_phase, tester_state.swing_phase);
+    tester_go1_stance_proctor.updateRigidBodyModel(tester_state);
+    tester_go1_stance_proctor.updateMPCStates(tester_state);
+    tester_go1_stance_proctor.solveMPCForces(tester_state);
     std::cout << "\nC++ GRF:\n" << tester_state.foot_forces_grf << std::endl;
     std::cout << "\nC++ swing forces:\n" << tester_state.foot_forces_swing << std::endl;
 
@@ -688,7 +691,7 @@ int go1TestFunctions::testZeroPosErrorWalk() {
 
     std::cout << "\nMATLAB forces:\n" << matlabForces << std::endl;
 
-    tester_state.convertForcesToTorques(tester_joint_angles);
+    tester_state.convertForcesToTorquesMujoco(tester_joint_angles);
 
     std::cout << "\nC++ torques:\n" << tester_state.joint_torques << std::endl;
 
@@ -923,4 +926,29 @@ int go1TestFunctions::testConvertForcesToTorques() {
 
 int go1TestFunctions::testUpdateStateFromMujoco() {
     return 0;
+}
+
+int go1TestFunctions::testNumericJacobian() {
+    auto start = std::chrono::high_resolution_clock::now();
+
+    Eigen::VectorXd x(22);
+    x.setZero();
+    Eigen::Vector3d f_meas(0, 0, 9.8);
+    Eigen::Vector3d omg_meas(1, 0, 0.5);
+
+    Eigen::MatrixXd jacobian = numericalJacobian(fState, x, 1e-6, f_meas, omg_meas);
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> duration = end - start;
+    std::cout << "Numerical Jacobian df/dx:\n" << jacobian;
+    std::cout << "\nCalculation time: " << duration.count() << " ms" << std::endl;
+
+    Eigen::MatrixXd h_jac = numericalJacobian(hState, x);
+
+    auto end2 = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> duration2 = end2 - end;
+    std::cout << "Numerical Jacobian dh/dx:\n" << h_jac;
+    std::cout << "\nCalculation time: " << duration2.count() << " ms" << std::endl;
+
+    return 1;
 }

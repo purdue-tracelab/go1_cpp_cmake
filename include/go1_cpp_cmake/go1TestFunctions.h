@@ -5,6 +5,7 @@
 
 // Package-specific header files (this will expand as we have more functions to test)
 #include "go1StanceMPC.h"
+#include "go1StateEstimator.h"
 
 class go1TestFunctions {
     public:
@@ -20,6 +21,7 @@ class go1TestFunctions {
         int testBezierVel();
         int testConvertForcesToTorques();
         int testUpdateStateFromMujoco();
+        int testNumericJacobian();
 
         go1State tester_state;
         mjtNum tester_joint_angles[19];

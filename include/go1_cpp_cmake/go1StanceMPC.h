@@ -1,5 +1,5 @@
-#ifndef GO1_STANCEMPC_H
-#define GO1_STANCEMPC_H
+#ifndef GO1_STANCE_MPC_H
+#define GO1_STANCE_MPC_H
 
 // Standard libraries
 #include <vector>
@@ -17,52 +17,55 @@
 #include "go1Params.h"
 #include "go1Utils.h"
 
-void go1StanceMPC(go1State &state);
-/*
-    Note: trying pre-allocation causes segmentation fault during walking for similar
-    reasons that walking using grfMPC doesn't properly update during walking. If you
-    figure it out, uncomment the matrices & solver below.
-*/
+void go1StanceMPC(go1State &state); // standalone version of go1MPC class below
 
-// // weights
-// Eigen::Matrix<double, 13, 1> q_weights;
-// double r_weight;
-// Eigen::Matrix<double, MPC_REF_DIM, MPC_REF_DIM> Q;
-// Eigen::Matrix<double, 3*NUM_LEG*MPC_HORIZON, 3*NUM_LEG*MPC_HORIZON> R;
+class go1MPC { // class-based version of go1StanceMPC function above
+    public:
+        go1MPC();
+        void reset();
+        void updateRigidBodyModel(const go1State& state);
+        void updateMPCStates(const go1State& state);
+        void solveMPCForces(go1State& state);
 
-// // QP ZOH matrices
-// Eigen::Matrix<double, 13, 13> A_mat; // 13x13
-// Eigen::Matrix<double, 13, 13> A_mat_d;
-// Eigen::Matrix<double, 13, 12> B_mat; // 13x12
-// Eigen::Matrix<double, 13, 12> B_mat_d;
+        // weights
+        Eigen::Matrix<double, 13, 1> q_weights;
+        Eigen::SparseMatrix<double> Q;
+        Eigen::SparseMatrix<double> R;
 
-// // QP-MPC ZOH matrices
-// Eigen::Matrix<double, MPC_REF_DIM, 13> A_qp; // (13*MPC_HORIZON)x13
-// Eigen::Matrix<double, MPC_REF_DIM, MPC_INPUT_DIM> B_qp; // (13*MPC_HORIZON)x(12*MPC_HORIZON)
-// Eigen::Matrix<double, 13, 1> mpc_state; // state reformulated in RBM form [13x1]
-// Eigen::Matrix<double, 13, 1> mpc_state_d_block; // desired state reformulated in RBM form [13x1]
-// Eigen::Matrix<double, MPC_REF_DIM, 1> mpc_state_d; // desired state reformulated in QP-MPC form [(13*MPC_HORIZON)x1]
+        // Continuous- and discrete-time dynamics matrices
+        Eigen::Matrix<double, 13, 13> A_mat; // 13x13
+        Eigen::Matrix<double, 13, 13> A_mat_d;
+        Eigen::Matrix<double, 13, 12> B_mat; // 13x12
+        Eigen::Matrix<double, 13, 12> B_mat_d;
 
-// // standard QP formulation
-// // minimize 1/2 * x' * P * x + q' * x
-// // subject to lb <= C_qp * x <= ub
-// Eigen::SparseMatrix<double> P; // P = B_qp^T * Q * B_qp + R, the Hessian of the QP problem [(12MPC_HORIZON)x(12MPC_HORIZON)]
-// Eigen::Matrix<double, 12*MPC_HORIZON, 12*MPC_HORIZON> denseP;
-// Eigen::Matrix<double, MPC_INPUT_DIM, 1> q; // q , the gradient of the QP problem [(12MPC_HORIZON)x1]
-// Eigen::VectorXd qp_lb;
-// Eigen::VectorXd qp_ub;
+        // MPC matrices
+        Eigen::Matrix<double, MPC_REF_DIM, 13> A_qp; // (13*MPC_HORIZON)x13
+        Eigen::Matrix<double, MPC_REF_DIM, MPC_INPUT_DIM> B_qp; // (13*MPC_HORIZON)x(12*MPC_HORIZON)
+        Eigen::Matrix<double, 13, 1> mpc_state; // state reformulated in RBM form [13x1]
+        Eigen::Matrix<double, 13, 1> mpc_state_d_block; // desired state reformulated in RBM form [13x1]
+        Eigen::Matrix<double, MPC_REF_DIM, 1> mpc_state_d; // desired state reformulated in QP-MPC form [(13*MPC_HORIZON)x1]
 
-// Eigen::Matrix<double, FRIC_PYR*NUM_LEG*MPC_HORIZON + 2*MPC_HORIZON, MPC_INPUT_DIM> dense_C_qp;
-// Eigen::SparseMatrix<double> C_qp; // stacked C_ineq and C_eq for all constraints
-// Eigen::Matrix<double, FRIC_PYR*NUM_LEG*MPC_HORIZON, MPC_INPUT_DIM> C_ineq; // handles the frictional pyramid constraints
-// Eigen::Matrix<double, FRIC_PYR*NUM_LEG, 3*NUM_LEG> C_ineq_blk;
-// Eigen::VectorXd fric_lb;
-// Eigen::VectorXd fric_ub;
+        // MPC matrices (sparse versions)
+        Eigen::SparseMatrix<double> A_qp_sparse; // (13*MPC_HORIZON)x13
+        Eigen::SparseMatrix<double> B_qp_sparse; // (13*MPC_HORIZON)x(12*MPC_HORIZON)
+        Eigen::SparseMatrix<double> B_qp_T_Q_sparse; // (12*MPC_HORIZON)x(12*MPC_HORIZON)
 
-// Eigen::Matrix<double, 2*MPC_HORIZON, MPC_INPUT_DIM> C_eq; // handles the swing leg equality constraints (sets swing leg stance forces to 0 in MPC)
-// Eigen::Matrix<double, 2, 12> C_eq_blk14;
-// Eigen::Matrix<double, 2, 12> C_eq_blk23;
+        // standard QP formulation
+        // minimize 1/2 * U^T * P * U + U^T * q
+        // subject to lb <= C_qp * U <= ub
+        Eigen::SparseMatrix<double> P; // P = B_qp^T * Q * B_qp + R, the Hessian of the QP problem [(12*MPC_HORIZON)x(12*MPC_HORIZON)]
+        Eigen::Matrix<double, MPC_INPUT_DIM, 1> q; // q = 2.0 * B_qp^T * Q * (A_qp * x_curr - x_ref), the gradient of the QP problem [(12*MPC_HORIZON)x1]
+        Eigen::VectorXd qp_lb;
+        Eigen::VectorXd qp_ub;
+        Eigen::Matrix<double, FRIC_PYR*NUM_LEG*MPC_HORIZON + 2*MPC_HORIZON, MPC_INPUT_DIM> dense_C_qp;
+        Eigen::SparseMatrix<double> C_qp; // stacked C_ineq and C_eq for all constraints
 
-// OsqpEigen::Solver mpc_solver;
+        // friction pyramid inequality constraints
+        Eigen::Matrix<double, FRIC_PYR*NUM_LEG*MPC_HORIZON, MPC_INPUT_DIM> C_ineq;
+        Eigen::Matrix<double, FRIC_PYR*NUM_LEG, 3*NUM_LEG> C_ineq_blk;
 
-#endif // GO1_STANCEMPC_H
+        OsqpEigen::Solver mpc_solver;
+        Eigen::Matrix<double, 3, NUM_LEG> grf_forces;
+};
+
+#endif // GO1_STANCE_MPC_H

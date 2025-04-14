@@ -4,6 +4,7 @@
     As you can see, there will be more functions to test as things progress,
     and of course, break.
 */
+
 int main(int argc, char ** argv) {
     go1TestFunctions test_proctor = go1TestFunctions();
     // int test1 = test_proctor.testZeroPosErrorGRF();
@@ -15,6 +16,7 @@ int main(int argc, char ** argv) {
     // int test7 = test_proctor.testSwingPD();
     // int test8 = test_proctor.testBezierPos();
     // int test9 = test_proctor.testBezierVel();
+    // int test10 = test_proctor.testNumericJacobian();
 
     int numTests = 1; //9;
     int numTestsPassed = test2; // + test3 + test4 + test5 + test6 + test7 + test8 + test9;
