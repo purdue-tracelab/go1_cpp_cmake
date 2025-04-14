@@ -13,6 +13,8 @@
 #include "go1Params.h"
 #include "go1FK.h"
 #include "go1Utils.h"
+#include "unitree_legged_sdk/unitree_legged_sdk.h"
+
 
 class go1State {
     public:
@@ -20,6 +22,7 @@ class go1State {
         go1State();
         void resetState();
         void updateStateFromMujoco(const mjtNum* q_vec, const mjtNum* q_vel, const Eigen::Vector3d& lin_acc);
+        void updateHardwareState(UNITREE_LEGGED_SDK::LowState& state);
         void convertForcesToTorquesMujoco(const mjtNum* q_vec);
         void convertForcesToTorquesHardware(const Eigen::VectorXd& jointPos);
         void raibertHeuristic(bool withCapturePoint = false);
@@ -37,6 +40,7 @@ class go1State {
         Eigen::Vector3d root_pos_d;
         Eigen::Vector3d root_pos_est;
         Eigen::Vector3d root_lin_vel;
+        Eigen::Vector3d root_lin_vel_old;      
         Eigen::Vector3d root_lin_vel_d;
         Eigen::Vector3d root_lin_vel_est;
         Eigen::Vector3d root_lin_acc;
@@ -50,8 +54,11 @@ class go1State {
         Eigen::Vector3d root_rpy_d;
         Eigen::Vector3d root_rpy_est;
         Eigen::Vector3d root_ang_vel;
+        Eigen::Vector3d root_ang_vel_old;      
         Eigen::Vector3d root_ang_vel_d;
         Eigen::Vector3d root_ang_vel_est;
+
+        Eigen::Matrix<double, 1, 12> jointPos;      // added
 
         // actuation-related variables (ORDER IS FR, FL, RR, RL)
         Eigen::Matrix<double, 3, NUM_LEG> foot_forces_grf;

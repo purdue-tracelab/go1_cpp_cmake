@@ -83,8 +83,10 @@ add_library(go1_main_lib
 target_link_libraries(go1_main_lib
     OsqpEigen::OsqpEigen
     ${MUJOCO_LIBRARY}
-    # unitree_legged_sdk
-    # "${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/lib/cpp/amd64/libunitree_legged_sdk.a"
+    "${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/lib/cpp/${ARCH}/libunitree_legged_sdk.a"
+)
+target_include_directories(go1_main_lib PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/include
 )
 
 # Add function testing executable
@@ -119,10 +121,10 @@ target_link_libraries(run_go1Stand
 
 # Add hardware control executable
 add_executable(run_go1HardwareControl src/runGo1HardwareControl.cpp)
-target_include_directories(run_go1HardwareControl PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/include")
+# target_include_directories(run_go1HardwareControl PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/include")
 target_link_libraries(run_go1HardwareControl
     go1_main_lib
-    "${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/lib/cpp/${ARCH}/libunitree_legged_sdk.a"
+    # "${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/lib/cpp/${ARCH}/libunitree_legged_sdk.a"
 )
 target_link_options(run_go1HardwareControl PRIVATE -no-pie)
 

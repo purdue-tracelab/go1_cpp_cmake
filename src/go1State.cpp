@@ -39,6 +39,7 @@ void go1State::resetState() {
     root_pos_d.setZero();
     root_pos_est.setZero();
     root_lin_vel.setZero();
+    root_lin_vel_old.setZero();
     root_lin_vel_d.setZero();
     root_lin_vel_est.setZero();
     root_lin_acc.setZero();
@@ -51,8 +52,11 @@ void go1State::resetState() {
     root_rpy_old.setZero();
     root_rpy_d.setZero();
     root_ang_vel.setZero();
+    root_ang_vel_old.setZero();
     root_ang_vel_d.setZero();
     root_ang_vel_est.setZero();
+
+    jointPos.setZero();
 
     // VERY IMPORTANT FOOT ORDER: FR, FL, RR, RL
     foot_pos.setZero();
@@ -75,6 +79,142 @@ void go1State::resetState() {
     std::fill(std::begin(contacts), std::end(contacts), true);
     init = true;
     
+}
+
+void go1State::updateHardwareState(UNITREE_LEGGED_SDK::LowState& state) {
+    // Get updated joint position
+    // order is FR_0, FR_1, FR_2, FL_0, FL_1, FL_2, RR_0, RR_1, RR_2, RL_0, RL_1, RL_2
+    for (int i = 0; i < jointPos.size(); i++) {
+        jointPos[i] = state.motorState[i].q;
+    }
+    
+    // Update current and old states of the root and feet
+    root_pos_old = root_pos;
+    root_lin_vel_old = root_lin_vel;
+    root_lin_acc << state.imu.accelerometer[0], state.imu.accelerometer[1], state.imu.accelerometer[2];
+
+    root_rpy_old = root_rpy;
+    root_quat_old = root_quat;
+
+    root_ang_vel_old = root_ang_vel;
+
+    foot_pos_old = foot_pos;
+    foot_pos = go1FKHardware(jointPos, root_rpy); // implemented go1FK using Muqun and Leo's work
+
+    if (init) {
+        root_pos_old = root_pos;
+        root_rpy_old = root_rpy;
+        foot_pos_old = foot_pos;
+    }
+    
+    for (int i = 0; i < NUM_LEG; i++) {
+        foot_pos_abs.block<3, 1>(0, i) = foot_pos.block<3, 1>(0, i) + root_pos;
+    }
+
+    Eigen::Matrix3d rootRotMat = rotZ(root_rpy(2))*rotY(root_rpy(1))*rotX(root_rpy(0));
+    Eigen::Matrix3d hipRotMat = rotZ(root_rpy(2))*rotY(root_rpy(1));
+
+    root_hip_pos.block<3, 1>(0, 0) = rootRotMat*Eigen::Vector3d(DELTA_X_HIP, -DELTA_Y_HIP, 0) + hipRotMat*Eigen::Vector3d(0, -DELTA_Y_HIP_JOINT, 0);
+    root_hip_pos.block<3, 1>(0, 1) = rootRotMat*Eigen::Vector3d(DELTA_X_HIP, DELTA_Y_HIP, 0) + hipRotMat*Eigen::Vector3d(0, DELTA_Y_HIP_JOINT, 0);
+    root_hip_pos.block<3, 1>(0, 2) = rootRotMat*Eigen::Vector3d(-DELTA_X_HIP, -DELTA_Y_HIP, 0) + hipRotMat*Eigen::Vector3d(0, -DELTA_Y_HIP_JOINT, 0);
+    root_hip_pos.block<3, 1>(0, 3) = rootRotMat*Eigen::Vector3d(-DELTA_X_HIP, DELTA_Y_HIP, 0) + hipRotMat*Eigen::Vector3d(0, DELTA_Y_HIP_JOINT, 0);
+
+    root_hip_pos_abs.block<3, 1>(0, 0) = root_pos + rootRotMat*Eigen::Vector3d(DELTA_X_HIP, -DELTA_Y_HIP, 0) + hipRotMat*Eigen::Vector3d(0, -DELTA_Y_HIP_JOINT, 0);
+    root_hip_pos_abs.block<3, 1>(0, 1) = root_pos + rootRotMat*Eigen::Vector3d(DELTA_X_HIP, DELTA_Y_HIP, 0) + hipRotMat*Eigen::Vector3d(0, DELTA_Y_HIP_JOINT, 0);
+    root_hip_pos_abs.block<3, 1>(0, 2) = root_pos + rootRotMat*Eigen::Vector3d(-DELTA_X_HIP, -DELTA_Y_HIP, 0) + hipRotMat*Eigen::Vector3d(0, -DELTA_Y_HIP_JOINT, 0);
+    root_hip_pos_abs.block<3, 1>(0, 3) = root_pos + rootRotMat*Eigen::Vector3d(-DELTA_X_HIP, DELTA_Y_HIP, 0) + hipRotMat*Eigen::Vector3d(0, DELTA_Y_HIP_JOINT, 0);
+
+    if (walking_mode) {
+        // Determine foot contacts based on swing_phase
+        if (swing_phase >= 0 && swing_phase <= SWING_PHASE_MAX/2) {
+            contacts[0] = true;  // FR stance
+            contacts[1] = false;  // FL swing
+            contacts[2] = false;  // RR swing
+            contacts[3] = true;  // RL stance
+
+        } else if (swing_phase > SWING_PHASE_MAX/2 && swing_phase <= SWING_PHASE_MAX) {
+            contacts[0] = false;  // FR swing
+            contacts[1] = true;  // FL stance
+            contacts[2] = true;  // RR stance
+            contacts[3] = false;  // RL swing
+
+        }
+
+        if (swing_phase == 0 || swing_phase == SWING_PHASE_MAX + 1) {
+            swing_phase = 0;
+
+            contacts[0] = true;  // FR stance
+            contacts[1] = false;  // FL swing
+            contacts[2] = false;  // RR swing
+            contacts[3] = true;  // RL stance
+
+            foot_forces_swing.setZero();
+            joint_torques.setZero();
+            foot_pos_liftoff.setZero();
+        
+            for (int i = 0; i < NUM_LEG; i++) {
+                if (!contacts[i]) {
+                    foot_pos_liftoff.block<3, 1>(0, i) = foot_pos_abs.block<3, 1>(0, i);
+                }
+            }
+
+        } else if (swing_phase == SWING_PHASE_MAX/2 + 1) { // swap swing legs and contact legs
+            contacts[0] = false;  // FR swing
+            contacts[1] = true;  // FL stance
+            contacts[2] = true;  // RR stance
+            contacts[3] = false;  // RL swing
+
+            foot_forces_swing.setZero();
+            joint_torques.setZero();
+            foot_pos_liftoff.setZero();
+        
+            for (int i = 0; i < NUM_LEG; i++) {
+                if (!contacts[i]) {
+                    foot_pos_liftoff.block<3, 1>(0, i) = foot_pos_abs.block<3, 1>(0, i);
+                }
+            }
+
+        }
+
+        // Pick planner based on PLANNER_SELECT
+        if (PLANNER_SELECT == 0) {
+            go1State::raibertHeuristic(false);
+        } else if (PLANNER_SELECT == 1) {
+            go1State::raibertHeuristic(true); // w/ Capture Point
+        } else {
+            go1State::amirHLIP();
+        }
+
+        // Find desired foot positions and velocities based on swing_phase, then compute swing leg PD forces
+        Eigen::Vector3d bezierPosVec = bezierPos();
+        Eigen::Vector3d bezierVelVec = bezierVel();
+        bool absolute = false; // toggle for foot positions in absolute or relative frame
+
+        for (int i = 0; i < NUM_LEG; i++) {
+            if (!contacts[i] && absolute) {
+                foot_pos_d.block<3, 1>(0, i) << root_hip_pos_abs(0, i) + bezierPosVec.x(), root_hip_pos_abs(1, i) + bezierPosVec.y(), bezierPosVec.z(); 
+                foot_vel_d.block<3, 1>(0, i) = bezierVelVec;
+
+                go1State::swingPD(i, foot_pos_d.block<3, 1>(0, i), foot_vel_d.block<3, 1>(0, i), true);
+
+            } else if (!contacts[i] && !absolute) {
+                foot_pos_d.block<3, 1>(0, i) << root_hip_pos(0, i) + bezierPosVec.x(), root_hip_pos(1, i) + bezierPosVec.y(), bezierPosVec.z() - WALK_HEIGHT; 
+                foot_vel_d.block<3, 1>(0, i) = bezierVelVec;
+
+                go1State::swingPD(i, foot_pos_d.block<3, 1>(0, i), foot_vel_d.block<3, 1>(0, i), false);
+            }
+        }
+
+        if (!init) {
+            swing_phase++;
+        }
+
+    }
+
+    // Flip init to false for actual planning
+    if (init) {
+        init = false;
+    }
 }
 
 void go1State::updateStateFromMujoco(const mjtNum* q_vec, const mjtNum* q_vel, const Eigen::Vector3d& lin_acc) {
