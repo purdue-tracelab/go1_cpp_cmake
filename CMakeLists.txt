@@ -119,14 +119,23 @@ target_link_libraries(run_go1Stand
     ${CURSES_LIBRARIES}
 )
 
-# Add hardware control executable
-add_executable(run_go1HardwareControl src/runGo1HardwareControl.cpp)
-# target_include_directories(run_go1HardwareControl PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/include")
-target_link_libraries(run_go1HardwareControl
+add_executable(run_threadedGo1MujocoSim src/runThreadedGo1Mujoco.cpp)
+target_link_libraries(run_threadedGo1MujocoSim
     go1_main_lib
-    # "${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/lib/cpp/${ARCH}/libunitree_legged_sdk.a"
+    glfw
+    ${GLEW_LIBRARIES}
+    ${OPENGL_LIBRARIES}
+    ${CURSES_LIBRARIES}
 )
-target_link_options(run_go1HardwareControl PRIVATE -no-pie)
+
+# # Add hardware control executable
+# add_executable(run_go1HardwareControl src/runGo1HardwareControl.cpp)
+# # target_include_directories(run_go1HardwareControl PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/include")
+# target_link_libraries(run_go1HardwareControl
+#     go1_main_lib
+#     # "${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/lib/cpp/${ARCH}/libunitree_legged_sdk.a"
+# )
+# target_link_options(run_go1HardwareControl PRIVATE -no-pie)
 
 # Install libraries and executables
 install(TARGETS
@@ -135,7 +144,8 @@ install(TARGETS
     run_go1MujocoSim
     run_go1InertiaCalc
     run_go1Stand
-    run_go1HardwareControl
+    run_threadedGo1MujocoSim
+    # run_go1HardwareControl
     DESTINATION lib/${PROJECT_NAME}
 )
 

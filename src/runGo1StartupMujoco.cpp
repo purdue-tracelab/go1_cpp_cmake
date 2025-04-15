@@ -12,7 +12,7 @@
 
 // Global variables for MuJoCo
 mjModel* model = nullptr;
-mjData* data = nullptr;
+mjData* mujoco_data = nullptr;
 mjvCamera cam;
 mjvOption opt;
 mjvScene scn;
@@ -102,7 +102,7 @@ void initVisualization() {
 
 // Function to render the MuJoCo scene
 void renderScene() {
-    mjv_updateScene(model, data, &opt, nullptr, &cam, mjCAT_ALL, &scn);
+    mjv_updateScene(model, mujoco_data, &opt, nullptr, &cam, mjCAT_ALL, &scn);
     mjrRect viewport = {0, 0, window_width, window_height};
     mjr_render(viewport, &scn, &con);
     glfwSwapBuffers(window);
@@ -377,7 +377,7 @@ int main(void) {
         return -1;
     }
 
-    data = mj_makeData(model);
+    mujoco_data = mj_makeData(model);
     
     if (model->nkey > 0) {
         int keyframe_id = mj_name2id(model, mjOBJ_KEY, "prone");
@@ -385,9 +385,9 @@ int main(void) {
             std::cerr << "Keyframe 'prone' not found!" << std::endl;
             return -1;
         }
-        mj_resetDataKeyframe(model, data, keyframe_id);
+        mj_resetDataKeyframe(model, mujoco_data, keyframe_id);
     } else {
-        mj_resetData(model, data);
+        mj_resetData(model, mujoco_data);
     }
 
     initVisualization();
@@ -409,11 +409,11 @@ int main(void) {
     int sensor_adr2 = model->sensor_adr[sensor_id2];
 
     // Initialize the state and estimator from MuJoCo data
-    std::memcpy(qpos_buffer, data->qpos, model->nq * sizeof(mjtNum));
-    std::memcpy(qvel_buffer, data->qvel, model->nv * sizeof(mjtNum));
-    Eigen::Vector3d lin_acc = Eigen::Map<const Eigen::Vector3d>(data->cacc + 3 * base_id);
-    Eigen::Vector3d lin_acc_meas = Eigen::Map<const Eigen::Vector3d>(data->sensordata + sensor_adr1);
-    Eigen::Vector3d ang_vel_meas = Eigen::Map<const Eigen::Vector3d>(data->sensordata + sensor_adr2);
+    std::memcpy(qpos_buffer, mujoco_data->qpos, model->nq * sizeof(mjtNum));
+    std::memcpy(qvel_buffer, mujoco_data->qvel, model->nv * sizeof(mjtNum));
+    Eigen::Vector3d lin_acc = Eigen::Map<const Eigen::Vector3d>(mujoco_data->cacc + 3 * base_id);
+    Eigen::Vector3d lin_acc_meas = Eigen::Map<const Eigen::Vector3d>(mujoco_data->sensordata + sensor_adr1);
+    Eigen::Vector3d ang_vel_meas = Eigen::Map<const Eigen::Vector3d>(mujoco_data->sensordata + sensor_adr2);
     
     mujoco_go1_state.updateStateFromMujoco(qpos_buffer, qvel_buffer, lin_acc);
     mujoco_go1_estimator.collectInitialState(mujoco_go1_state);
@@ -442,18 +442,18 @@ int main(void) {
 
     // Main simulation loop
     while (running && !glfwWindowShouldClose(window)) {
-        std::cout << "Simulation time: " << data->time << std::endl;
+        std::cout << "Simulation time: " << mujoco_data->time << std::endl;
 
         // Desired states (gradual transition to standing w/ ALEPH = BETTA = 0.2)
         mujoco_go1_state.root_pos_d << 0, 0, WALK_HEIGHT;
         mujoco_go1_state.root_lin_vel_d << 0, 0, 0;
 
         // Extract joint position, joint velocity, and base linear acceleration from MuJoCo
-        std::memcpy(qpos_buffer, data->qpos, model->nq * sizeof(mjtNum));
-        std::memcpy(qvel_buffer, data->qvel, model->nv * sizeof(mjtNum));
-        Eigen::Vector3d lin_acc = Eigen::Map<const Eigen::Vector3d>(data->cacc + 3 * base_id);
-        Eigen::Vector3d lin_acc_meas = Eigen::Map<const Eigen::Vector3d>(data->sensordata + sensor_adr1);
-        Eigen::Vector3d ang_vel_meas = Eigen::Map<const Eigen::Vector3d>(data->sensordata + sensor_adr2);
+        std::memcpy(qpos_buffer, mujoco_data->qpos, model->nq * sizeof(mjtNum));
+        std::memcpy(qvel_buffer, mujoco_data->qvel, model->nv * sizeof(mjtNum));
+        Eigen::Vector3d lin_acc = Eigen::Map<const Eigen::Vector3d>(mujoco_data->cacc + 3 * base_id);
+        Eigen::Vector3d lin_acc_meas = Eigen::Map<const Eigen::Vector3d>(mujoco_data->sensordata + sensor_adr1);
+        Eigen::Vector3d ang_vel_meas = Eigen::Map<const Eigen::Vector3d>(mujoco_data->sensordata + sensor_adr2);
 
         // Update Go1 state from MuJoCo & perform swing PD force control
         auto start1 = std::chrono::high_resolution_clock::now();
@@ -470,14 +470,14 @@ int main(void) {
         double duration_3 = 0.0;
 
         // Update MPC controller (50 Hz)
-        if (data->time - lastMPCUpdateTime >= mpcInterval) {
+        if (mujoco_data->time - lastMPCUpdateTime >= mpcInterval) {
             auto start3 = std::chrono::high_resolution_clock::now();
             // go1StanceMPC(mujoco_go1_state);
             findMPCSolution();
             auto end3 = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double, std::milli> elapsed3 = end3 - start3;
             duration_3 = elapsed3.count();
-            lastMPCUpdateTime = data->time;
+            lastMPCUpdateTime = mujoco_data->time;
         }
 
         // Convert foot forces to joint torques
@@ -488,26 +488,26 @@ int main(void) {
                                 mujoco_go1_state.joint_torques.block<3, 1>(0, 3); // RL
 
         for (int j = 0; j < model->nu; j++) {
-            data->ctrl[j] = joint_torques_stacked(j, 0);
+            mujoco_data->ctrl[j] = joint_torques_stacked(j, 0);
         }
 
         // Render at ~60 Hz
-        if (data->time - lastRenderSimTime >= renderInterval) {
+        if (mujoco_data->time - lastRenderSimTime >= renderInterval) {
             renderScene();
-            lastRenderSimTime = data->time;
+            lastRenderSimTime = mujoco_data->time;
         }
 
         // Store data in CSV file
         storeData(mujoco_go1_state, file, lin_acc_meas, ang_vel_meas);
         storeCalcTimeData(duration_1, duration_2, duration_3, calc_time_file);
-        mj_step(model, data);
+        mj_step(model, mujoco_data);
         
         std::this_thread::sleep_for(loop_time);
     }
 
     file.close();
 
-    mj_deleteData(data);
+    mj_deleteData(mujoco_data);
     mj_deleteModel(model);
     mjr_freeContext(&con);
     mjv_freeScene(&scn);
