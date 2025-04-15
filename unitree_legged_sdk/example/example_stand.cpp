@@ -69,27 +69,34 @@ void Custom::RobotControl()
   cmd.motorCmd[RR_0].tau = -0.65f;
   cmd.motorCmd[RL_0].tau = +0.65f;
 
+  // 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8
+
+
+
   // if( motiontime >= 100){
   if (motiontime >= 0)
   {
     // first, get record initial position
     // if( motiontime >= 100 && motiontime < 500){
+
+    //-0.3 1.21 -2.818 0.3 1.21 -2.818 -0.3 1.21 -2.818 0.3 1.21 -2.818
+    //FR FL RR RL
     if (motiontime >= 0 && motiontime < 10)
     {
-      qInit[0] = state.motorState[FR_0].q;
-      qInit[1] = state.motorState[FR_1].q;
-      qInit[2] = state.motorState[FR_2].q;
+      qInit[0] = -0.3; //state.motorState[FR_0].q;
+      qInit[1] = 1.21; //state.motorState[FR_1].q;
+      qInit[2] = -2.818; //state.motorState[FR_2].q;
 
       //Add all legs
-      qInit[3] = state.motorState[FL_0].q;
-      qInit[4] = state.motorState[FL_1].q;
-      qInit[5] = state.motorState[FL_2].q;
-      qInit[6] = state.motorState[RR_0].q;
-      qInit[7] = state.motorState[RR_1].q;
-      qInit[8] = state.motorState[RR_2].q;
-      qInit[9] = state.motorState[RL_0].q;
-      qInit[10] = state.motorState[RL_1].q;
-      qInit[11] = state.motorState[RL_2].q;
+      qInit[3] = 0.3; //state.motorState[FL_0].q;
+      qInit[4] = 1.21; //state.motorState[FL_1].q;
+      qInit[5] = -2.818; //state.motorState[FL_2].q;
+      qInit[6] = -0.3; //state.motorState[RR_0].q;
+      qInit[7] = 1.21; //state.motorState[RR_1].q;
+      qInit[8] = -2.818; //state.motorState[RR_2].q;
+      qInit[9] = 0.3; //state.motorState[RL_0].q;
+      qInit[10] = 1.21; //state.motorState[RL_1].q;
+      qInit[11] = -2.818; //state.motorState[RL_2].q;
 
     }
     // second, move to the origin point of a sine movement with Kp Kd
@@ -98,71 +105,73 @@ void Custom::RobotControl()
     {
       rate_count++;
       double rate = rate_count / 200.0; // needs count to 200
-      Kp[0] = 5.0;
-      Kp[1] = 5.0;
-      Kp[2] = 5.0;
-      Kd[0] = 1.0;
-      Kd[1] = 1.0;
-      Kd[2] = 1.0;
+      Kp[0] = 18.0;
+      Kp[1] = 18.0;
+      Kp[2] = 18.0;
+      Kd[0] = 5.0;
+      Kd[1] = 5.0;
+      Kd[2] = 5.0;
 
       //Add all legs
-      Kp[3] = 5.0;
-      Kp[4] = 5.0;
-      Kp[5] = 5.0;
-      Kd[3] = 1.0;
-      Kd[4] = 1.0;
-      Kd[5] = 1.0;
+      Kp[3] = 18.0;
+      Kp[4] = 18.0;
+      Kp[5] = 18.0;
+      Kd[3] = 5.0;
+      Kd[4] = 5.0;
+      Kd[5] = 5.0;
 
-      Kp[6] = 5.0;
-      Kp[7] = 5.0;
-      Kp[8] = 5.0;
-      Kd[6] = 1.0;
-      Kd[7] = 1.0;
-      Kd[8] = 1.0;
+      Kp[6] = 18.0;
+      Kp[7] = 18.0;
+      Kp[8] = 18.0;
+      Kd[6] = 5.0;
+      Kd[7] = 5.0;
+      Kd[8] = 5.0;
 
-      Kp[9] = 5.0;
-      Kp[10] = 5.0;
-      Kp[11] = 5.0;
-      Kd[9] = 1.0;
-      Kd[10] = 1.0;
-      Kd[11] = 1.0;
+      Kp[9] = 18.0;
+      Kp[10] = 18.0;
+      Kp[11] = 18.0;
+      Kd[9] = 5.0;
+      Kd[10] = 5.0;
+      Kd[11] = 5.0;
 
 
       // Kp[0] = 20.0; Kp[1] = 20.0; Kp[2] = 20.0;
       // Kd[0] = 2.0; Kd[1] = 2.0; Kd[2] = 2.0;
 
-      qDes[0] = jointLinearInterpolation(qInit[0], sin_mid_q[0], rate);
-      qDes[1] = jointLinearInterpolation(qInit[1], sin_mid_q[1], rate);
-      qDes[2] = jointLinearInterpolation(qInit[2], sin_mid_q[2], rate);
+      //0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8
+
+      qDes[0] = 0;//jointLinearInterpolation(qInit[0], sin_mid_q[0], rate); FR0
+      qDes[1] = 0.9;//jointLinearInterpolation(qInit[1], sin_mid_q[1], rate); FR1
+      qDes[2] = -1.8;//jointLinearInterpolation(qInit[2], sin_mid_q[2], rate); FR2
 
       //Add all legs
-      qDes[3] = jointLinearInterpolation(qInit[3], sin_mid_q[3], rate);
-      qDes[4] = jointLinearInterpolation(qInit[4], sin_mid_q[4], rate);
-      qDes[5] = jointLinearInterpolation(qInit[5], sin_mid_q[5], rate);
-      qDes[6] = jointLinearInterpolation(qInit[6], sin_mid_q[6], rate);
-      qDes[7] = jointLinearInterpolation(qInit[7], sin_mid_q[7], rate);
-      qDes[8] = jointLinearInterpolation(qInit[8], sin_mid_q[8], rate);
-      qDes[9] = jointLinearInterpolation(qInit[9], sin_mid_q[9], rate);
-      qDes[10] = jointLinearInterpolation(qInit[10], sin_mid_q[10], rate);
-      qDes[11] = jointLinearInterpolation(qInit[11], sin_mid_q[11], rate);
+      qDes[3] = 0; //jointLinearInterpolation(qInit[3], sin_mid_q[3], rate); FL0
+      qDes[4] = 0.9; //jointLinearInterpolation(qInit[4], sin_mid_q[4], rate); FL1
+      qDes[5] = -1.8; //jointLinearInterpolation(qInit[5], sin_mid_q[5], rate); FL2
+      qDes[6] = 0; //jointLinearInterpolation(qInit[6], sin_mid_q[6], rate); RR0
+      qDes[7] = 0.9; //jointLinearInterpolation(qInit[7], sin_mid_q[7], rate); RR1
+      qDes[8] = -1.8; //jointLinearInterpolation(qInit[8], sin_mid_q[8], rate); RR2
+      qDes[9] = 0; //jointLinearInterpolation(qInit[9], sin_mid_q[9], rate); RL0
+      qDes[10] = 0.9; //jointLinearInterpolation(qInit[10], sin_mid_q[10], rate); RL1
+      qDes[11] = -1.8; //jointLinearInterpolation(qInit[11], sin_mid_q[11], rate); RL2
     }
     double sin_joint1, sin_joint2;
-    if (motiontime >= 400)
-    {
-      sin_count++;
-      sin_joint1 = 0.6 * sin(3 * M_PI * sin_count / 1000.0);
-      sin_joint2 = -0.6 * sin(1.8 * M_PI * sin_count / 1000.0);
-      qDes[0] = sin_mid_q[0];
-      qDes[1] = sin_mid_q[1];
-      qDes[2] = sin_mid_q[2] + sin_joint2;
-    }
+    // if (motiontime >= 400)
+    // {
+    //   sin_count++;
+    //   sin_joint1 = 0.6 * sin(3 * M_PI * sin_count / 1000.0);
+    //   sin_joint2 = -0.6 * sin(1.8 * M_PI * sin_count / 1000.0);
+    //   qDes[0] = sin_mid_q[0];
+    //   qDes[1] = sin_mid_q[1];
+    //   qDes[2] = sin_mid_q[2] + sin_joint2;
+    // }
     
     //FR
     cmd.motorCmd[FR_0].q = qDes[0];
     cmd.motorCmd[FR_0].dq = 0;
     cmd.motorCmd[FR_0].Kp = Kp[0];
     cmd.motorCmd[FR_0].Kd = Kd[0];
-    cmd.motorCmd[FR_0].tau = -0.65f;
+    cmd.motorCmd[FR_0].tau = 0.0f;
 
     cmd.motorCmd[FR_1].q = qDes[1];
     cmd.motorCmd[FR_1].dq = 0;
@@ -182,7 +191,7 @@ void Custom::RobotControl()
     cmd.motorCmd[FL_0].dq = 0;
     cmd.motorCmd[FL_0].Kp = Kp[0];
     cmd.motorCmd[FL_0].Kd = Kd[0];
-    cmd.motorCmd[FL_0].tau = -0.65f;
+    cmd.motorCmd[FL_0].tau = 0.0f;
 
     cmd.motorCmd[FL_1].q = qDes[1];
     cmd.motorCmd[FL_1].dq = 0;
@@ -201,7 +210,7 @@ void Custom::RobotControl()
     cmd.motorCmd[RR_0].dq = 0;
     cmd.motorCmd[RR_0].Kp = Kp[0];
     cmd.motorCmd[RR_0].Kd = Kd[0];
-    cmd.motorCmd[RR_0].tau = -0.65f;
+    cmd.motorCmd[RR_0].tau = 0.0f;
 
     cmd.motorCmd[RR_1].q = qDes[1];
     cmd.motorCmd[RR_1].dq = 0;
@@ -220,7 +229,7 @@ void Custom::RobotControl()
     cmd.motorCmd[RL_0].dq = 0;
     cmd.motorCmd[RL_0].Kp = Kp[0];
     cmd.motorCmd[RL_0].Kd = Kd[0];
-    cmd.motorCmd[RL_0].tau = -0.65f;
+    cmd.motorCmd[RL_0].tau = 0.0f;
 
     cmd.motorCmd[RL_1].q = qDes[1];
     cmd.motorCmd[RL_1].dq = 0;
