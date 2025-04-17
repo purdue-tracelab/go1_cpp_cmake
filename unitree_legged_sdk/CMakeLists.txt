@@ -10,7 +10,10 @@ if("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "aarch64.*")
   set(ARCH arm64)
 endif()
 
-include_directories(include)
+include_directories(
+  include 
+  ${CURSES_INCLUDE_DIR}
+)
 link_directories(lib/cpp/${ARCH})
 
 option(PYTHON_BUILD "build python wrapper" OFF)
@@ -29,6 +32,8 @@ if(${catkin_FOUND})
     LIBRARIES ${PROJECT_SOURCE_DIR}/lib/cpp/${ARCH}/libunitree_legged_sdk.a
   )
 endif()
+find_package(Curses REQUIRED) # for keyboard control
+
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
@@ -54,7 +59,7 @@ target_link_libraries(example_joystick ${EXTRA_LIBS})
 target_link_options(example_joystick PRIVATE -no-pie)
 
 add_executable(example_stand example/example_stand.cpp)
-target_link_libraries(example_stand ${EXTRA_LIBS})
+target_link_libraries(example_stand ${EXTRA_LIBS} ${CURSES_LIBRARIES})
 target_link_options(example_stand PRIVATE -no-pie)
 
 add_executable(example_position_relay example/example_position_relay.cpp)
