@@ -38,6 +38,7 @@ public:
   int motiontime = 0;
   float dt = 0.002; // 0.001~0.01
   bool squat = false;
+  bool initialized = true;
 
 };
 
@@ -63,7 +64,7 @@ void Custom::RobotControl()
 {
   motiontime++;
   udp.GetRecv(state);
-  printf("%d  %b\n", motiontime, squat);
+  // printf("%d  %b\n", motiontime, squat);
 
   // gravity compensation
   cmd.motorCmd[FR_0].tau = -0.65f;
@@ -81,20 +82,20 @@ void Custom::RobotControl()
     //FR FL RR RL
     if (motiontime >= 0 && motiontime < 10)
     {
-      qInit[0] = -0.3; //state.motorState[FR_0].q;
-      qInit[1] = 1.21; //state.motorState[FR_1].q;
-      qInit[2] = -2.818; //state.motorState[FR_2].q;
+      qInit[0] = 0;
+      qInit[1] = state.motorState[FR_1].q;
+      qInit[2] = state.motorState[FR_2].q;
 
       //Add all legs
-      qInit[3] = 0.3; //state.motorState[FL_0].q;
-      qInit[4] = 1.21; //state.motorState[FL_1].q;
-      qInit[5] = -2.818; //state.motorState[FL_2].q;
-      qInit[6] = -0.3; //state.motorState[RR_0].q;
-      qInit[7] = 1.21; //state.motorState[RR_1].q;
-      qInit[8] = -2.818; //state.motorState[RR_2].q;
-      qInit[9] = 0.3; //state.motorState[RL_0].q;
-      qInit[10] = 1.21; //state.motorState[RL_1].q;
-      qInit[11] = -2.818; //state.motorState[RL_2].q;
+      qInit[3] = 0;
+      qInit[4] = state.motorState[FL_1].q;
+      qInit[5] = state.motorState[FL_2].q;
+      qInit[6] = 0;
+      qInit[7] = state.motorState[RR_1].q;
+      qInit[8] = state.motorState[RR_2].q;
+      qInit[9] = 0;
+      qInit[10] = state.motorState[RL_1].q;
+      qInit[11] = state.motorState[RL_2].q;
 
     }
     // second, move to the origin point of a sine movement with Kp Kd
@@ -102,7 +103,7 @@ void Custom::RobotControl()
     if (motiontime >= 10 && motiontime < 1000)
     {
       rate_count++;
-      double rate = rate_count / 1000.0; // needs count to 200
+      double rate = rate_count / 1000.0; // needs count to 1000
       Kp[0] = 60.0;
       Kp[1] = 60.0;
       Kp[2] = 60.0;
@@ -153,8 +154,9 @@ void Custom::RobotControl()
       qDes[10] = jointLinearInterpolation(qInit[10], 0.9, rate);
       qDes[11] = jointLinearInterpolation(qInit[11], -1.8, rate);
     }
-    else if (motiontime >= 1000)
+    else if (motiontime >= 1000 && !squat)
     {     
+      rate_count = 0;
       qDes[0] = 0;
       qDes[1] = 0.9;
       qDes[2] = -1.8;
@@ -172,22 +174,41 @@ void Custom::RobotControl()
     }
 
     else if (motiontime >= 2000 && squat == true)
-    {    
-      double rate = (rate_count-2000.0) / 1000.0;
-      qDes[0] = jointLinearInterpolation(0, qInit[0], rate);
-      qDes[1] = jointLinearInterpolation(0.9, qInit[1], rate);
-      qDes[2] = jointLinearInterpolation(-1.8, qInit[2], rate);
+    { 
+      if (rate_count < 1000) {
+        rate_count++;
+        double rate = rate_count / 1000.0;
+        qDes[0] = jointLinearInterpolation(0, qInit[0], rate);
+        qDes[1] = jointLinearInterpolation(0.9, qInit[1], rate);
+        qDes[2] = jointLinearInterpolation(-1.8, qInit[2], rate);
+  
+        //Add all legs
+        qDes[3] = jointLinearInterpolation(0, qInit[3], rate);
+        qDes[4] = jointLinearInterpolation(0.9, qInit[4], rate);
+        qDes[5] = jointLinearInterpolation(-1.8, qInit[5], rate);
+        qDes[6] = jointLinearInterpolation(0, qInit[6], rate);
+        qDes[7] = jointLinearInterpolation(0.9, qInit[7], rate);
+        qDes[8] = jointLinearInterpolation(-1.8, qInit[8], rate);
+        qDes[9] = jointLinearInterpolation(0, qInit[9], rate);
+        qDes[10] = jointLinearInterpolation(0.9, qInit[10], rate);
+        qDes[11] = jointLinearInterpolation(-1.8, qInit[11], rate);
+      } else {
+        qDes[0] = qInit[0];
+        qDes[1] = qInit[1];
+        qDes[2] = qInit[2];
+  
+        //Add all legs
+        qDes[3] = qInit[3];
+        qDes[4] = qInit[4];
+        qDes[5] = qInit[5];
+        qDes[6] = qInit[6];
+        qDes[7] = qInit[7];
+        qDes[8] = qInit[8];
+        qDes[9] = qInit[9];
+        qDes[10] = qInit[10];
+        qDes[11] = qInit[11];
+      }
 
-      //Add all legs
-      qDes[3] = jointLinearInterpolation(0, qInit[3], rate);
-      qDes[4] = jointLinearInterpolation(0.9, qInit[4], rate);
-      qDes[5] = jointLinearInterpolation(-1.8, qInit[5], rate);
-      qDes[6] = jointLinearInterpolation(0, qInit[6], rate);
-      qDes[7] = jointLinearInterpolation(0.9, qInit[7], rate);
-      qDes[8] = jointLinearInterpolation(-1.8, qInit[8], rate);
-      qDes[9] = jointLinearInterpolation(0, qInit[9], rate);
-      qDes[10] = jointLinearInterpolation(0.9, qInit[10], rate);
-      qDes[11] = jointLinearInterpolation(-1.8, qInit[11], rate);
     }
 
     //FR
@@ -283,14 +304,19 @@ void Custom::RobotControl()
 
 
 //Lowers to squat when p is pressed  
+
+
 void Custom::keyControl()
 { 
-// Initialize ncurses
-initscr(); // Start ncurses mode
-timeout(0); // Non-blocking input, no delay
-nodelay(stdscr, TRUE);
-noecho();            // Don't display pressed keys
-cbreak();            // Disable line buffering (don't need to press Enter)
+if (initialized) {
+  // Initialize ncurses
+  initscr(); // Start ncurses mode
+  timeout(0); // Non-blocking input, no delay
+  nodelay(stdscr, TRUE);
+  noecho();            // Don't display pressed keys
+  cbreak();            // Disable line buffering (don't need to press Enter)
+  initialized = false;
+  }
 
   int ch = getch();
 
@@ -301,6 +327,12 @@ cbreak();            // Disable line buffering (don't need to press Enter)
               break;
       }
     }
+    move(0, 0);
+
+    printw("%i and rate count is %d\n", squat, rate_count);
+
+
+    refresh();
 }
 
 int main(void)
@@ -321,11 +353,11 @@ int main(void)
   loop_udpRecv.start();
   loop_control.start();
   
-
+  
   while (1)
   {
-    sleep(10);
-    Custom keyControl();
+    // sleep(10);
+    custom.keyControl();
   };
 
   return 0;
