@@ -137,6 +137,15 @@ target_link_libraries(run_threadedGo1MujocoSim
 # )
 # target_link_options(run_go1HardwareControl PRIVATE -no-pie)
 
+# Add hardware thread control executable
+add_executable(run_go1HardwareThreadControl src/runGo1HardwareThreadControl.cpp)
+# target_include_directories(run_go1HardwareThreadControl PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/include")
+target_link_libraries(run_go1HardwareThreadControl
+    go1_main_lib
+    # "${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/lib/cpp/${ARCH}/libunitree_legged_sdk.a"
+)
+target_link_options(run_go1HardwareThreadControl PRIVATE -no-pie)
+
 # Install libraries and executables
 install(TARGETS
     go1_main_lib
@@ -146,6 +155,7 @@ install(TARGETS
     run_go1Stand
     run_threadedGo1MujocoSim
     # run_go1HardwareControl
+    run_go1HardwareThreadControl
     DESTINATION lib/${PROJECT_NAME}
 )
 
