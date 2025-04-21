@@ -15,6 +15,16 @@ constexpr double TORQUE_MAX_HIP = 23.7;
 constexpr double TORQUE_MAX_THIGH = 23.7;
 constexpr double TORQUE_MAX_CALF = 35.55;
 
+////////////////////////
+// Startup parameters //
+////////////////////////
+
+constexpr double THIGH_RAD_STAND = 0.9;
+constexpr double CALF_RAD_STAND = -1.8;
+constexpr double JOINT_KP = 60;
+constexpr double JOINT_KD = 3;
+
+
 /////////////////////////////////
 // State estimation parameters //
 /////////////////////////////////

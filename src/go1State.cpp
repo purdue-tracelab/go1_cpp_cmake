@@ -70,8 +70,10 @@ void go1State::resetState() {
     foot_forces_grf.setZero();
     foot_forces_swing.setZero();
     joint_torques.setZero();
+    joint_pos_init.setZero();
 
     walking_mode = false;
+    squat_prog = 0.0;
     swing_phase = 0; // ranges from 0 to SWING_PHASE_MAX
     foot_deltaX = 0;
     foot_deltaY = 0;
@@ -731,4 +733,102 @@ void go1State::swingPD(int leg_idx, Eigen::Vector3d footPosRef, Eigen::Vector3d 
         std::cerr << "Error: Invalid foot index for swingPD!" << std::endl;
         return;
     }
+}
+
+void go1State::jointPD(int joint_idx, double jointPos, double jointVel, bool startup) {
+    /*
+        Calculates joint-level PD control for standing & shutdown.
+    */
+    double jointInterp;
+    double jointTorque;
+    
+    switch(joint_idx % 3) {
+        case 0:
+            if (startup) {
+                jointInterp = (1.0 - squat_prog) * joint_pos_init(joint_idx);
+                joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(JOINT_KP * (jointInterp - jointPos) + JOINT_KD * (0 - jointVel), -TORQUE_MAX_HIP, TORQUE_MAX_HIP);
+                return;
+    
+            } else {
+                joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(JOINT_KP * (0.0 - jointPos) + JOINT_KD * (0.0 - jointVel), -TORQUE_MAX_HIP, TORQUE_MAX_HIP);
+                return;
+            }
+    
+        case 1:
+            if (startup) {
+                jointInterp = (1.0 - squat_prog) * joint_pos_init(joint_idx) + squat_prog * THIGH_RAD_STAND;
+                joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(JOINT_KP * (jointInterp - jointPos) + JOINT_KD * (0 - jointVel), -TORQUE_MAX_THIGH, TORQUE_MAX_THIGH);
+                return;
+            } else {
+                jointInterp = (1.0 - squat_prog) * joint_pos_init(joint_idx) + squat_prog * THIGH_RAD_STAND;
+                joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(JOINT_KP * (jointInterp - jointPos) + JOINT_KD * (0.0 - jointVel), -TORQUE_MAX_THIGH, TORQUE_MAX_THIGH);
+                return;
+            }
+                
+        case 2:
+            if (startup) {
+                jointInterp = (1.0 - squat_prog) * joint_pos_init(joint_idx) + squat_prog * CALF_RAD_STAND;
+                joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(JOINT_KP * (jointInterp - jointPos) + JOINT_KD * (0 - jointVel), -TORQUE_MAX_CALF, TORQUE_MAX_CALF);
+                return;
+            } else {
+                jointInterp = (1.0 - squat_prog) * joint_pos_init(joint_idx) + squat_prog * CALF_RAD_STAND;
+                joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(JOINT_KP * (jointInterp - jointPos) + JOINT_KD * (0.0 - jointVel), -TORQUE_MAX_CALF, TORQUE_MAX_CALF);
+                return;
+            }
+                
+    }
+}
+
+bool go1State::isStartupComplete() const {
+    return squat_prog >= 1.0;
+}
+
+bool go1State::isShutdownComplete() const {
+    return squat_prog <= 0.0;
+}
+
+void go1State::computeStartupPDMujoco(const mjtNum* q_vec, const mjtNum* q_vel) {
+/*
+    Activate simple joint PD for startup mode in MuJoCo.
+*/
+    for (int i = 0; i < 3*NUM_LEG; i++) {
+        go1State::jointPD(i, q_vec[7 + i], q_vel[i + 6]);
+    }
+
+    if (!isStartupComplete()) squat_prog += 0.002;
+}
+
+void go1State::computeShutdownPDMujoco(const mjtNum* q_vec, const mjtNum* q_vel) {
+/*
+    Activate simple joint PD for shutdown mode in MuJoCo.
+*/
+    for (int i = 0; i < 3*NUM_LEG; i++) {
+        go1State::jointPD(i, q_vec[7 + i], q_vel[i + 6], false);
+    }
+
+    if (!isShutdownComplete()) squat_prog -= 0.002;
+}
+
+go1StateSnapshot go1State::getSnapshot() const {
+    std::lock_guard<std::mutex> lock(mtx_);
+    go1StateSnapshot stateSnap;
+    stateSnap.foot_pos = foot_pos;
+    stateSnap.go1_lumped_inertia = go1_lumped_inertia;
+    stateSnap.root_pos = root_pos;
+    stateSnap.root_pos_d = root_pos_d;
+    stateSnap.root_rpy = root_rpy;
+    stateSnap.root_rpy_d = root_rpy_d;
+    stateSnap.root_lin_vel = root_lin_vel;
+    stateSnap.root_lin_vel_d = root_lin_vel_d;
+    stateSnap.root_ang_vel = root_ang_vel;
+    stateSnap.root_ang_vel_d = root_ang_vel_d;
+    stateSnap.walking_mode = walking_mode;
+    stateSnap.swing_phase = swing_phase;
+
+    return stateSnap;
+}
+
+void go1State::setGRFForces(const Eigen::Matrix<double, 3, NUM_LEG> &grf) {
+    std::lock_guard<std::mutex> lock(mtx_);
+    foot_forces_grf = grf;
 }

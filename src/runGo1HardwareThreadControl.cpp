@@ -47,6 +47,10 @@ public:
 };
 
 void Custom::UDPRecv() {
+
+  static int loopCounter = 0;
+  static auto lastPrintTime = std::chrono::steady_clock::now();
+
   while (runHardware) {
     auto start = std::chrono::steady_clock::now();
 
@@ -57,10 +61,24 @@ void Custom::UDPRecv() {
     if (elapsed < udpMethodTimeStep) {
       std::this_thread::sleep_for(udpMethodTimeStep - elapsed);
     }
+
+    loopCounter++;
+    auto now = std::chrono::steady_clock::now();
+    if (now - lastPrintTime >= std::chrono::seconds(1)) {
+      double loopRate = loopCounter / std::chrono::duration<double>(now - lastPrintTime).count();
+      std::cout << "[" << __func__ << "] Loop rate: " << loopRate << " Hz" << std::endl;
+      loopCounter = 0;
+      lastPrintTime = now;
+    }
+
   }
 }
 
 void Custom::UDPSend() {
+
+  static int loopCounter = 0;
+  static auto lastPrintTime = std::chrono::steady_clock::now();
+
   while (runHardware) {
     auto start = std::chrono::steady_clock::now();
 
@@ -71,10 +89,23 @@ void Custom::UDPSend() {
     if (elapsed < udpMethodTimeStep) {
       std::this_thread::sleep_for(udpMethodTimeStep - elapsed);
     }
+
+    loopCounter++;
+    auto now = std::chrono::steady_clock::now();
+    if (now - lastPrintTime >= std::chrono::seconds(1)) {
+      double loopRate = loopCounter / std::chrono::duration<double>(now - lastPrintTime).count();
+      std::cout << "[" << __func__ << "] Loop rate: " << loopRate << " Hz" << std::endl;
+      loopCounter = 0;
+      lastPrintTime = now;
+    }
+
   }
 }
 
 void Custom::RobotControl() {
+
+  static int loopCounter = 0;
+  static auto lastPrintTime = std::chrono::steady_clock::now();
 
   while (runHardware) {
     auto start = std::chrono::steady_clock::now();
@@ -147,6 +178,16 @@ void Custom::RobotControl() {
     if (elapsed < robotControlTimeStep) {
       std::this_thread::sleep_for(robotControlTimeStep - elapsed);
     }
+
+    loopCounter++;
+    auto now = std::chrono::steady_clock::now();
+    if (now - lastPrintTime >= std::chrono::seconds(1)) {
+      double loopRate = loopCounter / std::chrono::duration<double>(now - lastPrintTime).count();
+      std::cout << "[" << __func__ << "] Loop rate: " << loopRate << " Hz" << std::endl;
+      loopCounter = 0;
+      lastPrintTime = now;
+    }
+
   }
 }
 
