@@ -79,6 +79,8 @@ add_library(go1_main_lib
   src/go1StateEstimator.cpp
   include/go1_cpp_cmake/go1TestFunctions.h
   src/go1TestFunctions.cpp
+  include/go1_cpp_cmake/go1FSM.h
+  src/go1FSM.cpp
 )
 target_link_libraries(go1_main_lib
     OsqpEigen::OsqpEigen
@@ -128,6 +130,15 @@ target_link_libraries(run_threadedGo1MujocoSim
     ${CURSES_LIBRARIES}
 )
 
+add_executable(run_go1FSMMujoco src/runGo1FSMMujoco.cpp)
+target_link_libraries(run_go1FSMMujoco
+    go1_main_lib
+    glfw
+    ${GLEW_LIBRARIES}
+    ${OPENGL_LIBRARIES}
+    ${CURSES_LIBRARIES}
+)
+
 # # Add hardware control executable
 # add_executable(run_go1HardwareControl src/runGo1HardwareControl.cpp)
 # # target_include_directories(run_go1HardwareControl PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/include")
@@ -136,6 +147,15 @@ target_link_libraries(run_threadedGo1MujocoSim
 #     # "${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/lib/cpp/${ARCH}/libunitree_legged_sdk.a"
 # )
 # target_link_options(run_go1HardwareControl PRIVATE -no-pie)
+
+# Add hardware thread control executable
+add_executable(run_go1HardwareThreadControl src/runGo1HardwareThreadControl.cpp)
+# target_include_directories(run_go1HardwareThreadControl PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/include")
+target_link_libraries(run_go1HardwareThreadControl
+    go1_main_lib
+    # "${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/lib/cpp/${ARCH}/libunitree_legged_sdk.a"
+)
+target_link_options(run_go1HardwareThreadControl PRIVATE -no-pie)
 
 # Install libraries and executables
 install(TARGETS
@@ -146,6 +166,8 @@ install(TARGETS
     run_go1Stand
     run_threadedGo1MujocoSim
     # run_go1HardwareControl
+    run_go1HardwareThreadControl
+    run_go1FSMMujoco
     DESTINATION lib/${PROJECT_NAME}
 )
 

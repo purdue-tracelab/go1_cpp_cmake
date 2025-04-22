@@ -33,6 +33,10 @@ struct go1StateSnapshot {
     // send to go1State.foot_forces_grf
     Eigen::Matrix<double, 3, NUM_LEG> grf_forces;
 };
+<<<<<<< HEAD
+=======
+
+>>>>>>> 50a3885e9b70685f8a8136f2940bb4345f173823
 
 class go1State {
     public:
@@ -93,7 +97,12 @@ class go1State {
         Eigen::Matrix<double, 3, NUM_LEG> joint_torques;
         Eigen::Matrix<double, 12, 1> joint_pos_init;
 
+<<<<<<< HEAD
         // movement mode trackers
+=======
+        // gait phase
+        double squat_prog;
+>>>>>>> 50a3885e9b70685f8a8136f2940bb4345f173823
         bool walking_mode;
         double squat_prog;
         bool contacts[NUM_LEG];
@@ -134,8 +143,13 @@ class go1State {
         Eigen::VectorXd hlip_lb;
         Eigen::VectorXd GainsHLIP; // HLIP-based stepping controller gains
     
+<<<<<<< HEAD
     private:
         mutable std::mutex mtx_; // maybe experiment with adding more private variables?
+=======
+        private:
+            mutable std::mutex mtx_; // maybe experiment with adding more private variables?
+>>>>>>> 50a3885e9b70685f8a8136f2940bb4345f173823
 };
 
 #endif //GO1_STATE_H

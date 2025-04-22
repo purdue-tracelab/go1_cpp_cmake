@@ -739,24 +739,41 @@ void go1State::swingPD(int leg_idx, Eigen::Vector3d footPosRef, Eigen::Vector3d 
 }
 
 void go1State::jointPD(int joint_idx, double jointPos, double jointVel, bool startup) {
+<<<<<<< HEAD
 /*
     Calculates joint-level PD control for standing & shutdown.
 */
     double jointInterp;
     double jointTorque;
 
+=======
+    /*
+        Calculates joint-level PD control for standing & shutdown.
+    */
+    double jointInterp;
+    double jointTorque;
+    
+>>>>>>> 50a3885e9b70685f8a8136f2940bb4345f173823
     switch(joint_idx % 3) {
         case 0:
             if (startup) {
                 jointInterp = (1.0 - squat_prog) * joint_pos_init(joint_idx);
                 joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(JOINT_KP * (jointInterp - jointPos) + JOINT_KD * (0 - jointVel), -TORQUE_MAX_HIP, TORQUE_MAX_HIP);
                 return;
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> 50a3885e9b70685f8a8136f2940bb4345f173823
             } else {
                 joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(JOINT_KP * (0.0 - jointPos) + JOINT_KD * (0.0 - jointVel), -TORQUE_MAX_HIP, TORQUE_MAX_HIP);
                 return;
             }
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> 50a3885e9b70685f8a8136f2940bb4345f173823
         case 1:
             if (startup) {
                 jointInterp = (1.0 - squat_prog) * joint_pos_init(joint_idx) + squat_prog * THIGH_RAD_STAND;
@@ -767,7 +784,11 @@ void go1State::jointPD(int joint_idx, double jointPos, double jointVel, bool sta
                 joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(JOINT_KP * (jointInterp - jointPos) + JOINT_KD * (0.0 - jointVel), -TORQUE_MAX_THIGH, TORQUE_MAX_THIGH);
                 return;
             }
+<<<<<<< HEAD
             
+=======
+                
+>>>>>>> 50a3885e9b70685f8a8136f2940bb4345f173823
         case 2:
             if (startup) {
                 jointInterp = (1.0 - squat_prog) * joint_pos_init(joint_idx) + squat_prog * CALF_RAD_STAND;
@@ -778,7 +799,11 @@ void go1State::jointPD(int joint_idx, double jointPos, double jointVel, bool sta
                 joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(JOINT_KP * (jointInterp - jointPos) + JOINT_KD * (0.0 - jointVel), -TORQUE_MAX_CALF, TORQUE_MAX_CALF);
                 return;
             }
+<<<<<<< HEAD
             
+=======
+                
+>>>>>>> 50a3885e9b70685f8a8136f2940bb4345f173823
     }
 }
 
@@ -812,6 +837,7 @@ void go1State::computeShutdownPDMujoco(const mjtNum* q_vec, const mjtNum* q_vel)
     if (!isShutdownComplete()) squat_prog -= 0.002;
 }
 
+<<<<<<< HEAD
 void go1State::computeStartupPDhardware(UNITREE_LEGGED_SDK::LowState& state) {
     /*
         Activate simple joint PD for startup mode in MuJoCo.
@@ -835,6 +861,8 @@ void go1State::computeShutdownPDHarware(UNITREE_LEGGED_SDK::LowState& state) {
         if (!isShutdownComplete()) squat_prog -= 0.002;
     }
 
+=======
+>>>>>>> 50a3885e9b70685f8a8136f2940bb4345f173823
 go1StateSnapshot go1State::getSnapshot() const {
     std::lock_guard<std::mutex> lock(mtx_);
     go1StateSnapshot stateSnap;
