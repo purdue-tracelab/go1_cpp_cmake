@@ -28,8 +28,7 @@ int go1TestFunctions::testZeroPosErrorGRF() {
     explore with these cases to see if you can figure out why the system breaks
     in MuJoCo at the moment. It could be inertia, mass, rotations, etc.
 */
-    // grfMPC mpc_proctor; // retired until further notice
-    // initialize current tester state
+    // initialize objects
     tester_state.resetState();
 
     mjtNum temp_joint_angles[19] = {0.0, 0.0, 0.27, 1.0, 0.0, 0.0, 0.0, 0.0, 0.9, -1.8, 0.0, 0.9, -1.8, 0.0, 0.9, -1.8, 0.0, 0.9, -1.8};
@@ -49,16 +48,8 @@ int go1TestFunctions::testZeroPosErrorGRF() {
     std::cout << "##################################################################" << std::endl;
     std::cout << "-- Subtest 1: All feet on ground --" << std::endl;
     
-    // // grfMPC class method (retired until further notice)
-    // mpc_proctor.reset();
-    // mpc_proctor.calculateA(tester_state.root_rpy);
-    // mpc_proctor.calculateB(tester_state.go1_lumped_inertia, tester_state.root_rpy, tester_state.foot_pos);
-    // mpc_proctor.calculateMPCStates(tester_state);
-    // mpc_proctor.calculateQPMats(tester_state);
-    // mpc_proctor.solveMPC(tester_state);
-
-    // single-run script method
-    go1StanceMPC(tester_state);
+    go1MPC tester_mpc1;
+    tester_mpc1.solveMPCForState(tester_state);
 
     std::cout << "\nC++ GRF:\n" << tester_state.foot_forces_grf << std::endl;
 
@@ -112,16 +103,8 @@ int go1TestFunctions::testZeroPosErrorGRF() {
         tester_state.contacts[i] = false;
     }
     
-    // // grfMPC class method (retired until further notice)
-    // mpc_proctor.reset();
-    // mpc_proctor.calculateA(tester_state.root_rpy);
-    // mpc_proctor.calculateB(tester_state.go1_lumped_inertia, tester_state.root_rpy, tester_state.foot_pos);
-    // mpc_proctor.calculateMPCStates(tester_state);
-    // mpc_proctor.calculateQPMats(tester_state);
-    // mpc_proctor.solveMPC(tester_state);
-
-    // single-run script method
-    go1StanceMPC(tester_state);
+    go1MPC tester_mpc2;
+    tester_mpc2.solveMPCForState(tester_state);
 
     std::cout << "\nC++ GRF:\n" << tester_state.foot_forces_grf << std::endl;
 
@@ -174,16 +157,8 @@ int go1TestFunctions::testZeroPosErrorGRF() {
     tester_state.contacts[0] = false;
     tester_state.contacts[3] = false;
     
-    // // grfMPC class method (retired until further notice)
-    // mpc_proctor.reset();
-    // mpc_proctor.calculateA(tester_state.root_rpy);
-    // mpc_proctor.calculateB(tester_state.go1_lumped_inertia, tester_state.root_rpy, tester_state.foot_pos);
-    // mpc_proctor.calculateMPCStates(tester_state);
-    // mpc_proctor.calculateQPMats(tester_state);
-    // mpc_proctor.solveMPC(tester_state);
-
-    // single-run script method
-    go1StanceMPC(tester_state);
+    go1MPC tester_mpc3;
+    tester_mpc3.solveMPCForState(tester_state);
 
     std::cout << "\nC++ GRF:\n" << tester_state.foot_forces_grf << std::endl;
 
@@ -236,16 +211,8 @@ int go1TestFunctions::testZeroPosErrorGRF() {
     tester_state.contacts[1] = false;
     tester_state.contacts[2] = false;
     
-    // // grfMPC class method (retired until further notice)
-    // mpc_proctor.reset();
-    // mpc_proctor.calculateA(tester_state.root_rpy);
-    // mpc_proctor.calculateB(tester_state.go1_lumped_inertia, tester_state.root_rpy, tester_state.foot_pos);
-    // mpc_proctor.calculateMPCStates(tester_state);
-    // mpc_proctor.calculateQPMats(tester_state);
-    // mpc_proctor.solveMPC(tester_state);
-
-    // single-run script method
-    go1StanceMPC(tester_state);
+    go1MPC tester_mpc4;
+    tester_mpc4.solveMPCForState(tester_state);
 
     std::cout << "\nC++ GRF:\n" << tester_state.foot_forces_grf << std::endl;
 
@@ -328,16 +295,8 @@ int go1TestFunctions::testNonzeroPosErrorGRF() {
     std::cout << "** Note that the answer keys for this test are not properly set, so expect some error based on your desired position **" << std::endl;
     std::cout << "-- Subtest 1: All feet on ground --" << std::endl;
 
-    // // grfMPC class method (retired until further notice)
-    // mpc_proctor.reset();
-    // mpc_proctor.calculateA(tester_state.root_rpy);
-    // mpc_proctor.calculateB(tester_state.go1_lumped_inertia, tester_state.root_rpy, tester_state.foot_pos);
-    // mpc_proctor.calculateMPCStates(tester_state);
-    // mpc_proctor.calculateQPMats(tester_state);
-    // mpc_proctor.solveMPC(tester_state);
-
-    // single-run script method
-    go1StanceMPC(tester_state);
+    go1MPC tester_mpc1;
+    tester_mpc1.solveMPCForState(tester_state);
 
     std::cout << "\nC++ GRF:\n" << tester_state.foot_forces_grf << std::endl;
 
@@ -391,16 +350,8 @@ int go1TestFunctions::testNonzeroPosErrorGRF() {
         tester_state.contacts[i] = false;
     }
 
-    // // grfMPC class method (retired until further notice)
-    // mpc_proctor.reset();
-    // mpc_proctor.calculateA(tester_state.root_rpy);
-    // mpc_proctor.calculateB(tester_state.go1_lumped_inertia, tester_state.root_rpy, tester_state.foot_pos);
-    // mpc_proctor.calculateMPCStates(tester_state);
-    // mpc_proctor.calculateQPMats(tester_state);
-    // mpc_proctor.solveMPC(tester_state);
-
-    // single-run script method
-    go1StanceMPC(tester_state);
+    go1MPC tester_mpc2;
+    tester_mpc2.solveMPCForState(tester_state);
 
     std::cout << "\nC++ GRF:\n" << tester_state.foot_forces_grf << std::endl;
 
@@ -453,16 +404,8 @@ int go1TestFunctions::testNonzeroPosErrorGRF() {
     tester_state.contacts[0] = false;
     tester_state.contacts[3] = false;
 
-    // // grfMPC class method (retired until further notice)
-    // mpc_proctor.reset();
-    // mpc_proctor.calculateA(tester_state.root_rpy);
-    // mpc_proctor.calculateB(tester_state.go1_lumped_inertia, tester_state.root_rpy, tester_state.foot_pos);
-    // mpc_proctor.calculateMPCStates(tester_state);
-    // mpc_proctor.calculateQPMats(tester_state);
-    // mpc_proctor.solveMPC(tester_state);
-
-    // single-run script method
-    go1StanceMPC(tester_state);
+    go1MPC tester_mpc3;
+    tester_mpc3.solveMPCForState(tester_state);
 
     std::cout << "\nC++ GRF:\n" << tester_state.foot_forces_grf << std::endl;
 
@@ -515,16 +458,8 @@ int go1TestFunctions::testNonzeroPosErrorGRF() {
     tester_state.contacts[1] = false;
     tester_state.contacts[2] = false;
 
-    // // grfMPC class method (retired until further notice)
-    // mpc_proctor.reset();
-    // mpc_proctor.calculateA(tester_state.root_rpy);
-    // mpc_proctor.calculateB(tester_state.go1_lumped_inertia, tester_state.root_rpy, tester_state.foot_pos);
-    // mpc_proctor.calculateMPCStates(tester_state);
-    // mpc_proctor.calculateQPMats(tester_state);
-    // mpc_proctor.solveMPC(tester_state);
-
-    // single-run script method
-    go1StanceMPC(tester_state);
+    go1MPC tester_mpc4;
+    tester_mpc4.solveMPCForState(tester_state);
 
     std::cout << "\nC++ GRF:\n" << tester_state.foot_forces_grf << std::endl;
 
@@ -586,7 +521,6 @@ int go1TestFunctions::testZeroPosErrorWalk() {
     // initialize current tester state
     tester_state.resetState();
     tester_state.walking_mode = true;
-    go1MPC tester_go1_stance_proctor;
 
     mjtNum temp_joint_angles[19] = {0.0, 0.0, 0.27, 1.0, 0.0, 0.0, 0.0, 0.0, 0.9, -1.8, 0.0, 0.9, -1.8, 0.0, 0.9, -1.8, 0.0, 0.9, -1.8};
     mjtNum temp_joint_velocities[18] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
@@ -605,17 +539,8 @@ int go1TestFunctions::testZeroPosErrorWalk() {
 
     tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc);
 
-    // single-run script method
-    // go1StanceMPC(tester_state);
-    // tester_go1_stance_proctor.updateRigidBodyModel(tester_state.root_rpy, tester_state.go1_lumped_inertia, tester_state.foot_pos);
-    // tester_go1_stance_proctor.updateMPCStates(tester_state.root_pos, tester_state.root_pos_d,
-    //                                         tester_state.root_rpy, tester_state.root_rpy_d,
-    //                                         tester_state.root_lin_vel, tester_state.root_lin_vel_d,
-    //                                         tester_state.root_ang_vel, tester_state.root_ang_vel_d);
-    // tester_state.foot_forces_grf = tester_go1_stance_proctor.solveMPCForces(tester_state.swing_phase, tester_state.swing_phase);
-    tester_go1_stance_proctor.updateRigidBodyModel(tester_state);
-    tester_go1_stance_proctor.updateMPCStates(tester_state);
-    tester_go1_stance_proctor.solveMPCForces(tester_state);
+    go1MPC tester_mpc1;
+    tester_mpc1.solveMPCForState(tester_state);
 
     std::cout << "\nC++ GRF:\n" << tester_state.foot_forces_grf << std::endl;
     std::cout << "\nC++ swing forces:\n" << tester_state.foot_forces_swing << std::endl;
@@ -666,23 +591,11 @@ int go1TestFunctions::testZeroPosErrorWalk() {
     tester_state.walking_mode = true;
     tester_state.swing_phase = SWING_PHASE_MAX/2 + 1;
     tester_state.root_pos_d << 0, 0, 0.27;
-    go1MPC tester_go1_stance_proctor2;
 
     tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc);
 
-    // single-run script method
-    // go1StanceMPC(tester_state);
-    // tester_go1_stance_proctor.updateRigidBodyModel(tester_state.root_rpy, tester_state.go1_lumped_inertia, tester_state.foot_pos);
-    // tester_go1_stance_proctor.updateMPCStates(tester_state.root_pos, tester_state.root_pos_d,
-    //                                         tester_state.root_rpy, tester_state.root_rpy_d,
-    //                                         tester_state.root_lin_vel, tester_state.root_lin_vel_d,
-    //                                         tester_state.root_ang_vel, tester_state.root_ang_vel_d);
-    // tester_state.foot_forces_grf = tester_go1_stance_proctor.solveMPCForces(tester_state.swing_phase, tester_state.swing_phase);
-    tester_go1_stance_proctor.updateRigidBodyModel(tester_state);
-    tester_go1_stance_proctor.updateMPCStates(tester_state);
-    tester_go1_stance_proctor.solveMPCForces(tester_state);
-    std::cout << "\nC++ GRF:\n" << tester_state.foot_forces_grf << std::endl;
-    std::cout << "\nC++ swing forces:\n" << tester_state.foot_forces_swing << std::endl;
+    go1MPC tester_mpc2;
+    tester_mpc2.solveMPCForState(tester_state);
 
     matlabForces.setZero();
     matlabForces << -2.36255459640233e-13, 2.11386463888630e-13, -2.43360886997834e-13, 3.55271367880050e-13, 
@@ -920,14 +833,6 @@ int go1TestFunctions::testBezierVel() {
     return 1;
 }
 
-int go1TestFunctions::testConvertForcesToTorques() {
-    return 0;
-}
-
-int go1TestFunctions::testUpdateStateFromMujoco() {
-    return 0;
-}
-
 int go1TestFunctions::testNumericJacobian() {
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -936,7 +841,7 @@ int go1TestFunctions::testNumericJacobian() {
     Eigen::Vector3d f_meas(0, 0, 9.8);
     Eigen::Vector3d omg_meas(1, 0, 0.5);
 
-    Eigen::MatrixXd jacobian = numericalJacobian(fState, x, 1e-6, f_meas, omg_meas);
+    Eigen::MatrixXd jacobian = numericalJacobian(fState, x, 1e-6, true, f_meas, omg_meas);
 
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> duration = end - start;

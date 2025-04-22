@@ -17,17 +17,27 @@
 #include "go1Params.h"
 #include "go1Utils.h"
 
-void go1StanceMPC(go1State &state); // standalone version of go1MPC class below
-
-class go1MPC { // class-based version of go1StanceMPC function above
+class go1MPC {
     public:
         go1MPC();
         void reset();
+
+        // go1State wrappers for private helper functions
         void updateRigidBodyModel(const go1State& state);
         void updateMPCStates(const go1State& state);
-        void solveMPCForces(go1State& state);
+        void buildAndSolveQP(go1State& state);
 
-        // weights
+        // experimental go1StateSnapshot quick-use functions
+        void solveMPCFromSnapshot(go1StateSnapshot &snap);
+        void solveMPCForState(go1State &state);
+
+    private:
+        // experimental core helper functions
+        void updateRigidBodyModelFromSnapshot(const go1StateSnapshot &snap);
+        void updateMPCStatesFromSnapshot(const go1StateSnapshot &snap);
+        void buildAndSolveQPForSnapshot(go1StateSnapshot &snap);
+
+        // QP-MPC weights
         Eigen::Matrix<double, 13, 1> q_weights;
         Eigen::SparseMatrix<double> Q;
         Eigen::SparseMatrix<double> R;
@@ -65,7 +75,6 @@ class go1MPC { // class-based version of go1StanceMPC function above
         Eigen::Matrix<double, FRIC_PYR*NUM_LEG, 3*NUM_LEG> C_ineq_blk;
 
         OsqpEigen::Solver mpc_solver;
-        Eigen::Matrix<double, 3, NUM_LEG> grf_forces;
 };
 
 #endif // GO1_STANCE_MPC_H

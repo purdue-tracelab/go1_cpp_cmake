@@ -6,7 +6,8 @@
 #include <Eigen/Sparse>
 #include <Eigen/Eigenvalues>
 #include <unsupported/Eigen/MatrixFunctions>
-#include <string>
+#include <memory>
+#include <Eigen/Cholesky>
 
 // Package-specific header files
 #include "go1Params.h"
@@ -16,66 +17,130 @@
 
 class go1StateEstimator {
     public:
-        // functions
-        // go1StateEstimator(go1State& state);
-        go1StateEstimator();
-        void collectInitialState(const go1State& state);
-        void estimateState(go1State& state, const Eigen::Vector3d& accel, const Eigen::Vector3d& gyro);
-        void naiveKalmanFilter(go1State& state, const Eigen::Vector3d& accel, const Eigen::Vector3d& gyro);
-        void kinematicKalmanFilter(go1State& state, const Eigen::Vector3d& accel, const Eigen::Vector3d& gyro);
-        void twoStageKalmanFilter(go1State& state, const Eigen::Vector3d& accel, const Eigen::Vector3d& gyro);
-        void extendedKalmanFilter(go1State& state, const Eigen::Vector3d& accel, const Eigen::Vector3d& gyro);
-        
-        // filter vector and matrices
-        Eigen::VectorXd x_k;
-        Eigen::VectorXd x_k1;
-        Eigen::VectorXd u_k;
-        Eigen::VectorXd z_k;
-        Eigen::VectorXd y_res;
-        Eigen::MatrixXd F_k;
-        Eigen::MatrixXd B_k;
-        Eigen::MatrixXd H_k;
-        Eigen::MatrixXd P_k;
-        Eigen::MatrixXd P_k1;
-        Eigen::MatrixXd Q_k;
-        Eigen::MatrixXd R_k;
-        Eigen::MatrixXd S_k;
-        Eigen::MatrixXd K_k;
-        Eigen::Matrix3d eye3;
-
+        virtual ~go1StateEstimator() = default;
+        virtual void collectInitialState(const go1State& state) = 0;
+        virtual void estimateState(go1State& state, const Eigen::Vector3d& accel, const Eigen::Vector3d& gyro) = 0;
 };
 
-inline Eigen::VectorXd fState(const Eigen::VectorXd& x_k, const Eigen::Vector3d& f_meas, const Eigen::Vector3d& omg_meas) {
-/*
-    fState represents the nonlinear state transition function 
-    between the current and new state for the nonlinear
-    extendedKalmanFilter function.
-*/
-    Eigen::VectorXd x_k1 = x_k;
+class NaiveKF : public go1StateEstimator {
+    public:
+        NaiveKF();
+        void collectInitialState(const go1State& state) override;
+        void estimateState(go1State& state, const Eigen::Vector3d& accel, const Eigen::Vector3d& gyro) override;
+
+    private:
+        Eigen::Matrix<double, 9, 1> x_k, x_k1;
+        Eigen::Vector3d z_k, y_res;
+        Eigen::Matrix<double, 9, 9> F_k, P_k, P_k1, Q_k;
+        Eigen::Matrix<double, 3, 9> H_k;
+        Eigen::Matrix<double, 9, 3> K_k;
+        Eigen::Matrix3d R_k, S_k;
+        Eigen::Matrix3d eye3;
+};
+
+class KinematicKF : public go1StateEstimator {
+    public:
+        KinematicKF();
+        void collectInitialState(const go1State& state) override;
+        void estimateState(go1State& state, const Eigen::Vector3d& accel, const Eigen::Vector3d& gyro) override;
+
+    private:
+        Eigen::Matrix<double, 18, 1> x_k, x_k1;
+        Eigen::Vector3d u_k;
+        Eigen::Matrix<double, 28, 1> z_k, y_res;
+        Eigen::Matrix<double, 18, 18> F_k, P_k, P_k1, Q_k;
+        Eigen::Matrix<double, 18, 3> B_k;
+        Eigen::Matrix<double, 28, 18> H_k;
+        Eigen::Matrix<double, 28, 28> R_k, S_k;
+        Eigen::Matrix<double, 18, 28> K_k;
+        Eigen::Matrix3d eye3;
+};
+
+class TwoStageKF : public go1StateEstimator {
+    public:
+        TwoStageKF();
+        void collectInitialState(const go1State& state) override;
+        void estimateState(go1State& state, const Eigen::Vector3d& accel, const Eigen::Vector3d& gyro) override;
+
+    private:
+        Eigen::Matrix<double, 18, 1> x_k, x_k1;
+        Eigen::Vector3d u_k;
+        Eigen::Matrix<double, 28, 1> z_k, y_res;
+        Eigen::Matrix<double, 18, 18> F_k, P_k, P_k1, Q_k;
+        Eigen::Matrix<double, 18, 3> B_k;
+        Eigen::Matrix<double, 28, 18> H_k;
+        Eigen::Matrix<double, 28, 28> R_k, S_k;
+        Eigen::Matrix<double, 18, 28> K_k;
+        Eigen::Matrix3d eye3;
+};
+
+class ExtendedKF : public go1StateEstimator {
+    public:
+        ExtendedKF();
+        void collectInitialState(const go1State& state) override;
+        void estimateState(go1State& state, const Eigen::Vector3d& accel, const Eigen::Vector3d& gyro) override;
+    
+    private:
+        Eigen::Matrix<double, 22, 1> x_k, x_k1;
+        Eigen::Matrix<double, 12, 1> z_k, y_res;
+        Eigen::Matrix<double, 22, 22> F_k, P_k, P_k1, F_P_k, K_H_P_k, Q_k;
+        Eigen::Matrix<double, 22, 12> K_k;
+        Eigen::Matrix<double, 12, 22> H_k;
+        Eigen::Matrix<double, 12, 12> R_k, S_k;
+        Eigen::Matrix<double, 12, 22> H_P;
+        Eigen::Matrix<double, 12, 22> S_k_invT;
+        Eigen::Matrix<double, 12, 1> foot_pos_abs;
+        Eigen::LDLT<decltype(S_k)> S_k_ldlt;
+        // Eigen::LLT<decltype(P_k)> P_k_llt;
+        Eigen::Matrix3d eye3;
+};
+
+// virtual interface pointer function to create designated estimator object
+inline std::unique_ptr<go1StateEstimator> makeEstimator() {
+    switch (STATE_EST_SELECT) {
+        case 0: return std::make_unique<NaiveKF>();
+        case 1: return std::make_unique<KinematicKF>();
+        case 2: return std::make_unique<TwoStageKF>();
+        case 3: return std::make_unique<ExtendedKF>();
+        default: throw std::runtime_error("Invalid STATE_EST_SELECT");
+    }
+}
+
+// Nonlinear state transition function for ExtendedKF
+inline Eigen::Matrix<double, 22, 1> fState(const Eigen::Matrix<double, 22, 1>& x_k, const Eigen::Vector3d& f_meas, const Eigen::Vector3d& omg_meas) {
+    Eigen::Matrix<double, 22, 1> x_k1 = x_k;
     Eigen::Vector3d grav (0, 0, -9.81);
-    Eigen::Matrix3d C_k = quat2RotM(x_k.segment<4>(6));
+    Eigen::Matrix3d C_kT = quat2RotM(x_k.segment<4>(6)).transpose();
+
+    auto acc_world = C_kT * f_meas + grav;
+    if (!acc_world.allFinite()) {
+        std::ostringstream oss;
+        oss << "NaN/Inf in fState acc_world: [" << acc_world.transpose() << "]";
+        throw std::runtime_error(oss.str());
+    }
 
     // r_k+1
-    x_k1.segment<3>(0) = x_k.segment<3>(0) + DT_CTRL * x_k.segment<3>(3) + 0.5 * std::pow(DT_CTRL, 2) * (C_k.transpose() * f_meas + grav);
+    x_k1.segment<3>(0) = x_k.segment<3>(0) + DT_CTRL * x_k.segment<3>(3) + 0.5 * std::pow(DT_CTRL, 2) * (C_kT * f_meas + grav);
 
     // v_k+1
-    x_k1.segment<3>(3) = x_k.segment<3>(3) + DT_CTRL * (C_k.transpose() * f_meas + grav);
+    x_k1.segment<3>(3) = x_k.segment<3>(3) + DT_CTRL * (C_kT * f_meas + grav);
 
     // q_k+1
     Eigen::Quaterniond q(x_k(6), x_k(7), x_k(8), x_k(9));
-    q.normalize();
-    Eigen::Quaterniond dq;
+    if (std::abs(q.norm() - 1) > 1e-6) q.normalize();
 
     Eigen::Vector3d deltaRPY = DT_CTRL * omg_meas;
-    double angle = deltaRPY.norm();         
-
-    if (angle < 1e-6) {
-        dq = Eigen::Quaterniond(1.0, 0.5 * deltaRPY(0), 0.5 * deltaRPY(1), 0.5 * deltaRPY(2));
+    double angle = deltaRPY.norm();
+    Eigen::Quaterniond dq;
+    
+    if (angle < 1e-8) {
+        dq = Eigen::Quaterniond(1.0, 0.5 * deltaRPY.x(), 0.5 * deltaRPY.y(), 0.5 * deltaRPY.z());
     } else {
         dq = Eigen::Quaterniond(Eigen::AngleAxisd(angle, deltaRPY / angle));
     }
 
     Eigen::Quaterniond q_k1 = q * dq;
+    // Eigen::Quaterniond q_k1 = quatMult(q, dq);
     q_k1.normalize();
 
     x_k1.segment<4>(6) << q_k1.w(), q_k1.x(), q_k1.y(), q_k1.z();
@@ -83,12 +148,9 @@ inline Eigen::VectorXd fState(const Eigen::VectorXd& x_k, const Eigen::Vector3d&
     return x_k1;
 }
 
-inline Eigen::VectorXd hState(const Eigen::VectorXd& x_k) {
-/*
-    hState represents the nonlinear measurement model for the 
-    current state for the extendedKalmanFilter function.
-*/
-    Eigen::VectorXd z_k(12);
+// Nonlinear measurement model function for ExtendedKF
+inline Eigen::Matrix<double, 12, 1> hState(const Eigen::Matrix<double, 22, 1>& x_k) {
+    Eigen::Matrix<double, 12, 1> z_k;
     Eigen::Matrix3d C_k = quat2RotM(x_k.segment<4>(6));
 
     z_k.segment<3>(0) = C_k * (x_k.segment<3>(10) - x_k.segment<3>(0));
@@ -97,7 +159,6 @@ inline Eigen::VectorXd hState(const Eigen::VectorXd& x_k) {
     z_k.segment<3>(9) = C_k * (x_k.segment<3>(19) - x_k.segment<3>(0));
 
     return z_k;
-
 }
 
 #endif // GO1_STATE_EST_H

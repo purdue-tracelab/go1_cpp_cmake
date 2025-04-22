@@ -19,8 +19,6 @@ class go1TestFunctions {
         int testSwingPD();
         int testBezierPos();
         int testBezierVel();
-        int testConvertForcesToTorques();
-        int testUpdateStateFromMujoco();
         int testNumericJacobian();
 
         go1State tester_state;

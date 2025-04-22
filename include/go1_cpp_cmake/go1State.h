@@ -8,28 +8,57 @@
 #include <unsupported/Eigen/MatrixFunctions>
 #include "OsqpEigen/OsqpEigen.h"
 #include <mujoco/mujoco.h>
+#include <mutex>
 
 // Package-specific header files
 #include "go1Params.h"
 #include "go1FK.h"
 #include "go1Utils.h"
-#include "unitree_legged_sdk/unitree_legged_sdk.h"
 
+struct go1StateSnapshot {
+    // grab from go1State object
+    Eigen::Matrix<double, 3, NUM_LEG> foot_pos; // relative frame
+    Eigen::Matrix3d go1_lumped_inertia;
+    Eigen::Vector3d root_pos;
+    Eigen::Vector3d root_pos_d;
+    Eigen::Vector3d root_rpy;
+    Eigen::Vector3d root_rpy_d;
+    Eigen::Vector3d root_lin_vel;
+    Eigen::Vector3d root_lin_vel_d;
+    Eigen::Vector3d root_ang_vel;
+    Eigen::Vector3d root_ang_vel_d;
+    bool walking_mode;
+    int swing_phase;
+
+    // send to go1State.foot_forces_grf
+    Eigen::Matrix<double, 3, NUM_LEG> grf_forces;
+};
 
 class go1State {
     public:
         // functions
         go1State();
         void resetState();
-        void updateStateFromMujoco(const mjtNum* q_vec, const mjtNum* q_vel, const Eigen::Vector3d& lin_acc);
-        void updateHardwareState(UNITREE_LEGGED_SDK::LowState& state);
+        void updateStateFromMujoco(const mjtNum* q_vec, const mjtNum* q_vel, const Eigen::Vector3d &lin_acc);
         void convertForcesToTorquesMujoco(const mjtNum* q_vec);
-        void convertForcesToTorquesHardware(const Eigen::VectorXd& jointPos);
+        void convertForcesToTorquesHardware(const Eigen::VectorXd &jointPos);
         void raibertHeuristic(bool withCapturePoint = false);
         void amirHLIP();
         void swingPD(int leg_idx, Eigen::Vector3d footPosRef, Eigen::Vector3d footVelRef, bool absolute = false);
+        void jointPD(int joint_idx, double jointPos, double jointVel, bool startup = true);
         Eigen::Vector3d bezierPos();
         Eigen::Vector3d bezierVel();
+
+        // experimental functions for FSM
+        bool isStartupComplete() const;
+        bool isShutdownComplete() const;
+        void computeStartupPDMujoco(const mjtNum* q_vec, const mjtNum* q_vel);
+        void computeShutdownPDMujoco(const mjtNum* q_vec, const mjtNum* q_vel);
+        bool getWalkingMode() const { return walking_mode; }
+        void setWalkingMode(bool v) { walking_mode = v; }
+        int getSwingPhase() const { return swing_phase; }
+        go1StateSnapshot getSnapshot() const;
+        void setGRFForces(const Eigen::Matrix<double, 3, NUM_LEG> &grf);
 
         // default information
         Eigen::Matrix3d go1_lumped_inertia;
@@ -40,11 +69,11 @@ class go1State {
         Eigen::Vector3d root_pos_d;
         Eigen::Vector3d root_pos_est;
         Eigen::Vector3d root_lin_vel;
-        Eigen::Vector3d root_lin_vel_old;      
         Eigen::Vector3d root_lin_vel_d;
         Eigen::Vector3d root_lin_vel_est;
         Eigen::Vector3d root_lin_acc;
         Eigen::Vector3d root_lin_acc_est;
+        Eigen::Vector3d root_lin_acc_meas;
 
         Eigen::Quaterniond root_quat;
         Eigen::Quaterniond root_quat_old;
@@ -54,19 +83,19 @@ class go1State {
         Eigen::Vector3d root_rpy_d;
         Eigen::Vector3d root_rpy_est;
         Eigen::Vector3d root_ang_vel;
-        Eigen::Vector3d root_ang_vel_old;      
         Eigen::Vector3d root_ang_vel_d;
         Eigen::Vector3d root_ang_vel_est;
-
-        Eigen::Matrix<double, 1, 12> jointPos;      // added
+        Eigen::Vector3d root_ang_vel_meas;
 
         // actuation-related variables (ORDER IS FR, FL, RR, RL)
         Eigen::Matrix<double, 3, NUM_LEG> foot_forces_grf;
         Eigen::Matrix<double, 3, NUM_LEG> foot_forces_swing;
         Eigen::Matrix<double, 3, NUM_LEG> joint_torques;
+        Eigen::Matrix<double, 12, 1> joint_pos_init;
 
-        // gait phase
+        // movement mode trackers
         bool walking_mode;
+        double squat_prog;
         bool contacts[NUM_LEG];
         int swing_phase;
         bool init;
@@ -105,6 +134,8 @@ class go1State {
         Eigen::VectorXd hlip_lb;
         Eigen::VectorXd GainsHLIP; // HLIP-based stepping controller gains
     
+    private:
+        mutable std::mutex mtx_; // maybe experiment with adding more private variables?
 };
 
 #endif //GO1_STATE_H

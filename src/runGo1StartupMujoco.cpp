@@ -1,28 +1,27 @@
+#include <rclcpp/rclcpp.hpp>
 #include <mujoco/mujoco.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include <fstream>
 #include <vector>
-#include <thread>
 #include <filesystem>
-#include <ncurses.h>
 
 #include "go1_cpp_cmake/go1StanceMPC.h"
 #include "go1_cpp_cmake/go1StateEstimator.h"
 
 // Global variables for MuJoCo
 mjModel* model = nullptr;
-mjData* mujoco_data = nullptr;
+mjData* data = nullptr;
 mjvCamera cam;
 mjvOption opt;
 mjvScene scn;
 mjrContext con;
 GLFWwindow* window = nullptr;
-int window_width = 1270, window_height = 720;  // Default window size
+int window_width = 2560, window_height = 1440;  // Default window size
 
 // Global variables for Go1 Robot
 go1State mujoco_go1_state;
-go1StateEstimator mujoco_go1_estimator;
+std::unique_ptr<go1StateEstimator> mujoco_go1_estimator;
 go1MPC mujoco_go1_stance_proctor;
 Eigen::Matrix<double, 12, 1> joint_torques_stacked;
 
@@ -75,13 +74,13 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
 // Function to initialize visualization
 void initVisualization() {
     if (!glfwInit()) {
-        std::cerr << "Could not initialize GLFW!" << std::endl;
+        RCLCPP_ERROR(rclcpp::get_logger("mujoco_sim"), "Could not initialize GLFW!");
         exit(1);
     }
 
     window = glfwCreateWindow(window_width, window_height, "MuJoCo Simulation", NULL, NULL);
     if (!window) {
-        std::cerr << "Could not create GLFW window!" << std::endl;
+        RCLCPP_ERROR(rclcpp::get_logger("mujoco_sim"), "Could not create GLFW window!");
         glfwTerminate();
         exit(1);
     }
@@ -102,7 +101,7 @@ void initVisualization() {
 
 // Function to render the MuJoCo scene
 void renderScene() {
-    mjv_updateScene(model, mujoco_data, &opt, nullptr, &cam, mjCAT_ALL, &scn);
+    mjv_updateScene(model, data, &opt, nullptr, &cam, mjCAT_ALL, &scn);
     mjrRect viewport = {0, 0, window_width, window_height};
     mjr_render(viewport, &scn, &con);
     glfwSwapBuffers(window);
@@ -111,16 +110,9 @@ void renderScene() {
 
 // Function to set initial camera position
 void adjustCamera() {
-    cam.distance = 3.5;
+    cam.distance = 3.75;
     cam.azimuth = 235;
     cam.elevation = -20;
-}
-
-// refurbished MPC wrapper function
-void findMPCSolution() {
-    mujoco_go1_stance_proctor.updateRigidBodyModel(mujoco_go1_state);
-    mujoco_go1_stance_proctor.updateMPCStates(mujoco_go1_state);
-    mujoco_go1_stance_proctor.solveMPCForces(mujoco_go1_state);
 }
 
 // Function to write Eigen::Vector in CSV format
@@ -275,97 +267,27 @@ void writeCalcTimeCSVHeader(std::ofstream &file) {
     file << "state_update_time,estimation_time,MPC_calc_time\n";
 }
 
-void keyControl(const mjtNum simTime) {
-    // Initialize ncurses
-    initscr(); // Start ncurses mode
-    timeout(0); // Non-blocking input, no delay
-    nodelay(stdscr, TRUE);
-    noecho();            // Don't display pressed keys
-    cbreak();            // Disable line buffering (don't need to press Enter)
+int main(int argc, char** argv) {
+    rclcpp::init(argc, argv);
+    auto node = std::make_shared<rclcpp::Node>("mujoco_sim");
 
-    int ch = getch();
-
-    if (ch != ERR) {
-        switch (ch) {
-            case 'w':  // Move forwards
-                mujoco_go1_state.root_lin_vel_d << 0.3, 0, 0;
-                mujoco_go1_state.root_pos_d << mujoco_go1_state.root_pos(0) + mujoco_go1_state.root_lin_vel_d(0) * (SWING_PHASE_MAX + 1) * DT_CTRL, mujoco_go1_state.root_pos(1), WALK_HEIGHT;
-                break;
-    
-            case 'a':  // Move left
-                mujoco_go1_state.root_lin_vel_d << 0, 0.15, 0;
-                mujoco_go1_state.root_pos_d << mujoco_go1_state.root_pos(0), mujoco_go1_state.root_pos(1) + mujoco_go1_state.root_lin_vel_d(1) * (SWING_PHASE_MAX + 1) * DT_CTRL, WALK_HEIGHT;
-                break;
-    
-            case 's':  // Move backwards
-                mujoco_go1_state.root_lin_vel_d << -0.3, 0, 0;
-                mujoco_go1_state.root_pos_d << mujoco_go1_state.root_pos(0) + mujoco_go1_state.root_lin_vel_d(0) * (SWING_PHASE_MAX + 1) * DT_CTRL, mujoco_go1_state.root_pos(1), WALK_HEIGHT;
-                break;
-    
-            case 'd':  // Move right
-                mujoco_go1_state.root_lin_vel_d << 0, -0.15, 0;
-                mujoco_go1_state.root_pos_d << mujoco_go1_state.root_pos(0), mujoco_go1_state.root_pos(1) + mujoco_go1_state.root_lin_vel_d(1) * (SWING_PHASE_MAX + 1) * DT_CTRL, WALK_HEIGHT;
-                break;
-            
-            case 'e': // Yaw right
-                mujoco_go1_state.root_ang_vel_d << 0, 0, -1;
-                mujoco_go1_state.root_rpy_d << 0, 0, mujoco_go1_state.root_rpy(2) + mujoco_go1_state.root_ang_vel_d(2) * (SWING_PHASE_MAX + 1) * DT_CTRL;
-                break;
-
-            case 'q':
-                mujoco_go1_state.root_ang_vel_d << 0, 0, 1;
-                mujoco_go1_state.root_rpy_d << 0, 0, mujoco_go1_state.root_rpy(2) + mujoco_go1_state.root_ang_vel_d(2) * (SWING_PHASE_MAX + 1) * DT_CTRL;
-                break;
-
-            case 'p':
-                mujoco_go1_state.walking_mode = !mujoco_go1_state.walking_mode;
-                mujoco_go1_state.root_lin_vel_d << 0, 0, 0;
-                mujoco_go1_state.root_ang_vel_d << 0, 0, 0;
-                mujoco_go1_state.root_pos_d << mujoco_go1_state.root_pos(0), mujoco_go1_state.root_pos(1), WALK_HEIGHT;
-                mujoco_go1_state.root_rpy_d << 0, 0, mujoco_go1_state.root_rpy(2); 
-
-            default:
-                mujoco_go1_state.root_lin_vel_d << 0, 0, 0;
-                mujoco_go1_state.root_ang_vel_d << 0, 0, 0;
-                mujoco_go1_state.root_pos_d << mujoco_go1_state.root_pos(0), mujoco_go1_state.root_pos(1), WALK_HEIGHT;
-                mujoco_go1_state.root_rpy_d << 0, 0, mujoco_go1_state.root_rpy(2);
-                break;  // Ignore other keys
-        }
-
-    }
-
-    move(0, 0);
-    printw("Simulation time: %f\n", simTime);
-    printw("Desired Lin Vel: (%f, %f, %f)\n", 
-            mujoco_go1_state.root_lin_vel_d(0), 
-            mujoco_go1_state.root_lin_vel_d(1), 
-            mujoco_go1_state.root_lin_vel_d(2));
-    printw("Desired Ang Vel: (%f, %f, %f)\n", 
-        mujoco_go1_state.root_ang_vel_d(0), 
-        mujoco_go1_state.root_ang_vel_d(1), 
-        mujoco_go1_state.root_ang_vel_d(2));
-
-    refresh();
-
-}
-
-int main(void) {
-    std::cout << "Initializing MuJoCo..." << std::endl;
+    RCLCPP_INFO(node->get_logger(), "Initializing MuJoCo...");
 
     mujoco_go1_state.resetState();
     joint_torques_stacked.setZero();
 
     // Load MuJoCo model
     char error[1000] = "";
-    std::filesystem::path relative_model_path("../models/go1.xml");
+    std::filesystem::path relative_model_path("../models/go1_MATLAB.xml");
     std::string model_path = std::filesystem::absolute(relative_model_path);
 
     mjVFS vfs;
     mj_defaultVFS(&vfs);
 
     if (mj_addFileVFS(&vfs, model_path.c_str(), model_path.c_str()) != 0) {
-        std::cerr << "Failed to add XML to VFS: " << model_path.c_str() << std::endl;
+        RCLCPP_ERROR(node->get_logger(), "Failed to add XML to VFS: %s", model_path.c_str());
         mj_deleteVFS(&vfs);
+        rclcpp::shutdown();
         return -1;
     }
 
@@ -373,28 +295,29 @@ int main(void) {
     mj_deleteVFS(&vfs);
 
     if (!model) {
-        std::cerr << "Failed to load MuJoCo model: " << error << std::endl;
+        RCLCPP_ERROR(node->get_logger(), "Failed to load MuJoCo model: %s", error);
+        rclcpp::shutdown();
         return -1;
     }
 
-    mujoco_data = mj_makeData(model);
+    data = mj_makeData(model);
     
     if (model->nkey > 0) {
         int keyframe_id = mj_name2id(model, mjOBJ_KEY, "prone");
         if (keyframe_id == -1) {
-            std::cerr << "Keyframe 'prone' not found!" << std::endl;
+            RCLCPP_ERROR(node->get_logger(), "Keyframe 'prone' not found!");
+            rclcpp::shutdown();
             return -1;
         }
-        mj_resetDataKeyframe(model, mujoco_data, keyframe_id);
+        mj_resetDataKeyframe(model, data, keyframe_id);
     } else {
-        mj_resetData(model, mujoco_data);
+        mj_resetData(model, data);
     }
 
     initVisualization();
     adjustCamera();
 
-    const std::chrono::milliseconds loop_time(static_cast<long>(1000 * model->opt.timestep)); // 500 Hz loop time
-    bool running = true;
+    rclcpp::Rate rate(1.0 / model->opt.timestep);
     double lastMPCUpdateTime = -1.0; // calculate MPC solution at the beginning
     double mpcInterval = DT_MPC_CTRL;
     double lastRenderSimTime = -1.0; // render at the beginning
@@ -408,18 +331,19 @@ int main(void) {
     int sensor_adr1 = model->sensor_adr[sensor_id1];
     int sensor_adr2 = model->sensor_adr[sensor_id2];
 
-    // Initialize the state and estimator from MuJoCo data
-    std::memcpy(qpos_buffer, mujoco_data->qpos, model->nq * sizeof(mjtNum));
-    std::memcpy(qvel_buffer, mujoco_data->qvel, model->nv * sizeof(mjtNum));
-    Eigen::Vector3d lin_acc = Eigen::Map<const Eigen::Vector3d>(mujoco_data->cacc + 3 * base_id);
-    Eigen::Vector3d lin_acc_meas = Eigen::Map<const Eigen::Vector3d>(mujoco_data->sensordata + sensor_adr1);
-    Eigen::Vector3d ang_vel_meas = Eigen::Map<const Eigen::Vector3d>(mujoco_data->sensordata + sensor_adr2);
+    // Initialize the state from MuJoCo
+    std::memcpy(qpos_buffer, data->qpos, model->nq * sizeof(mjtNum));
+    std::memcpy(qvel_buffer, data->qvel, model->nv * sizeof(mjtNum));
+    Eigen::Vector3d lin_acc = Eigen::Map<const Eigen::Vector3d>(data->cacc + 3 * base_id);
+    Eigen::Vector3d lin_acc_meas = Eigen::Map<const Eigen::Vector3d>(data->sensordata + sensor_adr1);
+    Eigen::Vector3d ang_vel_meas = Eigen::Map<const Eigen::Vector3d>(data->sensordata + sensor_adr2);
     
     mujoco_go1_state.updateStateFromMujoco(qpos_buffer, qvel_buffer, lin_acc);
-    mujoco_go1_estimator.collectInitialState(mujoco_go1_state);
+    mujoco_go1_estimator = makeEstimator();
+    mujoco_go1_estimator->collectInitialState(mujoco_go1_state);
 
-    // Write CSV headers only once
-    std::string filename = "../data/go1_mujoco_data.csv";
+    // Write header only once
+    std::string filename = "../data/go1_mujoco_data.csv"; // change this path to relative
     std::cout << "Writing data to: " << filename << std::endl;
     std::ofstream file(filename, std::ios::trunc);
     writeCSVHeader(file);
@@ -431,29 +355,37 @@ int main(void) {
     writeCalcTimeCSVHeader(calc_time_file);
     calc_time_file.close();
 
-    // Reopen files in append mode
+    // Reopen the file in append mode
     file.open(filename, std::ios::app);
     calc_time_file.open(calc_time_filename, std::ios::app);
 
     if (!file.is_open() || !calc_time_file.is_open()) {
-        std::cerr << "Error opening files!" << std::endl;
+        std::cerr << "Error opening file!" << std::endl;
         return -1;
     }
 
-    // Main simulation loop
-    while (running && !glfwWindowShouldClose(window)) {
-        std::cout << "Simulation time: " << mujoco_data->time << std::endl;
+    // Main simulation loop (broken atm bc of experimental FSM code)
+    while (rclcpp::ok() && !glfwWindowShouldClose(window)) {
+        std::cout << "Simulation time: " << data->time << std::endl;
 
-        // Desired states (gradual transition to standing w/ ALEPH = BETTA = 0.2)
-        mujoco_go1_state.root_pos_d << 0, 0, WALK_HEIGHT;
-        mujoco_go1_state.root_lin_vel_d << 0, 0, 0;
+        if (data->time < 2.0) {
+            mujoco_go1_state.computeStartupPDMujoco(qpos_buffer, qvel_buffer);
+        } else if (data->time < 4.0) {
+            mujoco_go1_state.root_pos_d << 0.0, 0.0, WALK_HEIGHT;
+        } else if (data->time < 7.0) {
+            mujoco_go1_state.setWalkingMode(true);
+        } else if (data->time < 10.0) {
+            mujoco_go1_state.setWalkingMode(false);
+        } else if (data->time < 12.0) {
+            mujoco_go1_state.computeShutdownPDMujoco(qpos_buffer, qvel_buffer);
+        }
 
         // Extract joint position, joint velocity, and base linear acceleration from MuJoCo
-        std::memcpy(qpos_buffer, mujoco_data->qpos, model->nq * sizeof(mjtNum));
-        std::memcpy(qvel_buffer, mujoco_data->qvel, model->nv * sizeof(mjtNum));
-        Eigen::Vector3d lin_acc = Eigen::Map<const Eigen::Vector3d>(mujoco_data->cacc + 3 * base_id);
-        Eigen::Vector3d lin_acc_meas = Eigen::Map<const Eigen::Vector3d>(mujoco_data->sensordata + sensor_adr1);
-        Eigen::Vector3d ang_vel_meas = Eigen::Map<const Eigen::Vector3d>(mujoco_data->sensordata + sensor_adr2);
+        std::memcpy(qpos_buffer, data->qpos, model->nq * sizeof(mjtNum));
+        std::memcpy(qvel_buffer, data->qvel, model->nv * sizeof(mjtNum));
+        Eigen::Vector3d lin_acc = Eigen::Map<const Eigen::Vector3d>(data->cacc + 3 * base_id);
+        Eigen::Vector3d lin_acc_meas = Eigen::Map<const Eigen::Vector3d>(data->sensordata + sensor_adr1);
+        Eigen::Vector3d ang_vel_meas = Eigen::Map<const Eigen::Vector3d>(data->sensordata + sensor_adr2);
 
         // Update Go1 state from MuJoCo & perform swing PD force control
         auto start1 = std::chrono::high_resolution_clock::now();
@@ -462,7 +394,7 @@ int main(void) {
         std::chrono::duration<double, std::milli> elapsed1 = end1 - start1;
         double duration_1 = elapsed1.count();
         auto start2 = std::chrono::high_resolution_clock::now();
-        mujoco_go1_estimator.estimateState(mujoco_go1_state, lin_acc_meas, ang_vel_meas);
+        mujoco_go1_estimator->estimateState(mujoco_go1_state, lin_acc_meas, ang_vel_meas);
         auto end2  = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double, std::milli> elapsed2 = end2 - start2;
         double duration_2 = elapsed2.count();
@@ -470,50 +402,56 @@ int main(void) {
         double duration_3 = 0.0;
 
         // Update MPC controller (50 Hz)
-        if (mujoco_data->time - lastMPCUpdateTime >= mpcInterval) {
+        if (data->time - lastMPCUpdateTime >= mpcInterval && mujoco_go1_state.isStartupComplete()) {
             auto start3 = std::chrono::high_resolution_clock::now();
-            // go1StanceMPC(mujoco_go1_state);
-            findMPCSolution();
+
+            mujoco_go1_stance_proctor.solveMPCForState(mujoco_go1_state);
+
             auto end3 = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double, std::milli> elapsed3 = end3 - start3;
             duration_3 = elapsed3.count();
-            lastMPCUpdateTime = mujoco_data->time;
+            lastMPCUpdateTime = data->time;
         }
 
         // Convert foot forces to joint torques
-        mujoco_go1_state.convertForcesToTorquesMujoco(qpos_buffer);
+        if (mujoco_go1_state.root_pos_d.norm() > 1e-6) {
+            mujoco_go1_state.convertForcesToTorquesMujoco(qpos_buffer); // fix this w/ new go1State functions
+        }
+
         joint_torques_stacked << mujoco_go1_state.joint_torques.block<3, 1>(0, 0), // FR
                                 mujoco_go1_state.joint_torques.block<3, 1>(0, 1), // FL
                                 mujoco_go1_state.joint_torques.block<3, 1>(0, 2), // RR
                                 mujoco_go1_state.joint_torques.block<3, 1>(0, 3); // RL
 
         for (int j = 0; j < model->nu; j++) {
-            mujoco_data->ctrl[j] = joint_torques_stacked(j, 0);
+            data->ctrl[j] = joint_torques_stacked(j, 0);
         }
 
         // Render at ~60 Hz
-        if (mujoco_data->time - lastRenderSimTime >= renderInterval) {
+        if (data->time - lastRenderSimTime >= renderInterval) {
             renderScene();
-            lastRenderSimTime = mujoco_data->time;
+            lastRenderSimTime = data->time;
         }
 
         // Store data in CSV file
         storeData(mujoco_go1_state, file, lin_acc_meas, ang_vel_meas);
         storeCalcTimeData(duration_1, duration_2, duration_3, calc_time_file);
-        mj_step(model, mujoco_data);
-        
-        std::this_thread::sleep_for(loop_time);
+        mj_step(model, data);
+
+        rclcpp::spin_some(node);
+        rate.sleep();
     }
 
     file.close();
 
-    mj_deleteData(mujoco_data);
+    mj_deleteData(data);
     mj_deleteModel(model);
     mjr_freeContext(&con);
     mjv_freeScene(&scn);
     glfwDestroyWindow(window);
     glfwTerminate();
+    rclcpp::shutdown();
 
-    std::cout << "MuJoCo Simulation Complete!" << std::endl;
+    RCLCPP_INFO(node->get_logger(), "MuJoCo Simulation Complete!");
     return 0;
 }

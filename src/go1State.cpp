@@ -4,8 +4,9 @@
     go1State.cpp handles the information storage between the different
     scripts for storing current information about the Unitree Go1 robot
     (position, orientation, target and current foot positions, foot forces, 
-    velocities, accelerations, contacts, etc.). This will get modified as we
-    progress towards walking and footstep planning.
+    velocities, accelerations, contacts, etc.). This is the main focus of
+    translation into hardware from MuJoCo simulation state update and
+    management.
 */
 
 go1State::go1State() {
@@ -21,9 +22,11 @@ go1State::go1State() {
                         -0.12675, 0.12675, -0.12675, 0.12675,
                         -WALK_HEIGHT, -WALK_HEIGHT, -WALK_HEIGHT, -WALK_HEIGHT;
 
-    root_hip_pos << 0.1881, 0.1881, -0.1881, -0.1881,
+    root_hip_pos_abs << 0.1881, 0.1881, -0.1881, -0.1881,
                     -0.12675, 0.12675, -0.12675, 0.12675,
                     0, 0, 0, 0;
+
+    root_hip_pos = root_hip_pos_abs;
 
     resetState();
 }
@@ -39,11 +42,11 @@ void go1State::resetState() {
     root_pos_d.setZero();
     root_pos_est.setZero();
     root_lin_vel.setZero();
-    root_lin_vel_old.setZero();
     root_lin_vel_d.setZero();
     root_lin_vel_est.setZero();
     root_lin_acc.setZero();
     root_lin_acc_est.setZero();
+    root_lin_acc_meas.setZero();
 
     root_quat = Eigen::Quaterniond::Identity();
     root_quat_old = Eigen::Quaterniond::Identity();
@@ -52,11 +55,9 @@ void go1State::resetState() {
     root_rpy_old.setZero();
     root_rpy_d.setZero();
     root_ang_vel.setZero();
-    root_ang_vel_old.setZero();
     root_ang_vel_d.setZero();
     root_ang_vel_est.setZero();
-
-    jointPos.setZero();
+    root_ang_vel_meas.setZero();
 
     // VERY IMPORTANT FOOT ORDER: FR, FL, RR, RL
     foot_pos.setZero();
@@ -70,8 +71,10 @@ void go1State::resetState() {
     foot_forces_grf.setZero();
     foot_forces_swing.setZero();
     joint_torques.setZero();
+    joint_pos_init.setZero();
 
     walking_mode = false;
+    squat_prog = 0.0;
     swing_phase = 0; // ranges from 0 to SWING_PHASE_MAX
     foot_deltaX = 0;
     foot_deltaY = 0;
@@ -217,13 +220,12 @@ void go1State::updateHardwareState(UNITREE_LEGGED_SDK::LowState& state) {
     }
 }
 
-void go1State::updateStateFromMujoco(const mjtNum* q_vec, const mjtNum* q_vel, const Eigen::Vector3d& lin_acc) {
+void go1State::updateStateFromMujoco(const mjtNum* q_vec, const mjtNum* q_vel, const Eigen::Vector3d &lin_acc) {
 /*
     Reads the current state from the MuJoCo simulation and updates the
     go1State object with position, rotation, velocities, and foot 
     location updates. Also ticks swing_phase forward for tracking with
-    swing leg PD functionality. If you want to initialize the state, use
-    "true" as the boolean input; if not, leave empty or use "false".
+    swing leg PD functionality.
 */
     if (!q_vec || !q_vel) {
         std::cerr << "Error: q_vec or q_vel is NULL!" << std::endl;
@@ -244,7 +246,8 @@ void go1State::updateStateFromMujoco(const mjtNum* q_vec, const mjtNum* q_vel, c
     root_quat.y() = q_vec[5];
     root_quat.z() = q_vec[6];
 
-    root_rpy = rotM2Euler(root_quat.toRotationMatrix());
+    // root_rpy = rotM2Euler(root_quat.toRotationMatrix());
+    root_rpy = quat2Euler(root_quat);
     root_ang_vel << q_vel[3], q_vel[4], q_vel[5];
 
     foot_pos_old = foot_pos;
@@ -254,6 +257,8 @@ void go1State::updateStateFromMujoco(const mjtNum* q_vec, const mjtNum* q_vel, c
         root_pos_old = root_pos;
         root_rpy_old = root_rpy;
         foot_pos_old = foot_pos;
+        joint_pos_init << q_vec[7], q_vec[8], q_vec[9], q_vec[10], q_vec[11], q_vec[12],
+                            q_vec[13], q_vec[14], q_vec[15], q_vec[16], q_vec[17], q_vec[18];
     }
     
     for (int i = 0; i < NUM_LEG; i++) {
@@ -358,9 +363,9 @@ void go1State::updateStateFromMujoco(const mjtNum* q_vec, const mjtNum* q_vel, c
             swing_phase++;
         }
 
-    }
+    } 
 
-    // Flip init to false for actual planning
+    // Flip init to false since old states have been populated in first function call
     if (init) {
         init = false;
     }
@@ -411,7 +416,7 @@ void go1State::convertForcesToTorquesMujoco(const mjtNum* q_vec) {
 
 }
 
-void go1State::convertForcesToTorquesHardware(const Eigen::VectorXd& jointPos) {
+void go1State::convertForcesToTorquesHardware(const Eigen::VectorXd &jointPos) {
 /*
     Converts all the foot forces from MPC and swing leg PD to torques for
     the lowest level of control, our joint motor actuators. Based on the 
@@ -503,7 +508,7 @@ Eigen::Vector3d go1State::bezierVel() {
     return fut_velDes;
 }
 
-void go1State::raibertHeuristic(bool withCapturePoint) { // check if always hitting boundary (auxilliary)
+void go1State::raibertHeuristic(bool withCapturePoint) {
 /*
     Calculates foot_deltaX and foot_deltaY by using a simple Raibert
     Heuristic footstep planner. If you also want capture point, use "true"
@@ -517,10 +522,10 @@ void go1State::raibertHeuristic(bool withCapturePoint) { // check if always hitt
 
     if (withCapturePoint) {
         // Step lengths delta_* = sqrt(base_height/gravity)*(base_vel_* - base_vel_*_d) + (swing_duration/2)*base_vel_*_d
-        double delta_x = std::sqrt(std::abs(WALK_HEIGHT) / 9.8) * (lin_vel_rel(0) - root_lin_vel_d(0)) +
+        double delta_x = std::sqrt(WALK_HEIGHT/9.8) * (lin_vel_rel(0) - root_lin_vel_d(0)) +
                             (swingTime * DT_CTRL) / 2.0 * lin_vel_rel(0);
 
-        double delta_y = std::sqrt(std::abs(WALK_HEIGHT) / 9.8) * (lin_vel_rel(1) - root_lin_vel_d(1)) +
+        double delta_y = std::sqrt(WALK_HEIGHT/9.8) * (lin_vel_rel(1) - root_lin_vel_d(1)) +
                             (swingTime * DT_CTRL) / 2.0 * lin_vel_rel(1);
 
     } else {
@@ -549,7 +554,7 @@ void go1State::raibertHeuristic(bool withCapturePoint) { // check if always hitt
 
 }
 
-void go1State::amirHLIP() { // check if always hitting boundary (active)
+void go1State::amirHLIP() {
 /*
     Calculates foot_deltaX and foot_deltaY based on Amir Iqbal's
     HT-LIP footstep planning algorithm, which uses the SRBM's CoM's
@@ -560,7 +565,7 @@ void go1State::amirHLIP() { // check if always hitting boundary (active)
 */
     Eigen::Matrix3d rootRotMatZ = rotZ(root_rpy(2));
     Eigen::Vector3d lin_vel_rel = rootRotMatZ.transpose() * root_lin_vel;
-
+    
     double swingProg = 0.0;
     stanceFeetSumXY.setZero(); // sum of stance feet xy positions
     int twoFootContact = 0;
@@ -613,7 +618,7 @@ void go1State::amirHLIP() { // check if always hitting boundary (active)
     double a2 = sinh(DT_CTRL * (SWING_PHASE_MAX/2) * sqrt(f_M))/sqrt(f_M);
     double a3 = sinh(DT_CTRL * (SWING_PHASE_MAX/2) * sqrt(f_M))*sqrt(f_M);
     double a4 = cosh(DT_CTRL * (SWING_PHASE_MAX/2) * sqrt(f_M));
-
+    
     // State transition matrix for remaining swing duration
     double a1r = cosh((1.0 - 0.5*swingProg) * DT_CTRL * (SWING_PHASE_MAX/2) * sqrt(f_M)); // 0.5 because swing_progress_pram is averaged for the nominally 2 swinging legs
     double a2r = sinh((1.0 - 0.5*swingProg) * DT_CTRL * (SWING_PHASE_MAX/2) * sqrt(f_M))/sqrt(f_M);
@@ -679,11 +684,11 @@ void go1State::amirHLIP() { // check if always hitting boundary (active)
 
     // Solve the HLIP QP to get HLIP gains
     GainsHLIP = solver_hlip.getSolution(); //4x1
-
+    
     // HLIP based step lengths in xy plane
     double stepLengthX = root_lin_vel_d(0) * DT_CTRL * (SWING_PHASE_MAX/2) + (GainsHLIP.segment<2>(0).dot(X_hlip_error_minus));
     double stepLengthY = root_lin_vel_d(1) * DT_CTRL * (SWING_PHASE_MAX/2) + (GainsHLIP.segment<2>(2).dot(Y_hlip_error_minus));
-
+    
     // Saturation/clipping
     if (stepLengthX < -FOOT_DELTA_X_LIMIT) {
         stepLengthX = -FOOT_DELTA_X_LIMIT;
@@ -709,7 +714,7 @@ void go1State::swingPD(int leg_idx, Eigen::Vector3d footPosRef, Eigen::Vector3d 
     the foot positions, velocities, and their respective Bezier 
     curve references for smooth and precise swing leg control.
 */
-    if (contacts[leg_idx] == false && !absolute) { // relative frame swing PD
+    if (contacts[leg_idx] == false && !absolute && walking_mode) { // relative frame swing PD
         Eigen::Vector3d foot_posN = foot_pos.block<3, 1>(0, leg_idx);
         Eigen::Vector3d foot_velN = (foot_pos.block<3, 1>(0, leg_idx) - foot_pos_old.block<3, 1>(0, leg_idx))/DT_CTRL;
 
@@ -718,7 +723,7 @@ void go1State::swingPD(int leg_idx, Eigen::Vector3d footPosRef, Eigen::Vector3d 
 
         foot_forces_swing.block<3, 1>(0, leg_idx) = kp * (footPosRef - foot_posN) + kd * (footVelRef - foot_velN);
 
-    } else if (contacts[leg_idx] == false && absolute) { // absolute frame swing PD
+    } else if (contacts[leg_idx] == false && absolute && walking_mode) { // absolute frame swing PD
         Eigen::Vector3d foot_posN = foot_pos_abs.block<3, 1>(0, leg_idx);
         Eigen::Vector3d foot_velN = (foot_pos.block<3, 1>(0, leg_idx) - foot_pos_old.block<3, 1>(0, leg_idx))/DT_CTRL;
 
@@ -727,8 +732,129 @@ void go1State::swingPD(int leg_idx, Eigen::Vector3d footPosRef, Eigen::Vector3d 
 
         foot_forces_swing.block<3, 1>(0, leg_idx) = kp * (footPosRef - foot_posN) + kd * (footVelRef - foot_velN);
 
-    } else { // applying swing PD to stance legs: FORBIDDEN
-        std::cerr << "Error: Invalid foot index for swingPD!" << std::endl;
+    } else if (contacts[leg_idx] == true && walking_mode) { // applying swing PD to stance legs: FORBIDDEN
+        std::cerr << "Error: Invalid foot index for swing leg PD! control" << std::endl;
         return;
     }
+}
+
+void go1State::jointPD(int joint_idx, double jointPos, double jointVel, bool startup) {
+/*
+    Calculates joint-level PD control for standing & shutdown.
+*/
+    double jointInterp;
+    double jointTorque;
+
+    switch(joint_idx % 3) {
+        case 0:
+            if (startup) {
+                jointInterp = (1.0 - squat_prog) * joint_pos_init(joint_idx);
+                joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(JOINT_KP * (jointInterp - jointPos) + JOINT_KD * (0 - jointVel), -TORQUE_MAX_HIP, TORQUE_MAX_HIP);
+                return;
+
+            } else {
+                joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(JOINT_KP * (0.0 - jointPos) + JOINT_KD * (0.0 - jointVel), -TORQUE_MAX_HIP, TORQUE_MAX_HIP);
+                return;
+            }
+
+        case 1:
+            if (startup) {
+                jointInterp = (1.0 - squat_prog) * joint_pos_init(joint_idx) + squat_prog * THIGH_RAD_STAND;
+                joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(JOINT_KP * (jointInterp - jointPos) + JOINT_KD * (0 - jointVel), -TORQUE_MAX_THIGH, TORQUE_MAX_THIGH);
+                return;
+            } else {
+                jointInterp = (1.0 - squat_prog) * joint_pos_init(joint_idx) + squat_prog * THIGH_RAD_STAND;
+                joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(JOINT_KP * (jointInterp - jointPos) + JOINT_KD * (0.0 - jointVel), -TORQUE_MAX_THIGH, TORQUE_MAX_THIGH);
+                return;
+            }
+            
+        case 2:
+            if (startup) {
+                jointInterp = (1.0 - squat_prog) * joint_pos_init(joint_idx) + squat_prog * CALF_RAD_STAND;
+                joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(JOINT_KP * (jointInterp - jointPos) + JOINT_KD * (0 - jointVel), -TORQUE_MAX_CALF, TORQUE_MAX_CALF);
+                return;
+            } else {
+                jointInterp = (1.0 - squat_prog) * joint_pos_init(joint_idx) + squat_prog * CALF_RAD_STAND;
+                joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(JOINT_KP * (jointInterp - jointPos) + JOINT_KD * (0.0 - jointVel), -TORQUE_MAX_CALF, TORQUE_MAX_CALF);
+                return;
+            }
+            
+    }
+}
+
+bool go1State::isStartupComplete() const {
+    return squat_prog >= 1.0;
+}
+
+bool go1State::isShutdownComplete() const {
+    return squat_prog <= 0.0;
+}
+
+void go1State::computeStartupPDMujoco(const mjtNum* q_vec, const mjtNum* q_vel) {
+/*
+    Activate simple joint PD for startup mode in MuJoCo.
+*/
+    for (int i = 0; i < 3*NUM_LEG; i++) {
+        go1State::jointPD(i, q_vec[7 + i], q_vel[i + 6]);
+    }
+
+    if (!isStartupComplete()) squat_prog += 0.002;
+}
+
+void go1State::computeShutdownPDMujoco(const mjtNum* q_vec, const mjtNum* q_vel) {
+/*
+    Activate simple joint PD for shutdown mode in MuJoCo.
+*/
+    for (int i = 0; i < 3*NUM_LEG; i++) {
+        go1State::jointPD(i, q_vec[7 + i], q_vel[i + 6], false);
+    }
+
+    if (!isShutdownComplete()) squat_prog -= 0.002;
+}
+
+void go1State::computeStartupPDhardware(UNITREE_LEGGED_SDK::LowState& state) {
+    /*
+        Activate simple joint PD for startup mode in MuJoCo.
+    */
+        for (int i = 0; i < 3*NUM_LEG; i++) {
+            go1State::jointPD(i, state.motorState[i].q, state.motorState[i].dq);
+        }
+    
+        if (!isStartupComplete()) squat_prog += 0.002;
+    }
+
+
+void go1State::computeShutdownPDHarware(UNITREE_LEGGED_SDK::LowState& state) {
+    /*
+        Activate simple joint PD for shutdown mode in MuJoCo.
+    */
+        for (int i = 0; i < 3*NUM_LEG; i++) {
+            go1State::jointPD(i, state.motorState[i].q, state.motorState[i].dq, false);
+        }
+    
+        if (!isShutdownComplete()) squat_prog -= 0.002;
+    }
+
+go1StateSnapshot go1State::getSnapshot() const {
+    std::lock_guard<std::mutex> lock(mtx_);
+    go1StateSnapshot stateSnap;
+    stateSnap.foot_pos = foot_pos;
+    stateSnap.go1_lumped_inertia = go1_lumped_inertia;
+    stateSnap.root_pos = root_pos;
+    stateSnap.root_pos_d = root_pos_d;
+    stateSnap.root_rpy = root_rpy;
+    stateSnap.root_rpy_d = root_rpy_d;
+    stateSnap.root_lin_vel = root_lin_vel;
+    stateSnap.root_lin_vel_d = root_lin_vel_d;
+    stateSnap.root_ang_vel = root_ang_vel;
+    stateSnap.root_ang_vel_d = root_ang_vel_d;
+    stateSnap.walking_mode = walking_mode;
+    stateSnap.swing_phase = swing_phase;
+
+    return stateSnap;
+}
+
+void go1State::setGRFForces(const Eigen::Matrix<double, 3, NUM_LEG> &grf) {
+    std::lock_guard<std::mutex> lock(mtx_);
+    foot_forces_grf = grf;
 }

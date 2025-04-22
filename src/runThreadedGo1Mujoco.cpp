@@ -1,3 +1,4 @@
+#include <rclcpp/rclcpp.hpp>
 #include <mujoco/mujoco.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
@@ -9,13 +10,12 @@
 #include <mutex>
 #include <atomic>
 #include <cstring>
-#include <chrono>
 
 #include "go1_cpp_cmake/go1StanceMPC.h"
 
 // Global variables for MuJoCo
 mjModel* model = nullptr;
-mjData* mujoco_data = nullptr;
+mjData* data = nullptr;
 mjvCamera cam;
 mjvOption opt;
 mjvScene scn;
@@ -88,13 +88,13 @@ void window_close_callback(GLFWwindow* window) {
 // Function to initialize visualization
 void initVisualization() {
     if (!glfwInit()) {
-        std::cerr << "Could not initialize GLFW!" << std::endl;
+        RCLCPP_ERROR(rclcpp::get_logger("mujoco_sim"), "Could not initialize GLFW!");
         exit(1);
     }
 
     window = glfwCreateWindow(window_width, window_height, "MuJoCo Simulation", NULL, NULL);
     if (!window) {
-        std::cerr << "Could not create GLFW window!" << std::endl;
+        RCLCPP_ERROR(rclcpp::get_logger("mujoco_sim"), "Could not create GLFW window!");
         glfwTerminate();
         exit(1);
     }
@@ -116,7 +116,7 @@ void initVisualization() {
 
 // Function to render the MuJoCo scene
 void renderScene() {
-    mjv_updateScene(model, mujoco_data, &opt, nullptr, &cam, mjCAT_ALL, &scn);
+    mjv_updateScene(model, data, &opt, nullptr, &cam, mjCAT_ALL, &scn);
     mjrRect viewport = {0, 0, window_width, window_height};
     mjr_render(viewport, &scn, &con);
     glfwSwapBuffers(window);
@@ -138,18 +138,18 @@ void simulationThread() {
     while (runSimulation && !glfwWindowShouldClose(window)) {
         auto start = std::chrono::steady_clock::now();
 
-        std::memcpy(qpos_buffer.data(), mujoco_data->qpos, model->nq * sizeof(mjtNum));
-        std::memcpy(qvel_buffer.data(), mujoco_data->qvel, model->nv * sizeof(mjtNum));
+        std::memcpy(qpos_buffer.data(), data->qpos, model->nq * sizeof(mjtNum));
+        std::memcpy(qvel_buffer.data(), data->qvel, model->nv * sizeof(mjtNum));
         
         { // Lock state before applying torques
             std::lock_guard<std::mutex> lock(stateMutex);
             for (int j = 0; j < model->nu; j++) {
-                mujoco_data->ctrl[j] = joint_torques_stacked(j, 0);
+                data->ctrl[j] = joint_torques_stacked(j, 0);
             }
         }
 
         // Step the simulation
-        mj_step(model, mujoco_data);
+        mj_step(model, data);
 
         auto end = std::chrono::steady_clock::now();
         std::chrono::duration<double> elapsed = end - start;
@@ -169,11 +169,11 @@ void stateUpdateThread() { // 500 Hz
         auto start = std::chrono::steady_clock::now();
         { // Copy simulation data to buffers
             std::lock_guard<std::mutex> lock(stateMutex);
-            std::memcpy(qpos_buffer.data(), mujoco_data->qpos, model->nq * sizeof(mjtNum));
-            std::memcpy(qvel_buffer.data(), mujoco_data->qvel, model->nv * sizeof(mjtNum));
+            std::memcpy(qpos_buffer.data(), data->qpos, model->nq * sizeof(mjtNum));
+            std::memcpy(qvel_buffer.data(), data->qvel, model->nv * sizeof(mjtNum));
         }
         
-        Eigen::Vector3d lin_acc = Eigen::Map<const Eigen::Vector3d>(mujoco_data->cacc + 3 * base_id);
+        Eigen::Vector3d lin_acc = Eigen::Map<const Eigen::Vector3d>(data->cacc + 3 * base_id);
         
         { // update go1State object & compute torques
             std::lock_guard<std::mutex> lock(stateMutex);
@@ -201,9 +201,7 @@ void mpcThread() { // 50 Hz
         auto start = std::chrono::steady_clock::now();
         { // Calculate stance forces using go1MPC object
             std::lock_guard<std::mutex> lock(stateMutex);
-            mujoco_go1_stance_proctor.updateRigidBodyModel(mujoco_go1_state);
-            mujoco_go1_stance_proctor.updateMPCStates(mujoco_go1_state);
-            mujoco_go1_stance_proctor.solveMPCForces(mujoco_go1_state);
+            mujoco_go1_stance_proctor.solveMPCForState(mujoco_go1_state);
         }
         
         auto end = std::chrono::steady_clock::now();
@@ -216,22 +214,26 @@ void mpcThread() { // 50 Hz
 }
 
 int main(int argc, char** argv) {
-    std::cout << "Initializing MuJoCo..." << std::endl;
+    rclcpp::init(argc, argv);
+    auto node = std::make_shared<rclcpp::Node>("threaded_mujoco_sim");
+
+    RCLCPP_INFO(node->get_logger(), "Initializing MuJoCo ...");
 
     mujoco_go1_state.resetState();
     joint_torques_stacked.setZero();
 
     // Load MuJoCo model
     char error[1000] = "";
-    std::filesystem::path relative_model_path("../models/go1.xml");
+    std::filesystem::path relative_model_path("../models/go1_MATLAB.xml");
     std::string model_path = std::filesystem::absolute(relative_model_path);
 
     mjVFS vfs;
     mj_defaultVFS(&vfs);
 
     if (mj_addFileVFS(&vfs, model_path.c_str(), model_path.c_str()) != 0) {
-        std::cerr << "Failed to add XML to VFS: " << model_path.c_str() << std::endl;
+        RCLCPP_ERROR(node->get_logger(), "Failed to add XML to VFS: %s", model_path.c_str());
         mj_deleteVFS(&vfs);
+        rclcpp::shutdown();
         return -1;
     }
 
@@ -239,21 +241,23 @@ int main(int argc, char** argv) {
     mj_deleteVFS(&vfs);
 
     if (!model) {
-        std::cerr << "Failed to load MuJoCo model: " << error << std::endl;
+        RCLCPP_ERROR(node->get_logger(), "Failed to load MuJoCo model: %s", error);
+        rclcpp::shutdown();
         return -1;
     }
 
-    mujoco_data = mj_makeData(model);
+    data = mj_makeData(model);
     
     if (model->nkey > 0) {
         int keyframe_id = mj_name2id(model, mjOBJ_KEY, "standing");
         if (keyframe_id == -1) {
-            std::cerr << "Keyframe 'standing' not found!" << std::endl;
+            RCLCPP_ERROR(node->get_logger(), "Keyframe 'standing' not found!");
+            rclcpp::shutdown();
             return -1;
         }
-        mj_resetDataKeyframe(model, mujoco_data, keyframe_id);
+        mj_resetDataKeyframe(model, data, keyframe_id);
     } else {
-        mj_resetData(model, mujoco_data);
+        mj_resetData(model, data);
     }
 
     initVisualization();
@@ -267,6 +271,8 @@ int main(int argc, char** argv) {
     std::thread stateThread(stateUpdateThread);
     std::thread mpcCtrlThread(mpcThread);
 
+    std::thread rosSpinThread([&]() { rclcpp::spin(node); });
+
     double lastRenderSimTime = -1.0;
     double renderInterval = 1.0 / 60.0;  // ~60 Hz rendering
 
@@ -275,9 +281,9 @@ int main(int argc, char** argv) {
         glfwPollEvents();
 
         // Render the simulation
-        if (mujoco_data->time - lastRenderSimTime >= renderInterval) {
+        if (data->time - lastRenderSimTime >= renderInterval) {
             renderScene();
-            lastRenderSimTime = mujoco_data->time;
+            lastRenderSimTime = data->time;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1)); // why this?
     }
@@ -288,14 +294,16 @@ int main(int argc, char** argv) {
     if (simThread.joinable()) simThread.join();
     if (stateThread.joinable()) stateThread.join();
     if (mpcCtrlThread.joinable()) mpcCtrlThread.join();
+    if (rosSpinThread.joinable()) rosSpinThread.join();
 
-    mj_deleteData(mujoco_data);
+    mj_deleteData(data);
     mj_deleteModel(model);
     mjr_freeContext(&con);
     mjv_freeScene(&scn);
     glfwDestroyWindow(window);
     glfwTerminate();
+    rclcpp::shutdown();
 
-    std::cout << "MuJoCo Simulation Complete!" << std::endl;
+    RCLCPP_INFO(node->get_logger(), "MuJoCo Threaded Simulation Complete!");
     return 0;
 }
