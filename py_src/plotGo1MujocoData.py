@@ -134,7 +134,7 @@ def plot_state_data(csv_file, absolute=False):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("src/go1_cpp_humble/data/root_pose.png")
+    plt.savefig("data/root_pose.png")
 
     ##############
     ## Root vel ##
@@ -197,7 +197,7 @@ def plot_state_data(csv_file, absolute=False):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("src/go1_cpp_humble/data/root_vel.png")
+    plt.savefig("data/root_vel.png")
 
     #################
     ## Foot forces ##
@@ -266,7 +266,7 @@ def plot_state_data(csv_file, absolute=False):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("src/go1_cpp_humble/data/foot_forces.png")
+    plt.savefig("data/foot_forces.png")
 
     ###################
     ## Joint torques ##
@@ -311,7 +311,7 @@ def plot_state_data(csv_file, absolute=False):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("src/go1_cpp_humble/data/joint_torques.png")
+    plt.savefig("data/joint_torques.png")
 
     ####################
     ## Foot positions ##
@@ -464,7 +464,7 @@ def plot_state_data(csv_file, absolute=False):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("src/go1_cpp_humble/data/2d_foot_pos.png")
+    plt.savefig("data/2d_foot_pos.png")
 
     # plt.close(root_pose_plot)
     # plt.close(root_vel_plot)
@@ -473,5 +473,5 @@ def plot_state_data(csv_file, absolute=False):
     plt.close(joint_torque_plot)
     plt.show()
 
-csv_file = "src/go1_cpp_humble/data/go1_mujoco_data.csv"
+csv_file = "data/go1_mujoco_data.csv"
 plot_state_data(csv_file)
