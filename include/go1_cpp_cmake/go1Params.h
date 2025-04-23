@@ -28,7 +28,7 @@ constexpr double JOINT_KD = 3;
 // State estimation parameters //
 /////////////////////////////////
 
-constexpr int STATE_EST_SELECT = 0; // O: naive KF, 1: kinematic KF, 2: two-stage KF, 3: extended KF
+constexpr int STATE_EST_SELECT = 3; // O: naive KF, 1: kinematic KF, 2: two-stage KF, 3: extended KF
 
 /////////////////////////////
 // Swing leg PD parameters //

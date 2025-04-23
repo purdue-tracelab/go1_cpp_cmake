@@ -134,7 +134,7 @@ def plot_state_data(csv_file, absolute=False):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/root_pose.png")
+    plt.savefig("src/go1_cpp_humble/data/root_pose.png")
 
     ##############
     ## Root vel ##
@@ -197,13 +197,13 @@ def plot_state_data(csv_file, absolute=False):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/root_vel.png")
+    plt.savefig("src/go1_cpp_humble/data/root_vel.png")
 
     #################
     ## Foot forces ##
     #################
 
-    root_force_plot = plt.figure(3, figsize=(16, 9))
+    foot_force_plot = plt.figure(3, figsize=(16, 9))
 
     plt.subplot(3, 2, 1)
     plt.plot(time, foot_forces_grf_FR[:, 0], label="GRF FR x", color='r')
@@ -266,19 +266,21 @@ def plot_state_data(csv_file, absolute=False):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/foot_forces.png")
+    plt.savefig("src/go1_cpp_humble/data/foot_forces.png")
 
     ###################
     ## Joint torques ##
     ###################
 
-    root_torque_plot = plt.figure(4, figsize=(16, 9))
+    joint_torque_plot = plt.figure(4, figsize=(16, 9))
 
     plt.subplot(3, 1, 1)
     plt.plot(time, joint_torques_FR[:, 0], label="FR hip", color='r')
     plt.plot(time, joint_torques_FL[:, 0], label="FL hip", color='b')
     plt.plot(time, joint_torques_RR[:, 0], label="RR hip", color='g')
     plt.plot(time, joint_torques_RL[:, 0], label="RL hip", color='orange')
+    plt.axhline(y=23.7, xmax=time[-1], xmin=time[0], color='k', linestyle='--')
+    plt.axhline(y=-23.7, xmax=time[-1], xmin=time[0], color='k', linestyle='--')
     plt.title("Hip joint torques")
     plt.xlabel("Time (s)")
     plt.ylabel("Torque (N*m)")
@@ -289,6 +291,8 @@ def plot_state_data(csv_file, absolute=False):
     plt.plot(time, joint_torques_FL[:, 1], label="FL thigh", color='b')
     plt.plot(time, joint_torques_RR[:, 1], label="RR thigh", color='g')
     plt.plot(time, joint_torques_RL[:, 1], label="RL thigh", color='orange')
+    plt.axhline(y=23.7, xmax=time[-1], xmin=time[0], color='k', linestyle='--')
+    plt.axhline(y=-23.7, xmax=time[-1], xmin=time[0], color='k', linestyle='--')
     plt.title("Thigh joint torques")
     plt.xlabel("Time (s)")
     plt.ylabel("Torque (N*m)")
@@ -299,13 +303,15 @@ def plot_state_data(csv_file, absolute=False):
     plt.plot(time, joint_torques_FL[:, 2], label="FL calf", color='b')
     plt.plot(time, joint_torques_RR[:, 2], label="RR calf", color='g')
     plt.plot(time, joint_torques_RL[:, 2], label="RL calf", color='orange')
+    plt.axhline(y=35.55, xmax=time[-1], xmin=time[0], color='k', linestyle='--')
+    plt.axhline(y=-35.55, xmax=time[-1], xmin=time[0], color='k', linestyle='--')
     plt.title("Calf joint torques")
     plt.xlabel("Time (s)")
     plt.ylabel("Torque (N*m)")
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/joint_torques.png")
+    plt.savefig("src/go1_cpp_humble/data/joint_torques.png")
 
     ####################
     ## Foot positions ##
@@ -458,14 +464,14 @@ def plot_state_data(csv_file, absolute=False):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/2d_foot_pos.png")
+    plt.savefig("src/go1_cpp_humble/data/2d_foot_pos.png")
 
     # plt.close(root_pose_plot)
     # plt.close(root_vel_plot)
-    # plt.close(foot_pos_plot)
-    # plt.close(root_force_plot)
-    # plt.close(root_torque_plot)
+    plt.close(foot_pos_plot)
+    plt.close(foot_force_plot)
+    plt.close(joint_torque_plot)
     plt.show()
 
-csv_file = "data/go1_mujoco_data.csv"
+csv_file = "src/go1_cpp_humble/data/go1_mujoco_data.csv"
 plot_state_data(csv_file)

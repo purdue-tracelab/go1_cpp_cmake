@@ -38,17 +38,13 @@ int main(int argc, char** argv) {
     auto fsm = std::make_unique<go1FSM>(*state);
     fsm->start();
 
-    glfwSetWindowUserPointer(window, fsm.get());
-    glfwSetKeyCallback(window, key_callback);
-
-    const double timestep = model->opt.timestep;
-    const auto sim_dt = std::chrono::duration<double>(timestep);
+    const auto sim_dt = std::chrono::duration<double>(DT_CTRL);
     const auto render_dt = std::chrono::milliseconds(16);
     auto next_render_time = std::chrono::steady_clock::now();
 
-    while (!glfwWindowShouldClose(window)) {
+    while (1) {
    
-        state->updateStateFromHardware(UNITREE_LEGGED_SDK::LowState& state);
+        state->updateStateFromHardware(UNITREE_LEGGED_SDK::LowState& state); // Question for Annalise: why is this error here? Look at the name and type of the input
 
         switch (fsm->getFiniteState()) {
             case go1FiniteState::Startup:

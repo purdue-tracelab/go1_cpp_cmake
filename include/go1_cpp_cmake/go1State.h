@@ -2,6 +2,7 @@
 #define GO1_STATE_H
 
 // Open-source libraries
+#include "unitree_legged_sdk/unitree_legged_sdk.h"
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 #include <Eigen/Eigenvalues>
@@ -33,10 +34,6 @@ struct go1StateSnapshot {
     // send to go1State.foot_forces_grf
     Eigen::Matrix<double, 3, NUM_LEG> grf_forces;
 };
-<<<<<<< HEAD
-=======
-
->>>>>>> 50a3885e9b70685f8a8136f2940bb4345f173823
 
 class go1State {
     public:
@@ -44,6 +41,7 @@ class go1State {
         go1State();
         void resetState();
         void updateStateFromMujoco(const mjtNum* q_vec, const mjtNum* q_vel, const Eigen::Vector3d &lin_acc);
+        void updateStateFromHardware(UNITREE_LEGGED_SDK::LowState& state);
         void convertForcesToTorquesMujoco(const mjtNum* q_vec);
         void convertForcesToTorquesHardware(const Eigen::VectorXd &jointPos);
         void raibertHeuristic(bool withCapturePoint = false);
@@ -57,7 +55,9 @@ class go1State {
         bool isStartupComplete() const;
         bool isShutdownComplete() const;
         void computeStartupPDMujoco(const mjtNum* q_vec, const mjtNum* q_vel);
+        void computeStartupPDHardware(UNITREE_LEGGED_SDK::LowState& state);
         void computeShutdownPDMujoco(const mjtNum* q_vec, const mjtNum* q_vel);
+        void computeShutdownPDHardware(UNITREE_LEGGED_SDK::LowState& state);
         bool getWalkingMode() const { return walking_mode; }
         void setWalkingMode(bool v) { walking_mode = v; }
         int getSwingPhase() const { return swing_phase; }
@@ -96,13 +96,9 @@ class go1State {
         Eigen::Matrix<double, 3, NUM_LEG> foot_forces_swing;
         Eigen::Matrix<double, 3, NUM_LEG> joint_torques;
         Eigen::Matrix<double, 12, 1> joint_pos_init;
+        Eigen::Matrix<double, 12, 1> joint_pos;
 
-<<<<<<< HEAD
         // movement mode trackers
-=======
-        // gait phase
-        double squat_prog;
->>>>>>> 50a3885e9b70685f8a8136f2940bb4345f173823
         bool walking_mode;
         double squat_prog;
         bool contacts[NUM_LEG];
@@ -143,13 +139,8 @@ class go1State {
         Eigen::VectorXd hlip_lb;
         Eigen::VectorXd GainsHLIP; // HLIP-based stepping controller gains
     
-<<<<<<< HEAD
     private:
         mutable std::mutex mtx_; // maybe experiment with adding more private variables?
-=======
-        private:
-            mutable std::mutex mtx_; // maybe experiment with adding more private variables?
->>>>>>> 50a3885e9b70685f8a8136f2940bb4345f173823
 };
 
 #endif //GO1_STATE_H

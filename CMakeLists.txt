@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.5)
 project(go1_cpp_cmake)
 
+# Use C++17
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+cmake_policy(SET CMP0072 NEW)
+
 # check arch and os
 message("-- CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR}")
 if("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "x86_64.*")
@@ -24,25 +30,17 @@ endif()
 # Add unitree_legged_sdk subdirectory
 add_subdirectory(unitree_legged_sdk)
 
-# Use C++17
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-# Find third-party dependencies
+# Find linear algebra and optimization libraries
 find_package(Eigen3 REQUIRED)
 find_package(osqp REQUIRED)
 find_package(OsqpEigen REQUIRED)
 
-cmake_policy(SET CMP0072 NEW)
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(Curses REQUIRED) # for keyboard control
 
-# # Manually link TinyXML2 for inertia calculation
-# link_directories(/usr/lib/x86_64-linux-gnu)
-# include_directories(/usr/include)
+add_definitions(-DEIGEN_STACK_ALLOCATION_LIMIT=0) # Disable stack allocation limit for Eigen if desired
 
 # Manually define MuJoCo paths
 set(MUJOCO_INCLUDE_DIR /usr/local/mujoco/include)  # Adjust based on your system
@@ -67,6 +65,7 @@ include_directories(
 # Add main Go1 control library
 add_library(go1_main_lib
   include/go1_cpp_cmake/go1Params.h
+  include/go1_cpp_cmake/numericalJacobian.tpp # remove old numericalJacobian function
   include/go1_cpp_cmake/go1Utils.h
   src/go1Utils.cpp
   include/go1_cpp_cmake/go1FK.h
@@ -102,7 +101,7 @@ target_link_libraries(run_go1InertiaCalc
     # /usr/lib/x86_64-linux-gnu/libtinyxml2.so
     tinyxml2)
 
-# Add Mujoco simulation executables
+# Basic Go1 MuJoCo simulation executable
 add_executable(run_go1MujocoSim src/runGo1Mujoco.cpp)
 target_link_libraries(run_go1MujocoSim
     go1_main_lib
@@ -130,6 +129,7 @@ target_link_libraries(run_threadedGo1MujocoSim
     ${CURSES_LIBRARIES}
 )
 
+# Full Go1 FSM MuJoCo simulation executable w/ interactive mode switching (add velocity control)
 add_executable(run_go1FSMMujoco src/runGo1FSMMujoco.cpp)
 target_link_libraries(run_go1FSMMujoco
     go1_main_lib

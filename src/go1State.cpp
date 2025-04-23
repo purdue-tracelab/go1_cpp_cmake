@@ -84,25 +84,22 @@ void go1State::resetState() {
     
 }
 
-void go1State::updateHardwareState(UNITREE_LEGGED_SDK::LowState& state) {
+void go1State::updateStateFromHardware(UNITREE_LEGGED_SDK::LowState& state) {
     // Get updated joint position
     // order is FR_0, FR_1, FR_2, FL_0, FL_1, FL_2, RR_0, RR_1, RR_2, RL_0, RL_1, RL_2
-    for (int i = 0; i < jointPos.size(); i++) {
-        jointPos[i] = state.motorState[i].q;
+    for (int i = 0; i < joint_pos.size(); i++) {
+        joint_pos[i] = state.motorState[i].q;
     }
     
-    // Update current and old states of the root and feet
+    // Push back old states of the root pose and feet (figure out when estimation will send information back to go1State object)
     root_pos_old = root_pos;
-    root_lin_vel_old = root_lin_vel;
     root_lin_acc << state.imu.accelerometer[0], state.imu.accelerometer[1], state.imu.accelerometer[2];
 
     root_rpy_old = root_rpy;
     root_quat_old = root_quat;
 
-    root_ang_vel_old = root_ang_vel;
-
     foot_pos_old = foot_pos;
-    foot_pos = go1FKHardware(jointPos, root_rpy); // implemented go1FK using Muqun and Leo's work
+    foot_pos = go1FKHardware(joint_pos, root_rpy); // implemented go1FK using Muqun and Leo's work
 
     if (init) {
         root_pos_old = root_pos;
@@ -810,7 +807,7 @@ void go1State::computeShutdownPDMujoco(const mjtNum* q_vec, const mjtNum* q_vel)
     if (!isShutdownComplete()) squat_prog -= 0.002;
 }
 
-void go1State::computeStartupPDhardware(UNITREE_LEGGED_SDK::LowState& state) {
+void go1State::computeStartupPDHardware(UNITREE_LEGGED_SDK::LowState& state) {
 /*
     Activate simple joint PD for startup mode in MuJoCo.
 */
@@ -822,7 +819,7 @@ void go1State::computeStartupPDhardware(UNITREE_LEGGED_SDK::LowState& state) {
 }
 
 
-void go1State::computeShutdownPDHarware(UNITREE_LEGGED_SDK::LowState& state) {
+void go1State::computeShutdownPDHardware(UNITREE_LEGGED_SDK::LowState& state) {
 /*
     Activate simple joint PD for shutdown mode in MuJoCo.
 */

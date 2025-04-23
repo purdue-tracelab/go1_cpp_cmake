@@ -36,7 +36,7 @@ public:
   float motiontime = 0;
   float dt = 0.002; // 0.001~0.
   go1State hardware_go1_state;
-  go1StateEstimator hardware_go1_estimator;
+  // go1StateEstimator hardware_go1_estimator; // fix this part, follow
   float lastMPCUpdateTime = 0.0;
   float mpcInterval = 0.02;
 
