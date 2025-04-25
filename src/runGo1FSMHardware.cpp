@@ -13,6 +13,11 @@
 
 #include "go1_cpp_cmake/go1FSM.h"
 
+UNITREE_LEGGED_SDK::LowState lowState;
+Eigen::Matrix<double, 12, 1> joint_pos;
+// joint_pos.setZero();
+UNITREE_LEGGED_SDK::LowCmd cmd = {0};
+
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     if (action == GLFW_PRESS || action == GLFW_REPEAT) {
         auto fsm = static_cast<go1FSM*>(glfwGetWindowUserPointer(window));
@@ -44,28 +49,34 @@ int main(int argc, char** argv) {
 
     while (1) {
    
-        state->updateStateFromHardware(UNITREE_LEGGED_SDK::LowState& state); // Question for Annalise: why is this error here? Look at the name and type of the input
-
+        state->updateStateFromHardware(lowState); // Question for Annalise: why is this error here? Look at the name and type of the input
+                                        //was state-> updateStateFromHardware(UNITREE_LEGGED_SDK::LowState& state);
+                                        //change for all below
         switch (fsm->getFiniteState()) {
             case go1FiniteState::Startup:
-                state->computeStartupPDHardware(UNITREE_LEGGED_SDK::LowState& state);
+                state->computeStartupPDHardware(lowState);
                 break;
             case go1FiniteState::Shutdown:
-                state->computeShutdownPDHardware(UNITREE_LEGGED_SDK::LowState& state);
+                state->computeShutdownPDHardware(lowState);
                 break;
             default:
                 break;
         }
 
         if (fsm->getFiniteState() == go1FiniteState::Locomotion)
-            state->convertForcesToTorquesHardware(UNITREE_LEGGED_SDK::LowState& state);
-        for (int i = 0; i < model->nu; ++i)
-            cmd.motorCmd[i].q = PosStopF;
-            cmd.motorCmd[i].dq = VelStopF;
+            {
+            for(int i = 0; i < 11; ++i)
+            joint_pos[i] = lowState.motorState[i].q;
+            }
+            state->convertForcesToTorquesHardware(joint_pos); 
+        for (int i = 0; i < 3*NUM_LEG; ++i)
+            {
+            cmd.motorCmd[i].q = UNITREE_LEGGED_SDK::PosStopF;
+            cmd.motorCmd[i].dq = UNITREE_LEGGED_SDK::VelStopF;
             cmd.motorCmd[i].Kp = 0;
             cmd.motorCmd[i].Kd = 0;
-            cmd.motorCmd[i].tau = state->joint_torrques(i%3,i/3);
-        
+            cmd.motorCmd[i].tau = state->joint_torques(i%3,i/3);
+            }
 
         if (fsm->getFiniteState() == go1FiniteState::Shutdown && state->isShutdownComplete())
             break;
