@@ -58,6 +58,30 @@ go1FSM::go1FiniteState go1FSM::getFiniteState() const {
     return current_;
 }
 
+const char* go1FSM::go1FiniteState2Str() {
+    go1FiniteState finiteState = getFiniteState();
+    switch(finiteState) {
+        case go1FiniteState::Startup: return "Startup";
+        case go1FiniteState::Locomotion: return "Locomotion";
+        case go1FiniteState::Shutdown: return "Shutdown";
+        default: return "Unknown, am I cooked chat?";
+    }
+}
+
+void go1FSM::setDesiredVel(const Eigen::Vector3d &lin_vel_cmd, double &yaw_cmd) {
+    state_.root_lin_vel_d = lin_vel_cmd;
+    state_.root_ang_vel_d(2) = yaw_cmd;
+}
+
+void go1FSM::setDesiredPos() {
+    state_.root_pos_d += state_.root_lin_vel_d * DT_CTRL;
+    auto rpy = state_.root_rpy_d;
+    double new_yaw = rpy(2) + state_.root_ang_vel_d(2) * DT_CTRL;
+    new_yaw = std::atan2(std::sin(new_yaw), std::cos(new_yaw));
+    rpy(2) = new_yaw;
+    state_.root_rpy_d = rpy; 
+}
+
 void go1FSM::step() {
     just_transitioned_to_locomotion_ = false;
     data_interface_->pullSensorData(state_);

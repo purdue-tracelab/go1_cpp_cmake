@@ -28,7 +28,10 @@ class go1FSM {
         void requestWalk(bool enable = true);
         void requestShutdown();
         go1FiniteState getFiniteState() const;
+        const char* go1FiniteState2Str();
         const go1State& getState() const { return state_; }
+        void setDesiredPos();
+        void setDesiredVel(const Eigen::Vector3d &lin_vel_cmd, double &yaw_cmd);
 
         void collectInitialState() {
             data_interface_->pullSensorData(state_);

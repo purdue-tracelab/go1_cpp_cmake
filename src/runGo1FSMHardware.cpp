@@ -1,7 +1,7 @@
 #include "unitree_legged_sdk/unitree_legged_sdk.h"
-#include <GLFW/glfw3.h>
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <vector>
 #include <filesystem>
 #include <ncurses.h>
@@ -9,81 +9,317 @@
 #include <mutex>
 #include <atomic>
 #include <cstring>
-#include <chrono>
 
 #include "go1_cpp_cmake/go1FSM.h"
+#include "go1_cpp_cmake/go1StateEstimator.h"
 
-UNITREE_LEGGED_SDK::LowState lowState;
-Eigen::Matrix<double, 12, 1> joint_pos;
-// joint_pos.setZero();
-UNITREE_LEGGED_SDK::LowCmd cmd = {0};
+// Global variables for hardware interfacing
+UNITREE_LEGGED_SDK::LowState lowState = {0};
+UNITREE_LEGGED_SDK::UDP udp(UNITREE_LEGGED_SDK::LOWLEVEL, 8090, "192.168.123.10", 8007);
+bool running = false;
 
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-    if (action == GLFW_PRESS || action == GLFW_REPEAT) {
-        auto fsm = static_cast<go1FSM*>(glfwGetWindowUserPointer(window));
-        if (!fsm) return;
+///////////////////////////////
+// Data collection functions //
+///////////////////////////////
 
-        switch (key) {
-            case GLFW_KEY_I:
-                fsm->requestShutdown();
-                break;
-            case GLFW_KEY_P:
-                fsm->requestWalk(true);
-                break;
-            case GLFW_KEY_O:
-                fsm->requestWalk(false);
-                break;
+// Function to write Eigen::Vector in CSV format
+template <typename VectorType>
+void write_vector(const Eigen::MatrixBase<VectorType> &vec, std::ostream &os) {
+    for (size_t i = 0; i < vec.size(); ++i) {
+        os << vec(i);
+        if (i < vec.size() - 1) {
+            os << ",";  // Add comma between elements
         }
     }
 }
 
-int main(int argc, char** argv) {
+// Functions to store data in CSV file
+void storeData(const go1State &state, std::ostream &os) {
+    // Position
+    write_vector(state.root_pos, os); os << ",";
+    write_vector(state.root_pos_d, os); os << ",";
 
-    auto state = std::make_unique<go1State>();
-    auto fsm = std::make_unique<go1FSM>(*state);
-    fsm->start();
+    // Linear velocity
+    write_vector(state.root_lin_vel, os); os << ",";
+    write_vector(state.root_lin_vel_d, os); os << ",";
 
-    const auto sim_dt = std::chrono::duration<double>(DT_CTRL);
-    const auto render_dt = std::chrono::milliseconds(16);
-    auto next_render_time = std::chrono::steady_clock::now();
+    // RPY orientation
+    write_vector(state.root_rpy, os); os << ",";
+    write_vector(state.root_rpy_d, os); os << ",";
 
-    while (1) {
-   
-        state->updateStateFromHardware(lowState); // Question for Annalise: why is this error here? Look at the name and type of the input
-                                        //was state-> updateStateFromHardware(UNITREE_LEGGED_SDK::LowState& state);
-                                        //change for all below
-        switch (fsm->getFiniteState()) {
-            case go1FiniteState::Startup:
-                state->computeStartupPDHardware(lowState);
+    // Angular velocity
+    write_vector(state.root_ang_vel, os); os << ",";
+    write_vector(state.root_ang_vel_d, os); os << ",";
+ 
+    // Foot positions and velocities
+    write_vector(state.foot_pos_world_rot, os); os << ",";
+    write_vector(state.foot_pos_abs, os); os << ",";
+    write_vector(state.foot_pos_liftoff, os); os << ",";
+    write_vector(state.foot_pos_d, os); os << ",";
+    write_vector(state.foot_vel_d, os); os << ",";
+
+    // Foot forces and joint torques
+    {
+        Eigen::Map<const Eigen::VectorXd> flat_grf(
+            state.foot_forces_grf.data(),
+            state.foot_forces_grf.size()
+        );
+        write_vector(flat_grf, os);
+    }
+
+    os << ',';
+    
+    {
+        Eigen::Map<const Eigen::VectorXd> flat_swing(
+            state.foot_forces_swing.data(),
+            state.foot_forces_swing.size()
+        );
+        write_vector(flat_swing, os);
+    }
+
+    os << ',';
+    
+    {
+        Eigen::Map<const Eigen::VectorXd> flat_torque(
+            state.joint_torques.data(),
+            state.joint_torques.size()
+        );
+        write_vector(flat_torque, os);
+    }
+
+    os << ',';
+
+    // Foot contact states
+    os << state.swing_phase << "," 
+        << (state.contacts[0] ? 1 : 0) << "," 
+        << (state.contacts[1] ? 1 : 0) << "," 
+        << (state.contacts[2] ? 1 : 0) << "," 
+        << (state.contacts[3] ? 1 : 0) << ",";
+
+    // Estimated states
+    write_vector(state.root_pos_est, os); os << ",";
+    write_vector(state.root_lin_vel_est, os); os << ",";
+    write_vector(state.root_lin_acc_est, os); os << ",";
+    write_vector(state.root_rpy_est, os); os << ",";
+    
+    // Sensor measurements
+    write_vector(state.root_lin_acc_meas, os); os << ",";
+    write_vector(state.root_ang_vel_meas, os); os << ",";
+    write_vector(state.est_contacts, os); os << "\n";
+}
+
+void storeCalcTimeData(double update_time, double est_time, double MPC_calc_time, std::ostream &os) {
+    // Store calculation times
+    {
+        os << update_time << "," 
+        << est_time << "," 
+        << MPC_calc_time << "\n";
+    }
+}
+
+void writeCSVHeader(std::ostream &os) {    
+    os << "root_pos_x,root_pos_y,root_pos_z,root_pos_d_x,root_pos_d_y,root_pos_d_z,"
+            "root_lin_vel_x,root_lin_vel_y,root_lin_vel_z,root_lin_vel_d_x,root_lin_vel_d_y,root_lin_vel_d_z,"
+            "root_rpy_x,root_rpy_y,root_rpy_z,root_rpy_d_x,root_rpy_d_y,root_rpy_d_z,"
+            "root_ang_vel_x,root_ang_vel_y,root_ang_vel_z,root_ang_vel_d_x,root_ang_vel_d_y,root_ang_vel_d_z,"
+            "foot_pos_FR_x,foot_pos_FR_y,foot_pos_FR_z,foot_pos_FL_x,foot_pos_FL_y,foot_pos_FL_z,"
+            "foot_pos_RR_x,foot_pos_RR_y,foot_pos_RR_z,foot_pos_RL_x,foot_pos_RL_y,foot_pos_RL_z,"
+            "foot_pos_abs_FR_x,foot_pos_abs_FR_y,foot_pos_abs_FR_z,foot_pos_abs_FL_x,foot_pos_abs_FL_y,foot_pos_abs_FL_z,"
+            "foot_pos_abs_RR_x,foot_pos_abs_RR_y,foot_pos_abs_RR_z,foot_pos_abs_RL_x,foot_pos_abs_RL_y,foot_pos_abs_RL_z,"
+            "foot_pos_liftoff_FR_x,foot_pos_liftoff_FR_y,foot_pos_liftoff_FR_z,foot_pos_liftoff_FL_x,foot_pos_liftoff_FL_y,foot_pos_liftoff_FL_z,"
+            "foot_pos_liftoff_RR_x,foot_pos_liftoff_RR_y,foot_pos_liftoff_RR_z,foot_pos_liftoff_RL_x,foot_pos_liftoff_RL_y,foot_pos_liftoff_RL_z,"
+            "foot_pos_d_FR_x,foot_pos_d_FR_y,foot_pos_d_FR_z,foot_pos_d_FL_x,foot_pos_d_FL_y,foot_pos_d_FL_z,"
+            "foot_pos_d_RR_x,foot_pos_d_RR_y,foot_pos_d_RR_z,foot_pos_d_RL_x,foot_pos_d_RL_y,foot_pos_d_RL_z,"
+            "foot_vel_d_FR_x,foot_vel_d_FR_y,foot_vel_d_FR_z,foot_vel_d_FL_x,foot_vel_d_FL_y,foot_vel_d_FL_z,"
+            "foot_vel_d_RR_x,foot_vel_d_RR_y,foot_vel_d_RR_z,foot_vel_d_RL_x,foot_vel_d_RL_y,foot_vel_d_RL_z,"
+            "foot_forces_grf_FR_x,foot_forces_grf_FR_y,foot_forces_grf_FR_z,foot_forces_grf_FL_x,foot_forces_grf_FL_y,foot_forces_grf_FL_z,"
+            "foot_forces_grf_RR_x,foot_forces_grf_RR_y,foot_forces_grf_RR_z,foot_forces_grf_RL_x,foot_forces_grf_RL_y,foot_forces_grf_RL_z,"
+            "foot_forces_swing_FR_x,foot_forces_swing_FR_y,foot_forces_swing_FR_z,foot_forces_swing_FL_x,foot_forces_swing_FL_y,foot_forces_swing_FL_z,"
+            "foot_forces_swing_RR_x,foot_forces_swing_RR_y,foot_forces_swing_RR_z,foot_forces_swing_RL_x,foot_forces_swing_RL_y,foot_forces_swing_RL_z,"
+            "joint_torques_FR_hip,joint_torques_FR_thigh,joint_torques_FR_calf,joint_torques_FL_hip,joint_torques_FL_thigh,joint_torques_FL_calf,"
+            "joint_torques_RR_hip,joint_torques_RR_thigh,joint_torques_RR_calf,joint_torques_RL_hip,joint_torques_RL_thigh,joint_torques_RL_calf,"
+            "swing_phase,contact_FR,contact_FL,contact_RR,contact_RL,"
+            "root_pos_est_x,root_pos_est_y,root_pos_est_z,"
+            "root_lin_vel_est_x,root_lin_vel_est_y,root_lin_vel_est_z,"
+            "root_lin_acc_est_x,root_lin_acc_est_y,root_lin_acc_est_z,"
+            "root_rpy_est_x,root_rpy_est_y,root_rpy_est_z,"
+            "root_lin_acc_meas_x,root_lin_acc_meas_y,root_lin_acc_meas_z,"
+            "root_ang_vel_meas_x,root_ang_vel_meas_y,root_ang_vel_meas_z,"
+            "FR_contact_meas,FL_contact_meas,RR_contact_meas,RL_contact_meas\n";
+
+}
+
+void writeCalcTimeCSVHeader(std::ostream &os) {
+    os << "state_update_time,estimation_time,MPC_calc_time\n";
+}
+
+////////////////////
+// Main functions //
+////////////////////
+
+void keyControl(go1FSM &fsm) {
+/*
+    Keyboard terminal commands for sending desired velocities to
+    the physical Go1 robot. Can't continuously rotate, and the
+    swing leg control is iffy atm.
+*/
+    static bool hold_forward = false;
+    static bool hold_backward = false;
+    static bool hold_left = false;
+    static bool hold_right = false;
+    static bool hold_yawL = false;
+    static bool hold_yawR = false;
+
+    int ch;
+    while ((ch = getch()) != ERR) {
+        switch(ch) {
+            ///////////////////////
+            // Movement commands //
+            ///////////////////////
+
+            case 'w': 
+                hold_forward = true; 
                 break;
-            case go1FiniteState::Shutdown:
-                state->computeShutdownPDHardware(lowState);
+
+            case 's': 
+                hold_backward = true; 
                 break;
+
+            case 'a': 
+                hold_left = true; 
+                break;
+
+            case 'd': 
+                hold_right = true; 
+                break;
+
+            case 'q': 
+                hold_yawL = true; 
+                break;
+
+            case 'e': 
+                hold_yawR = true; 
+                break;
+
+            case 'x': // stop linear movement
+                hold_forward = hold_backward = false;
+                hold_left = hold_right = false;
+                break;
+
+            case 'z': // stop yaw movement
+                hold_yawL = hold_yawR = false;
+                break;
+
+            ///////////////////////////////////
+            // Finite state machine commands //
+            ///////////////////////////////////
+
+            case 'p':
+                fsm.requestWalk(true);
+                hold_forward = hold_backward = false;
+                hold_left = hold_right = false;
+                hold_yawL = hold_yawR = false;
+                break;
+
+            case 'o':
+                fsm.requestWalk(false);
+                hold_forward = hold_backward = false;
+                hold_left = hold_right = false;
+                hold_yawL = hold_yawR = false;
+                break;
+            
+            case 'i':
+                fsm.requestShutdown();
+                hold_forward = hold_backward = false;
+                hold_left = hold_right = false;
+                hold_yawL = hold_yawR = false;
+                break;
+
+            case 'u':
+                fsm.requestStartup();
+                hold_forward = hold_backward = false;
+                hold_left = hold_right = false;
+                hold_yawL = hold_yawR = false;
+                break;
+
+            case ' ':
+                running = false;
+                std::cout << "Killing controller..." << std::endl;
+                exit(0);
+                break;
+
             default:
                 break;
         }
-
-        if (fsm->getFiniteState() == go1FiniteState::Locomotion)
-            {
-            for(int i = 0; i < 11; ++i)
-            joint_pos[i] = lowState.motorState[i].q;
-            }
-            state->convertForcesToTorquesHardware(joint_pos); 
-        for (int i = 0; i < 3*NUM_LEG; ++i)
-            {
-            cmd.motorCmd[i].q = UNITREE_LEGGED_SDK::PosStopF;
-            cmd.motorCmd[i].dq = UNITREE_LEGGED_SDK::VelStopF;
-            cmd.motorCmd[i].Kp = 0;
-            cmd.motorCmd[i].Kd = 0;
-            cmd.motorCmd[i].tau = state->joint_torques(i%3,i/3);
-            }
-
-        if (fsm->getFiniteState() == go1FiniteState::Shutdown && state->isShutdownComplete())
-            break;
-
-        std::this_thread::sleep_for(sim_dt);
     }
 
-    fsm->stop();
+    Eigen::Vector3d v_cmd = Eigen::Vector3d::Zero();
+    double yaw_cmd = 0;
+
+    if (hold_forward) v_cmd.x() += 0.2;
+    if (hold_backward) v_cmd.x() -= 0.2;
+    if (hold_left) v_cmd.y() += 0.2;
+    if (hold_right) v_cmd.y() -= 0.2;
+    if (hold_yawL) yaw_cmd += 1.0;
+    if (hold_yawR) yaw_cmd -= 1.0;
+
+    double yaw = fsm.getState().root_rpy_est(2);
+    Eigen::Matrix3d rootRotZ = rotZ(yaw);
+    Eigen::Vector3d v_world = rootRotZ * v_cmd;
+
+    fsm.setDesiredVel(v_world, yaw_cmd);
+    fsm.setDesiredPos();
+
+    // Debug output
+    mvprintw(0, 0,
+        "v: [%.2f, %.2f], yaw_rate: %.2f, FSM state: %s",
+        v_cmd.x(), v_cmd.y(), yaw_cmd, fsm.go1FiniteState2Str()
+        );
+    refresh();
+}
+
+int main() {
+    std::ostringstream hardware_datastream;
+    writeCSVHeader(hardware_datastream);
+
+    AsyncLogger data_log("../data/go1_hardware_data.csv", hardware_datastream.str());
+    std::ostringstream hardware_data_row;
+
+    auto data_src = std::make_unique<hardwareDataReader>(lowState, udp);
+    auto estimator = makeEstimator();
+    auto command_sender = std::make_unique<hardwareCommandSender>(lowState, udp);
+
+    // Instantiate FSM at 500 Hz state loop, 50 Hz MPC
+    go1FSM fsm(DT_CTRL, DT_MPC_CTRL, std::move(data_src), std::move(estimator), std::move(command_sender));
+    fsm.collectInitialState();
+    fsm.step();
+    storeData(fsm.getState(), hardware_data_row);
+    data_log.logLine(hardware_data_row.str());
+
+    // Main loop
+    const std::chrono::milliseconds loop_time(static_cast<long>(DT_CTRL)); // 500 Hz loop time
+    running = true;
+
+    // Initialize ncurses
+    initscr(); // Start ncurses mode
+    timeout(0); // Non-blocking input, no delay
+    nodelay(stdscr, TRUE);
+    noecho();            // Don't display pressed keys
+    cbreak();            // Disable line buffering (don't need to press Enter)
+
+    while (running) {
+        keyControl(fsm);
+        fsm.step();
+
+        {
+            hardware_data_row.str("");
+            hardware_data_row.clear();
+            storeData(fsm.getState(), hardware_data_row);
+            data_log.logLine(hardware_data_row.str());
+        }
+
+        std::this_thread::sleep_for(loop_time);
+    }
+
     return 0;
 }

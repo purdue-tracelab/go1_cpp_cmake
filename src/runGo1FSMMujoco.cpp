@@ -274,7 +274,7 @@ void writeCalcTimeCSVHeader(std::ostream &os) {
 // Main function //
 ///////////////////
 
-int main(int argc, char** argv) {
+int main() {
     // Load MuJoCo model
     char error[1000] = "";
     std::filesystem::path rel("../models/go1_MATLAB.xml");

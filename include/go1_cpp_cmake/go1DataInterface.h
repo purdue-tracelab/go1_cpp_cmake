@@ -79,7 +79,7 @@ struct mujocoDataReader : lowLevelDataReader {
             state.foot_pos = rootRotMat.transpose() * state.foot_pos_world_rot;
             state.contactJacobian = go1ContactJacobian(state.joint_pos, root_rpy_ctrl);
 
-            // Copy current values into desired and old states to avoid jumping
+            // copy current values into desired and old states to avoid jumping
             if (state.init) {
                 state.foot_pos_old = state.foot_pos;
                 state.foot_pos_d = state.foot_pos;
@@ -98,6 +98,48 @@ struct mujocoDataReader : lowLevelDataReader {
         int contact_FL_adr;
         int contact_RR_adr;
         int contact_RL_adr;
+};
+
+struct hardwareDataReader : lowLevelDataReader {
+    public:
+        hardwareDataReader(UNITREE_LEGGED_SDK::LowState &lowState, 
+                                    UNITREE_LEGGED_SDK::UDP &udp) : extUDP(udp),
+                                                                    extLowState(lowState) {}
+
+        void pullSensorData(go1State &state) override {
+            // pull sensor data from UNITREE_LEGGED_SDK::LowState
+            extUDP.Recv();
+            extUDP.GetRecv(extLowState);
+
+            state.root_lin_acc_meas << extLowState.imu.accelerometer[0], extLowState.imu.accelerometer[1], extLowState.imu.accelerometer[2];
+            state.root_ang_vel_meas << extLowState.imu.gyroscope[0], extLowState.imu.gyroscope[1], extLowState.imu.gyroscope[2];
+            state.est_contacts << extLowState.footForce[0], extLowState.footForce[1], extLowState.footForce[2], extLowState.footForce[3];
+            
+            for (int i = 0; i < 3*NUM_LEG; i++) {
+                state.joint_pos(i, 0) = extLowState.motorState[i].q;
+                state.joint_vel(i, 0) = extLowState.motorState[i].dq;
+            }
+
+            // calculate foot position & Jacobian before state estimation
+            Eigen::Matrix3d rootRotMat = rotZ(state.root_rpy_est(2))*rotY(state.root_rpy_est(1))*rotX(state.root_rpy_est(0));
+            state.foot_pos_world_rot = go1FwdKin(state.joint_pos, state.root_rpy_est);
+            state.foot_pos_abs = state.foot_pos_world_rot.colwise() + state.root_pos_est;
+            state.foot_pos_old = state.foot_pos;
+            state.foot_pos = rootRotMat.transpose() * state.foot_pos_world_rot;
+            state.contactJacobian = go1ContactJacobian(state.joint_pos, state.root_rpy_est);
+
+            // Copy current values into desired and old states to avoid jumping
+            if (state.init) {
+                state.foot_pos_old = state.foot_pos;
+                state.foot_pos_d = state.foot_pos;
+                state.joint_pos_init = state.joint_pos;
+                state.init = false;
+            }
+        }
+
+    private:
+        UNITREE_LEGGED_SDK::UDP extUDP;
+        UNITREE_LEGGED_SDK::LowState extLowState;
 };
 
 struct lowLevelCommandSender {
@@ -124,6 +166,40 @@ struct mujocoCommandSender : lowLevelCommandSender {
     private:
         mjModel* mujoco_model;
         mjData* mujoco_data;
+};
+
+struct hardwareCommandSender : lowLevelCommandSender {
+    public:
+        hardwareCommandSender(UNITREE_LEGGED_SDK::LowState &lowState, 
+                                        UNITREE_LEGGED_SDK::UDP &udp) : safe(UNITREE_LEGGED_SDK::LeggedType::Go1), 
+                                                                        extUDP(udp),
+                                                                        extLowState(lowState)
+        {
+            extUDP.InitCmdData(cmd);
+        }
+        
+        void sendCommand(const go1State &state) override {
+            for (int i = 0; i < 3*NUM_LEG; i++) {
+                cmd.motorCmd[i].q = UNITREE_LEGGED_SDK::PosStopF;
+                cmd.motorCmd[i].dq = UNITREE_LEGGED_SDK::VelStopF;
+                cmd.motorCmd[i].Kp = 0;
+                cmd.motorCmd[i].Kd = 0;
+                cmd.motorCmd[i].tau = state.joint_torques(i % 3, i / 3);
+            }
+            
+            int res = safe.PowerProtect(cmd, extLowState, 1);
+            if (res < 0)
+                exit(-1);
+            
+            extUDP.SetSend(cmd);
+            extUDP.Send();
+        }
+
+    private:
+        UNITREE_LEGGED_SDK::Safety safe;
+        UNITREE_LEGGED_SDK::UDP extUDP;
+        UNITREE_LEGGED_SDK::LowState extLowState;
+        UNITREE_LEGGED_SDK::LowCmd cmd = {0};
 };
 
 #endif // GO1_DATA_INTERFACE_H

@@ -1,7 +1,5 @@
 #ifndef GO1_PARAMS_H
 #define GO1_PARAMS_H
-// #undef EIGEN_STACK_ALLOCATION_LIMIT
-// #define EIGEN_STACK_ALLOCATION_LIMIT 1048576 // increase to 1MB to avoid segfaults in Eigen
 
 /////////////////////////
 // Physical parameters //
@@ -26,13 +24,14 @@ constexpr double CALF_RAD_STAND = -1.8;
 constexpr double JOINT_KP = 60;
 constexpr double JOINT_KD = 3;
 
-/////////////////////////////////
-// State estimation parameters //
-/////////////////////////////////
+////////////////////////////////
+// General control parameters //
+////////////////////////////////
 
 constexpr int STATE_EST_SELECT = 2; // O: naive KF, 1: kinematic KF, 2: two-stage KF, 3: extended KF
 constexpr bool USE_EST_FOR_CONTROL = true; // false: no, use ground truth info, true: yes, use estimated info
 constexpr double MUJOCO_CONTACT_THRESH = 3.0;
+constexpr int UNITREE_SDK_CONTACT_THRESH = 200;
 
 /////////////////////////////
 // Swing leg PD parameters //
@@ -65,8 +64,10 @@ constexpr double FZ_MAX = 500.0;
 constexpr int FRIC_PYR = 6;
 constexpr int MPC_REF_DIM = 13 * MPC_HORIZON;
 constexpr int MPC_INPUT_DIM = 3 * NUM_LEG * MPC_HORIZON;
-constexpr double ALEPH = 0.8; // for blending MPC trajectory
-constexpr double BETTA = 0.8; // for blending MPC trajectory
+
+// for blending MPC trajectory
+constexpr double ALEPH = 0.8;
+constexpr double BETTA = 0.8;
 
 ///////////////////////////////////////////////
 // Inertia sets (only use one set at a time) //

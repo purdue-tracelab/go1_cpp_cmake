@@ -124,13 +124,13 @@ target_link_libraries(run_go1FSMMujoco
     ${CURSES_LIBRARIES}
 )
 
-# # Full Go1 FSM hardware executable (use Curses instead of MuJoCo window for interaction)
-# add_executable(run_go1FSMHardware src/runGo1FSMHardware.cpp)
-# target_link_libraries(run_go1FSMHardware
-#     go1_main_lib
-#     ${CURSES_LIBRARIES}
-# )
-# target_link_options(run_go1FSMHardware PRIVATE -no-pie)
+# Full Go1 FSM hardware executable (use Curses instead of MuJoCo window for interaction)
+add_executable(run_go1FSMHardware src/runGo1FSMHardware.cpp)
+target_link_libraries(run_go1FSMHardware
+    go1_main_lib
+    ${CURSES_LIBRARIES}
+)
+target_link_options(run_go1FSMHardware PRIVATE -no-pie)
 
 # Install libraries and executables
 install(TARGETS
@@ -139,7 +139,7 @@ install(TARGETS
     run_go1Tests
     run_go1MujocoSim
     run_go1FSMMujoco
-    # run_go1HardwareControl
+    run_go1FSMHardware
     DESTINATION lib/${PROJECT_NAME}
 )
 

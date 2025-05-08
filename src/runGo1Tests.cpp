@@ -5,7 +5,7 @@
     and of course, break.
 */
 
-int main(int argc, char ** argv) {
+int main() {
     go1TestFunctions test_proctor = go1TestFunctions();
     int test1 = test_proctor.testZeroPosErrorGRF();
     int test2 = test_proctor.testZeroPosErrorWalk();

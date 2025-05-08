@@ -44,8 +44,6 @@ void Custom::RobotControl()
   printf("ACC_X: %f, ACC_Y: %f, ACC_Z: %f\n", state.imu.accelerometer[0], state.imu.accelerometer[1], state.imu.accelerometer[2]);
   printf("GYR_X: %f, GRY_Y: %f, GYR_Z: %f\n", state.imu.gyroscope[0], state.imu.gyroscope[1], state.imu.gyroscope[2]);
   printf("FR_atm: %u, FL_atm: %u, RR_atm: %u, RL_atm: %u\n", state.footForce[0], state.footForce[1], state.footForce[2], state.footForce[3]);
-  printf("FR_0: %f, FR_1: %f, FR_2: %f\n", state.motorState[FR_0].q, state.motorState[FR_1].q, state.motorState[FR_2].q);
-
 
 
   std::cout << "###############################################" << std::endl

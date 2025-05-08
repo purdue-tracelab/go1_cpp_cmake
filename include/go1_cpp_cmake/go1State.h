@@ -140,7 +140,6 @@ class go1State {
         Eigen::Vector3d root_ang_vel_meas;
         Eigen::Matrix<double, 12, 1> joint_pos;
         Eigen::Matrix<double, 12, 1> joint_vel;
-        // std::array<bool, NUM_LEG> est_contacts;
         Eigen::Vector4d est_contacts;
 
         // Amir's HLIP

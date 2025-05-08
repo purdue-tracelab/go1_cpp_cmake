@@ -331,7 +331,7 @@ void keyControl(const mjtNum simTime) {
     refresh();
 }
 
-int main(int argc, char** argv) {
+int main() {
     std::cout << "Initializing MuJoCo..." << std::endl;
 
     mujoco_go1_state.resetState();
