@@ -126,7 +126,7 @@ void go1MPC::solveMPCFromSnapshot(go1StateSnapshot &snap) {
 void go1MPC::solveMPCForState(go1State &state) {
     auto snap = state.getSnapshot();
     solveMPCFromSnapshot(snap);
-    state.setGRFForces(snap.grf_forces);
+    state.retrieveGRF(snap.grf_forces);
 }
 
 // go1State wrapper for updateRigidBodyModelFromSnapshot
@@ -142,7 +142,7 @@ void go1MPC::updateRigidBodyModelFromSnapshot(const go1StateSnapshot &snap) {
     This is used to calculate the dynamics of the robot in the MPC problem.
 */
     // Extract information from the go1StateSnapshot object
-    Eigen::Matrix<double, 3, NUM_LEG> foot_pos = snap.foot_pos;
+    Eigen::Matrix<double, 3, NUM_LEG> foot_pos = snap.foot_pos_world_rot;
     Eigen::Matrix3d rootRotMatZ = rotZ(snap.root_rpy(2));
     Eigen::Matrix3d inertiaEst = rootRotMatZ * snap.go1_lumped_inertia * rootRotMatZ.transpose();
 
@@ -157,8 +157,8 @@ void go1MPC::updateRigidBodyModelFromSnapshot(const go1StateSnapshot &snap) {
 
     B_mat.setZero();
     for (int i = 0; i < NUM_LEG; i++) {
-        Eigen::Vector3d footPosN = foot_pos.block<3, 1>(0, i);
-        Eigen::Vector3d CoM (-0.0012, 0.0009, -0.0174); //(0, 0, 0); //
+        Eigen::Vector3d footPosN = foot_pos.col(i);
+        Eigen::Vector3d CoM(-0.0012, 0.0009, -0.0174); //(0, 0, 0); //
         Eigen::Matrix3d skewFootN = skew(footPosN - CoM);
 
         B_mat.block<3, 3>(6, 3*i) = inertiaEst.ldlt().solve(skewFootN);
@@ -217,7 +217,7 @@ void go1MPC::updateMPCStatesFromSnapshot(const go1StateSnapshot &snap) {
 void go1MPC::buildAndSolveQP(go1State& state) {
     auto snap = state.getSnapshot();
     buildAndSolveQPForSnapshot(snap);
-    state.setGRFForces(snap.grf_forces);
+    state.retrieveGRF(snap.grf_forces);
 }
 
 void go1MPC::buildAndSolveQPForSnapshot(go1StateSnapshot &snap) {
@@ -260,7 +260,14 @@ void go1MPC::buildAndSolveQPForSnapshot(go1StateSnapshot &snap) {
         int swingPhaseShift = DT_MPC/DT_CTRL;
         int tempCurrSwingPhase = tempSwingPhase;
 
-        for (int i = 0; i < MPC_HORIZON; i++) {
+        // Fill in current contacts for first horizon? Unsure if this is correct
+        C_qp.coeffRef(0, 2) = snap.contacts[0] ? 0 : 1;
+        C_qp.coeffRef(0, 5) = snap.contacts[1] ? 0 : 1;
+        C_qp.coeffRef(1, 8) = snap.contacts[2] ? 0 : 1;
+        C_qp.coeffRef(1, 11) = snap.contacts[3] ? 0 : 1;
+
+        // Fill in rest of contacts according to nominal gait schedule
+        for (int i = 1; i < MPC_HORIZON; i++) {
             tempCurrSwingPhase = (tempSwingPhase + i*swingPhaseShift) % SWING_PHASE_MAX;
 
             if (tempCurrSwingPhase <= SWING_PHASE_MAX/2) {
@@ -318,9 +325,8 @@ void go1MPC::buildAndSolveQPForSnapshot(go1StateSnapshot &snap) {
 
     // Store the result into go1StateSnapshot's grf_forces
     for (int i = 0; i < NUM_LEG; ++i) {
-        if (!solution.segment<3>(i * 3).hasNaN()) {
-            snap.grf_forces.col(i) = -solution.segment<3>(i * 3);
-        }
+        if (!solution.segment<3>(i * 3).hasNaN())
+            snap.grf_forces.col(i) = -solution.segment<3>(i * 3);   
     }
 
 }

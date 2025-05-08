@@ -10,6 +10,8 @@
 #include "OsqpEigen/OsqpEigen.h"
 #include <mujoco/mujoco.h>
 #include <mutex>
+#include <atomic>
+#include <array>
 
 // Package-specific header files
 #include "go1Params.h"
@@ -17,8 +19,14 @@
 #include "go1Utils.h"
 
 struct go1StateSnapshot {
-    // grab from go1State object
-    Eigen::Matrix<double, 3, NUM_LEG> foot_pos; // relative frame
+/*
+    A snapshot of the current go1State of the robot, used to
+    send information to the go1MPC solver without blocking the
+    necessary loops for footstep planning and state estimation.
+*/
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+    // collect information from go1State for go1MPC
+    Eigen::Matrix<double, 3, NUM_LEG> foot_pos_world_rot; // relative frame
     Eigen::Matrix3d go1_lumped_inertia;
     Eigen::Vector3d root_pos;
     Eigen::Vector3d root_pos_d;
@@ -30,78 +38,81 @@ struct go1StateSnapshot {
     Eigen::Vector3d root_ang_vel_d;
     bool walking_mode;
     int swing_phase;
+    std::array<bool, NUM_LEG> contacts;
 
-    // send to go1State.foot_forces_grf
+    // collect from go1MPC for go1State.foot_forces_grf
     Eigen::Matrix<double, 3, NUM_LEG> grf_forces;
 };
 
 class go1State {
     public:
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         // functions
         go1State();
         void resetState();
-        void updateStateFromMujoco(const mjtNum* q_vec, const mjtNum* q_vel, const Eigen::Vector3d &lin_acc);
-        void updateStateFromHardware(UNITREE_LEGGED_SDK::LowState& state);
-        void convertForcesToTorquesMujoco(const mjtNum* q_vec);
-        void convertForcesToTorquesHardware(const Eigen::VectorXd &jointPos);
+
+        // top-level planning & conversion functions
+        void updateLocomotionPlan();
+        void convertForcesToTorques();
+        void swingPD(int leg_idx, Eigen::Vector3d footPosRef, Eigen::Vector3d footVelRef);        
+
+        // footstep planning functions
         void raibertHeuristic(bool withCapturePoint = false);
         void amirHLIP();
-        void swingPD(int leg_idx, Eigen::Vector3d footPosRef, Eigen::Vector3d footVelRef, bool absolute = false);
-        void jointPD(int joint_idx, double jointPos, double jointVel, bool startup = true);
-        Eigen::Vector3d bezierPos();
-        Eigen::Vector3d bezierVel();
 
-        // experimental functions for FSM
+        // foot trajectory functions
+        Eigen::Vector3d bezierPos(int leg_idx);
+        Eigen::Vector3d bezierVel(int leg_idx);
+        Eigen::Vector3d sinusoidalPos(int leg_idx);
+        Eigen::Vector3d sinusoidalVel(int leg_idx);
+
+        // startup/shutdown functions
         bool isStartupComplete() const;
         bool isShutdownComplete() const;
-        void computeStartupPDMujoco(const mjtNum* q_vec, const mjtNum* q_vel);
-        void computeStartupPDHardware(UNITREE_LEGGED_SDK::LowState& state);
-        void computeShutdownPDMujoco(const mjtNum* q_vec, const mjtNum* q_vel);
-        void computeShutdownPDHardware(UNITREE_LEGGED_SDK::LowState& state);
-        bool getWalkingMode() const { return walking_mode; }
-        void setWalkingMode(bool v) { walking_mode = v; }
-        int getSwingPhase() const { return swing_phase; }
+        void computeStartupPDMujoco();
+        void computeShutdownPDMujoco();
+        void jointPD(int joint_idx, double jointPos, double jointVel, bool startup = true);
+
+        // snapshot getter/setter functions for go1MPC
         go1StateSnapshot getSnapshot() const;
-        void setGRFForces(const Eigen::Matrix<double, 3, NUM_LEG> &grf);
+        void retrieveGRF(const Eigen::Matrix<double, 3, NUM_LEG> &grf);
+
+        // general getters/setters
+        bool getWalkingMode() const { return walking_mode; } // feels useless
+        void setWalkingMode(bool v) { walking_mode = v; } // feels useless
+        int getSwingPhase() const { return swing_phase; } // feels useless
 
         // default information
         Eigen::Matrix3d go1_lumped_inertia;
 
         // state variables
         Eigen::Vector3d root_pos;
-        Eigen::Vector3d root_pos_old;
         Eigen::Vector3d root_pos_d;
-        Eigen::Vector3d root_pos_est;
         Eigen::Vector3d root_lin_vel;
         Eigen::Vector3d root_lin_vel_d;
-        Eigen::Vector3d root_lin_vel_est;
         Eigen::Vector3d root_lin_acc;
-        Eigen::Vector3d root_lin_acc_est;
-        Eigen::Vector3d root_lin_acc_meas;
-
         Eigen::Quaterniond root_quat;
-        Eigen::Quaterniond root_quat_old;
-        Eigen::Quaterniond root_quat_est;
         Eigen::Vector3d root_rpy;
-        Eigen::Vector3d root_rpy_old;
         Eigen::Vector3d root_rpy_d;
-        Eigen::Vector3d root_rpy_est;
         Eigen::Vector3d root_ang_vel;
         Eigen::Vector3d root_ang_vel_d;
-        Eigen::Vector3d root_ang_vel_est;
-        Eigen::Vector3d root_ang_vel_meas;
 
         // actuation-related variables (ORDER IS FR, FL, RR, RL)
+        Eigen::MatrixXd contactJacobian;
         Eigen::Matrix<double, 3, NUM_LEG> foot_forces_grf;
+        Eigen::Matrix<double, 12, 1> foot_forces_grf_stacked;
         Eigen::Matrix<double, 3, NUM_LEG> foot_forces_swing;
+        Eigen::Matrix<double, 3, NUM_LEG> joint_torques_swing;
         Eigen::Matrix<double, 3, NUM_LEG> joint_torques;
+        Eigen::Matrix<double, 12, 1> joint_torques_stacked;
+        Eigen::Matrix<double, 12, 1> joint_torques_limits;
         Eigen::Matrix<double, 12, 1> joint_pos_init;
-        Eigen::Matrix<double, 12, 1> joint_pos;
 
         // movement mode trackers
         bool walking_mode;
         double squat_prog;
-        bool contacts[NUM_LEG];
+        std::array<bool, NUM_LEG> contacts;
+        std::array<bool, NUM_LEG> contacts_old;
         int swing_phase;
         bool init;
 
@@ -109,15 +120,28 @@ class go1State {
         double foot_deltaX;
         double foot_deltaY;
         Eigen::Matrix<double, 3, NUM_LEG> default_foot_pos; // relative frame
-        Eigen::Matrix<double, 3, NUM_LEG> root_hip_pos; // relative frame
-        Eigen::Matrix<double, 3, NUM_LEG> root_hip_pos_abs;
-        Eigen::Matrix<double, 3, NUM_LEG> foot_pos; // relative frame
-        Eigen::Matrix<double, 3, NUM_LEG> foot_pos_old; // relative frame
-        Eigen::Matrix<double, 3, NUM_LEG> foot_pos_abs;
+        Eigen::Matrix<double, 3, NUM_LEG> foot_pos_world_rot; // relative frame, but world orientation
+        Eigen::Matrix<double, 3, NUM_LEG> foot_pos; // relative frame & relatve orientation
+        Eigen::Matrix<double, 3, NUM_LEG> foot_pos_old;
+        Eigen::Matrix<double, 3, NUM_LEG> foot_pos_abs; // world frame & world orientation
         Eigen::Matrix<double, 3, NUM_LEG> foot_pos_abs_est;
         Eigen::Matrix<double, 3, NUM_LEG> foot_pos_d;
         Eigen::Matrix<double, 3, NUM_LEG> foot_vel_d;
-        Eigen::Matrix<double, 3, NUM_LEG> foot_pos_liftoff; // absolute frame
+        Eigen::Matrix<double, 3, NUM_LEG> foot_pos_liftoff;
+
+        // sensor/estimated variables
+        Eigen::Vector3d root_pos_est;
+        Eigen::Vector3d root_lin_vel_est;
+        Eigen::Vector3d root_lin_acc_est;
+        Eigen::Vector3d root_lin_acc_meas;
+        Eigen::Quaterniond root_quat_est;
+        Eigen::Vector3d root_rpy_est;
+        Eigen::Vector3d root_ang_vel_est;
+        Eigen::Vector3d root_ang_vel_meas;
+        Eigen::Matrix<double, 12, 1> joint_pos;
+        Eigen::Matrix<double, 12, 1> joint_vel;
+        // std::array<bool, NUM_LEG> est_contacts;
+        Eigen::Vector4d est_contacts;
 
         // Amir's HLIP
         Eigen::Vector2d stanceFeetSumXY;

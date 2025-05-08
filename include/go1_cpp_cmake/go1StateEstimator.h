@@ -8,6 +8,7 @@
 #include <unsupported/Eigen/MatrixFunctions>
 #include <memory>
 #include <Eigen/Cholesky>
+#include <filesystem>
 
 // Package-specific header files
 #include "go1Params.h"
@@ -17,16 +18,18 @@
 
 class go1StateEstimator {
     public:
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         virtual ~go1StateEstimator() = default;
         virtual void collectInitialState(const go1State& state) = 0;
-        virtual void estimateState(go1State& state, const Eigen::Vector3d& accel, const Eigen::Vector3d& gyro) = 0;
+        virtual void estimateState(go1State& state) = 0;
+        virtual void setFootHeightResidual(double h) {}
 };
 
 class NaiveKF : public go1StateEstimator {
     public:
         NaiveKF();
         void collectInitialState(const go1State& state) override;
-        void estimateState(go1State& state, const Eigen::Vector3d& accel, const Eigen::Vector3d& gyro) override;
+        void estimateState(go1State& state) override;
 
     private:
         Eigen::Matrix<double, 9, 1> x_k, x_k1;
@@ -42,7 +45,8 @@ class KinematicKF : public go1StateEstimator {
     public:
         KinematicKF();
         void collectInitialState(const go1State& state) override;
-        void estimateState(go1State& state, const Eigen::Vector3d& accel, const Eigen::Vector3d& gyro) override;
+        void estimateState(go1State& state) override;
+        void setFootHeightResidual(double h) override;
 
     private:
         Eigen::Matrix<double, 18, 1> x_k, x_k1;
@@ -60,7 +64,8 @@ class TwoStageKF : public go1StateEstimator {
     public:
         TwoStageKF();
         void collectInitialState(const go1State& state) override;
-        void estimateState(go1State& state, const Eigen::Vector3d& accel, const Eigen::Vector3d& gyro) override;
+        void estimateState(go1State& state) override;
+        void setFootHeightResidual(double h) override;
 
     private:
         Eigen::Matrix<double, 18, 1> x_k, x_k1;
@@ -78,7 +83,7 @@ class ExtendedKF : public go1StateEstimator {
     public:
         ExtendedKF();
         void collectInitialState(const go1State& state) override;
-        void estimateState(go1State& state, const Eigen::Vector3d& accel, const Eigen::Vector3d& gyro) override;
+        void estimateState(go1State& state) override;
     
     private:
         Eigen::Matrix<double, 22, 1> x_k, x_k1;

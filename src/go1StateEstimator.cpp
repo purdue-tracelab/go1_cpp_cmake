@@ -23,12 +23,12 @@ NaiveKF::NaiveKF() {
     S_k.setZero();
     K_k.setZero();
 
-    // Initialize covariances
-    P_k = (Eigen::Matrix<double, 9, 1>() << 100, 100, 100, 10, 10, 10, 1, 1, 1).finished().asDiagonal();
+    // Initialize covariances (adjust P, Q, and R for residual-whiteness [nu_k ~= 1])
+    P_k = (Eigen::Matrix<double, 9, 1>() << 1e-4, 1e-4, 1e-4, 1e-4, 1e-4, 1e-4, 1e-2, 1e-2, 1e-2).finished().asDiagonal();
     Q_k.setIdentity();
-    Q_k *= 0.1;
+    Q_k *= 1.0;
     R_k.setIdentity();
-    R_k *= 0.1;
+    R_k *= 1e-6;
 
     // Set up discrete-time dynamics and measurement models
     F_k.setIdentity();
@@ -44,17 +44,17 @@ void NaiveKF::collectInitialState(const go1State& state) {
     x_k << state.root_pos, state.root_lin_vel, state.root_lin_acc;
 }
 
-void NaiveKF::estimateState(go1State& state, const Eigen::Vector3d& accel, const Eigen::Vector3d& gyro) {
+void NaiveKF::estimateState(go1State& state) {
     // Predict next state
     x_k1 = F_k * x_k;
     P_k1 = F_k * P_k * F_k.transpose() + Q_k;
 
     // Check residual to calculate optimal Kalman gain
-    Eigen::Matrix3d rootRot = rotZ(state.root_rpy(2))*rotY(state.root_rpy(1))*rotX(state.root_rpy(0));
-    z_k = accel + rootRot.transpose() * Eigen::Vector3d(0, 0, -9.81);
+    Eigen::Matrix3d rootRot = rotZ(state.root_rpy_est(2))*rotY(state.root_rpy_est(1))*rotX(state.root_rpy_est(0));
+    z_k = state.root_lin_acc_meas + rootRot.transpose() * Eigen::Vector3d(0, 0, -9.81);
     y_res = z_k - H_k * x_k1;
     S_k = H_k * P_k1 * H_k.transpose() + R_k;
-    // S_k = (S_k + S_k.transpose()) / 2.0;
+    S_k = (S_k + S_k.transpose()) / 2.0;
     K_k = P_k1 * H_k.transpose() * S_k.inverse();
 
     // Update estimation and covariance
@@ -65,8 +65,8 @@ void NaiveKF::estimateState(go1State& state, const Eigen::Vector3d& accel, const
     state.root_pos_est = x_k1.segment<3>(0);
     state.root_lin_vel_est = x_k1.segment<3>(3);
     state.root_lin_acc_est = x_k1.segment<3>(6);
-    state.root_rpy_est = state.root_rpy + DT_CTRL * gyro;
-    state.root_ang_vel_est = gyro;
+    state.root_rpy_est = state.root_rpy_est + DT_CTRL * state.root_ang_vel_meas;
+    state.root_ang_vel_est = state.root_ang_vel_meas;
 
     // Push back
     x_k = x_k1;
@@ -106,7 +106,7 @@ KinematicKF::KinematicKF() {
     Q_k.block<3, 3>(3, 3) = 0.01 * DT_CTRL * 9.81 * eye3 / 20.0;
 
     for (int i = 0; i < NUM_LEG; i++) {
-        Q_k.block<3, 3>(6 + i*3, 6 + i*3) = 0.03 * eye3;
+        Q_k.block<3, 3>(6 + i*3, 6 + i*3) = 0.03 * DT_CTRL * eye3;
     }
 
     R_k.setIdentity();
@@ -129,7 +129,7 @@ KinematicKF::KinematicKF() {
     for (int i = 0; i < NUM_LEG; i++) {
         H_k.block<3, 3>(i*3, 0) = -eye3;
         H_k.block<3, 3>(i*3, 6 + i*3) = eye3;
-        H_k.block<3, 3>(NUM_LEG*3 + i*3, 3) = eye3;
+        H_k.block<3, 3>(NUM_LEG*3 + i*3, 3) = -eye3;
         H_k(NUM_LEG*6 + i, 8 + i*3) = 1;
     }
 }
@@ -143,17 +143,25 @@ void KinematicKF::collectInitialState(const go1State& state) {
         state.foot_pos_abs.col(3);
 }
 
-void KinematicKF::estimateState(go1State& state, const Eigen::Vector3d& accel, const Eigen::Vector3d& gyro) {
+void KinematicKF::setFootHeightResidual(double h) {
+    for (int i = 0; i < NUM_LEG; i++) {
+        z_k(NUM_LEG*6 + i) = h;
+    }
+}
+
+void KinematicKF::estimateState(go1State& state) {
     // Collect input
-    Eigen::Matrix3d rootRot = rotZ(state.root_rpy(2))*rotY(state.root_rpy(1))*rotX(state.root_rpy(0));
-    u_k = rootRot * accel + Eigen::Vector3d(0, 0, -9.81);
+    Eigen::Matrix3d rootRot = rotZ(state.root_rpy_est(2))*rotY(state.root_rpy_est(1))*rotX(state.root_rpy_est(0));
+    u_k = rootRot * state.root_lin_acc_meas + Eigen::Vector3d(0, 0, -9.81);
 
     // Update covariances based on foot contact
+    double trust;
     for (int i = 0; i < NUM_LEG; i++) {
-        Q_k.block<3, 3>(6 + i*3, 6 + i*3) = (1 + (1 - state.contacts[i]) * 1e3) * DT_CTRL * 0.03 * eye3;
-        R_k.block<3, 3>(i*3, i*3) = (1 + (1 - state.contacts[i]) * 1e3) * 0.001 * eye3;
-        R_k.block<3, 3>(NUM_LEG*3 + i*3, NUM_LEG*3 + i*3) = (1 + (1 - state.contacts[i]) * 1e3) * 0.1 * eye3;
-        R_k(NUM_LEG*6 + i, NUM_LEG*6 + i) = (1 + (1 - state.contacts[i]) * 1e3) * 0.001;
+        trust = state.contacts[i] ? 1.0 : 1e6;
+        Q_k.block<3, 3>(6 + i*3, 6 + i*3) = trust * DT_CTRL * 0.03 * eye3;
+        R_k.block<3, 3>(i*3, i*3) = trust * 0.001 * eye3;
+        R_k.block<3, 3>(NUM_LEG*3 + i*3, NUM_LEG*3 + i*3) = trust * 0.1 * eye3;
+        R_k(NUM_LEG*6 + i, NUM_LEG*6 + i) = trust * 0.001;
     }
 
     // Predict next state
@@ -162,10 +170,9 @@ void KinematicKF::estimateState(go1State& state, const Eigen::Vector3d& accel, c
 
     // Find current measurement
     for (int i = 0; i < NUM_LEG; i++) {
-        z_k.block<3, 1>(i*3, 0) = rootRot * state.foot_pos.col(i);
-        Eigen::Vector3d v_fut = (state.foot_pos_old.col(i) - state.foot_pos.col(i)) / DT_CTRL - skew(gyro) * state.foot_pos.col(i);
-        z_k.block<3, 1>(NUM_LEG*3 + i*3, 0) = (1 - state.contacts[i]) * x_k.segment<3>(3) + state.contacts[i] * rootRot * v_fut;
-        z_k(NUM_LEG*6 + i) = (1 - state.contacts[i]) * (x_k(2) + state.foot_pos(i, 2));
+        z_k.block<3, 1>(i*3, 0) = state.foot_pos_world_rot.col(i);
+        Eigen::Vector3d v_fut = rootRot * (state.foot_pos.col(i) - state.foot_pos_old.col(i)) / DT_CTRL - skew(state.root_ang_vel_meas) * state.foot_pos_world_rot.col(i);
+        z_k.block<3, 1>(NUM_LEG*3 + i*3, 0) = v_fut;
     }
 
     // Check residual for calculating optimal Kalman gain
@@ -178,6 +185,7 @@ void KinematicKF::estimateState(go1State& state, const Eigen::Vector3d& accel, c
     x_k1 += K_k * y_res;
     P_k1 -= K_k * H_k * P_k1;
 
+    // Optional adjustment, not sure why it's used
     if (P_k1.block<2, 2>(0, 0).determinant() > 1e-6) {
         P_k1.block<2, 16>(0, 2).setZero();
         P_k1.block<16, 2>(2, 0).setZero();
@@ -187,9 +195,9 @@ void KinematicKF::estimateState(go1State& state, const Eigen::Vector3d& accel, c
     // Send estimates to go1State object
     state.root_pos_est = x_k1.segment<3>(0);
     state.root_lin_vel_est = x_k1.segment<3>(3);
-    state.root_lin_acc_est = accel;
-    state.root_rpy_est = state.root_rpy + DT_CTRL * gyro;
-    state.root_ang_vel_est = gyro;
+    state.root_lin_acc_est = state.root_lin_acc_meas;
+    state.root_rpy_est = state.root_rpy + DT_CTRL * state.root_ang_vel_meas;
+    state.root_ang_vel_est = state.root_ang_vel_meas;
     
     // Push back
     x_k = x_k1;
@@ -224,11 +232,13 @@ TwoStageKF::TwoStageKF() {
 
     // Initialize covariances
     Q_k.setIdentity();
-    Q_k.block<3, 3>(0, 0) = 0.01 * DT_CTRL * eye3 / 20.0;
-    Q_k.block<3, 3>(3, 3) = 0.01 * DT_CTRL * 9.81 * eye3 / 20.0;
+    // Q_k.block<3, 3>(0, 0) = 0.01 * DT_CTRL * eye3 / 20.0;
+    // Q_k.block<3, 3>(3, 3) = 0.01 * DT_CTRL * 9.81 * eye3 / 20.0;
+    Q_k.block<3, 3>(0, 0) = 0.02 * DT_CTRL * eye3;
+    Q_k.block<3, 3>(3, 3) = 0.1 * DT_CTRL * 9.81 * eye3;
 
     for (int i = 0; i < NUM_LEG; i++) {
-        Q_k.block<3, 3>(6 + i*3, 6 + i*3) = 0.03 * eye3;
+        Q_k.block<3, 3>(6 + i*3, 6 + i*3) = 0.03 * DT_CTRL * eye3;
     }
 
     R_k.setIdentity();
@@ -239,7 +249,13 @@ TwoStageKF::TwoStageKF() {
     }
 
     P_k.setIdentity();
-    P_k *= 3;
+    // P_k *= 3.0
+    P_k.block<3, 3>(0, 0) = 0.1 * eye3;
+    P_k.block<3, 3>(3, 3) = 0.3 * eye3;
+
+    for (int i = 0;i < NUM_LEG; i++) {
+        P_k.block<3, 3>(6 + i*3, 6 + i*3) = eye3;
+    }
 
     // Set up discrete-time dynamics and measurement models
     F_k.setIdentity();
@@ -251,40 +267,48 @@ TwoStageKF::TwoStageKF() {
     for (int i = 0; i < NUM_LEG; i++) {
         H_k.block<3, 3>(i*3, 0) = -eye3;
         H_k.block<3, 3>(i*3, 6 + i*3) = eye3;
-        H_k.block<3, 3>(NUM_LEG*3 + i*3, 3) = eye3;
+        H_k.block<3, 3>(NUM_LEG*3 + i*3, 3) = -eye3;
         H_k(NUM_LEG*6 + i, 8 + i*3) = 1;
     }
 }
 
 void TwoStageKF::collectInitialState(const go1State& state) {
     x_k << state.root_pos,
-           state.root_lin_vel,
-           state.foot_pos_abs.col(0),
-           state.foot_pos_abs.col(1),
-           state.foot_pos_abs.col(2),
-           state.foot_pos_abs.col(3);
+            state.root_lin_vel,
+            state.foot_pos_abs.col(0),
+            state.foot_pos_abs.col(1),
+            state.foot_pos_abs.col(2),
+            state.foot_pos_abs.col(3);
 }
 
-void TwoStageKF::estimateState(go1State& state, const Eigen::Vector3d& accel, const Eigen::Vector3d& gyro) {
+void TwoStageKF::setFootHeightResidual(double h) {
+    for (int i = 0; i < NUM_LEG; i++) {
+        z_k(NUM_LEG*6 + i) = h;
+    }
+}
+
+void TwoStageKF::estimateState(go1State& state) {
     // Estimate orientation
-    double kappa = 0.1 * std::clamp(1.0 - (accel - Eigen::Vector3d(0, 0, 9.81)).norm() / 9.81, 0.0, 1.0);
-    Eigen::Matrix3d rootRot = rotZ(state.root_rpy(2))*rotY(state.root_rpy(1))*rotX(state.root_rpy(0));
-    Eigen::Vector3d omg_corr = skew(accel.normalized()) * rootRot * Eigen::Vector3d(0, 0, 1);
-    Eigen::Matrix3d rootRotEst = rootRot * (eye3 + skew(DT_CTRL*(gyro + kappa * omg_corr)));
+    double kappa = 0.1 * std::clamp(1.0 - (state.root_lin_acc_meas - Eigen::Vector3d(0, 0, 9.81)).norm() / 9.81, 0.0, 1.0);
+    Eigen::Matrix3d rootRot = rotZ(state.root_rpy_est(2))*rotY(state.root_rpy_est(1))*rotX(state.root_rpy_est(0));
+    Eigen::Vector3d omg_corr = skew(state.root_lin_acc_meas.normalized()) * rootRot.transpose() * Eigen::Vector3d(0, 0, 1);
+    Eigen::Matrix3d rootRotEst = rootRot * (eye3 + skew(DT_CTRL * (state.root_ang_vel_meas + kappa * omg_corr)));
 
     // Send orientation estimates to go1State object
     state.root_rpy_est = rotM2Euler(rootRotEst);
-    state.root_ang_vel_est = gyro;
+    state.root_ang_vel_est = state.root_ang_vel_meas;
 
     // Calculate input
-    u_k = rootRot * accel + Eigen::Vector3d(0, 0, -9.81);
+    u_k = rootRot * state.root_lin_acc_meas + Eigen::Vector3d(0, 0, -9.81);
 
     // Update covariances based on foot contact
+    double trust;
     for (int i = 0; i < NUM_LEG; i++) {
-        Q_k.block<3, 3>(6 + i*3, 6 + i*3) = (1 + (1 - state.contacts[i]) * 1e3) * DT_CTRL * 0.03 * eye3;
-        R_k.block<3, 3>(i*3, i*3) = (1 + (1 - state.contacts[i]) * 1e3) * 0.001 * eye3;
-        R_k.block<3, 3>(NUM_LEG*3 + i*3, NUM_LEG*3 + i*3) = (1 + (1 - state.contacts[i]) * 1e3) * 0.1 * eye3;
-        R_k(NUM_LEG*6 + i, NUM_LEG*6 + i) = (1 + (1 - state.contacts[i]) * 1e3) * 0.001;
+        trust = state.contacts[i] ? 1.0 : 1e6;
+        Q_k.block<3, 3>(6 + i*3, 6 + i*3) = trust * DT_CTRL * 0.03 * eye3;
+        R_k.block<3, 3>(i*3, i*3) = trust * 0.001 * eye3;
+        R_k.block<3, 3>(NUM_LEG*3 + i*3, NUM_LEG*3 + i*3) = trust * 0.1 * eye3;
+        R_k(NUM_LEG*6 + i, NUM_LEG*6 + i) = trust * 0.001;
     }
 
     // Predict next state
@@ -293,10 +317,9 @@ void TwoStageKF::estimateState(go1State& state, const Eigen::Vector3d& accel, co
 
     // Find current measurement
     for (int i = 0; i < NUM_LEG; i++) {
-        z_k.block<3, 1>(i*3, 0) = rootRot * state.foot_pos.col(i);
-        Eigen::Vector3d v_fut = (state.foot_pos_old.col(i) - state.foot_pos.col(i)) / DT_CTRL - skew(gyro) * state.foot_pos.col(i);
-        z_k.block<3, 1>(NUM_LEG*3 + i*3, 0) = (1 - state.contacts[i]) * x_k.segment<3>(3) + state.contacts[i] * rootRot * v_fut;
-        z_k(NUM_LEG*6 + i) = (1 - state.contacts[i]) * (x_k(2) + state.foot_pos(i, 2));
+        z_k.block<3, 1>(i*3, 0) = state.foot_pos_world_rot.col(i);
+        Eigen::Vector3d v_fut = rootRot * (state.foot_pos.col(i) - state.foot_pos_old.col(i)) / DT_CTRL - skew(state.root_ang_vel_meas) * state.foot_pos_world_rot.col(i);
+        z_k.block<3, 1>(NUM_LEG*3 + i*3, 0) = v_fut;
     }
 
     // Check residual for calculating optimal Kalman gain
@@ -309,6 +332,7 @@ void TwoStageKF::estimateState(go1State& state, const Eigen::Vector3d& accel, co
     x_k1 += K_k * y_res;
     P_k1 -= K_k * H_k * P_k1;
 
+    // Optional adjustment, not sure why it's used
     if (P_k1.block<2, 2>(0, 0).determinant() > 1e-6) {
         P_k1.block<2, 16>(0, 2).setZero();
         P_k1.block<16, 2>(2, 0).setZero();
@@ -318,7 +342,7 @@ void TwoStageKF::estimateState(go1State& state, const Eigen::Vector3d& accel, co
     // Send estimates to go1State object
     state.root_pos_est = x_k1.segment<3>(0);
     state.root_lin_vel_est = x_k1.segment<3>(3);
-    state.root_lin_acc_est = accel;
+    state.root_lin_acc_est = state.root_lin_acc_meas;
     
     // Push back
     x_k = x_k1;
@@ -373,9 +397,9 @@ void ExtendedKF::collectInitialState(const go1State& state) {
             state.foot_pos_abs.col(3);
 }
 
-void ExtendedKF::estimateState(go1State& state, const Eigen::Vector3d& accel, const Eigen::Vector3d& gyro) {
+void ExtendedKF::estimateState(go1State& state) {
     // Predict next state
-    x_k1 = fState(x_k, accel, gyro);
+    x_k1 = fState(x_k, state.root_lin_acc_meas, state.root_ang_vel_meas);
     foot_pos_abs << state.foot_pos_abs.col(0), 
                     state.foot_pos_abs.col(1), 
                     state.foot_pos_abs.col(2), 
@@ -387,7 +411,7 @@ void ExtendedKF::estimateState(go1State& state, const Eigen::Vector3d& accel, co
     }
 
     // Find state dynamics Jacobians
-    F_k = numericalJacobianFixedSize<22, 22>(fState, x_k, 1e-6, false, accel, gyro);
+    F_k = numericalJacobianFixedSize<22, 22>(fState, x_k, 1e-6, false, state.root_lin_acc_meas, state.root_ang_vel_meas);
     H_k = numericalJacobianFixedSize<12, 22>(hState, x_k1, 1e-6, false);
 
     // Check residual for calculating optimal Kalman gain
@@ -420,11 +444,11 @@ void ExtendedKF::estimateState(go1State& state, const Eigen::Vector3d& accel, co
     // Send estimates to go1State object
     state.root_pos_est = x_k1.segment<3>(0);
     state.root_lin_vel_est = x_k1.segment<3>(3);
-    state.root_lin_acc_est = accel;
+    state.root_lin_acc_est = state.root_lin_acc_meas;
     Eigen::Quaterniond temp_q(x_k1(6), x_k1(7), x_k1(8), x_k1(9));
     state.root_quat_est = temp_q.normalized();
     state.root_rpy_est = quat2Euler(state.root_quat_est);
-    state.root_ang_vel_est = gyro;
+    state.root_ang_vel_est = state.root_ang_vel_meas;
 
     // Push back
     x_k = x_k1;

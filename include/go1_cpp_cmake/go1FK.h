@@ -10,9 +10,7 @@
 #include "go1Utils.h"
 
 Eigen::Matrix4d transformMat(const Eigen::Matrix3d &rotMat, const double dispX, const double dispY, const double dispZ);
-Eigen::Matrix<double, 3, NUM_LEG> go1FKMujoco(const mjtNum* q_vec, const Eigen::Vector3d& root_rpy);
-Eigen::Matrix<double, 3, NUM_LEG> go1FKHardware(const Eigen::VectorXd& jointPos, const Eigen::Vector3d& root_rpy);
-Eigen::MatrixXd go1FootJacMujoco(const mjtNum* q_vec, const Eigen::Vector3d& root_rpy);
-Eigen::MatrixXd go1FootJacHardware(const Eigen::VectorXd& jointPos, const Eigen::Vector3d& root_rpy);
+Eigen::Matrix<double, 3, NUM_LEG> go1FwdKin(const Eigen::VectorXd& jointPos, const Eigen::Vector3d& root_rpy);
+Eigen::MatrixXd go1ContactJacobian(const Eigen::VectorXd& jointPos, const Eigen::Vector3d& root_rpy);
 
 #endif //GO1_FWD_KIN_H

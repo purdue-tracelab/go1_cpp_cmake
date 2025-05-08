@@ -11,6 +11,8 @@ constexpr int NUM_LEG = 4;
 constexpr double DELTA_X_HIP = 0.1881;
 constexpr double DELTA_Y_HIP = 0.04675;
 constexpr double DELTA_Y_HIP_JOINT = 0.08;
+constexpr double THIGH_LENGTH = 0.213;
+constexpr double CALF_LENGTH = 0.213;
 constexpr double TORQUE_MAX_HIP = 23.7;
 constexpr double TORQUE_MAX_THIGH = 23.7;
 constexpr double TORQUE_MAX_CALF = 35.55;
@@ -28,17 +30,23 @@ constexpr double JOINT_KD = 3;
 // State estimation parameters //
 /////////////////////////////////
 
-constexpr int STATE_EST_SELECT = 3; // O: naive KF, 1: kinematic KF, 2: two-stage KF, 3: extended KF
+constexpr int STATE_EST_SELECT = 2; // O: naive KF, 1: kinematic KF, 2: two-stage KF, 3: extended KF
+constexpr bool USE_EST_FOR_CONTROL = true; // false: no, use ground truth info, true: yes, use estimated info
+constexpr double MUJOCO_CONTACT_THRESH = 3.0;
 
 /////////////////////////////
 // Swing leg PD parameters //
 /////////////////////////////
 
-constexpr int PLANNER_SELECT = 0; // 0: Raibert Heuristic, 1: Raibert Heuristic with Capture Point, 2: HT-LIP
-constexpr double SWING_KP = 1000;
-constexpr double SWING_KD = 20;
+constexpr int PLANNER_SELECT = 2; // 0: Raibert Heuristic, 1: Raibert Heuristic with Capture Point, 2: HT-LIP
+constexpr int SWING_PD_SELECT = 1; // 0: Cartesian PD, 1: Joint PD
+constexpr double SWING_TRAJ_SELECT = 0; // 0: Bezier, 1: Sinusoidal (sinusoidal broken atm)
+constexpr double SWING_KP_CART = 3000;
+constexpr double SWING_KD_CART = 40;
+constexpr double SWING_KP_JOINT = 60;
+constexpr double SWING_KD_JOINT = 3;
 constexpr double WALK_HEIGHT = 0.27;
-constexpr double STEP_HEIGHT = 0.075;
+constexpr double STEP_HEIGHT = 0.10;
 constexpr double FOOT_DELTA_X_LIMIT = 0.20;
 constexpr double FOOT_DELTA_Y_LIMIT = 0.10;
 constexpr int SWING_PHASE_MAX = 199; // swap between 0-99 (0.2 s gait cycle) and 0-199 (0.4 s gait cycle)
@@ -48,9 +56,9 @@ constexpr int SWING_PHASE_MAX = 199; // swap between 0-99 (0.2 s gait cycle) and
 ////////////////////
 
 constexpr double DT_CTRL = 0.002; // General control frequency (500 Hz)
-constexpr int MPC_HORIZON = 8; // w/ EIGEN_STACK_ALLOCATION_LIMIT, max = 7; w/o, max = 9
+constexpr int MPC_HORIZON = 7; // w/ EIGEN_STACK_ALLOCATION_LIMIT, max = 7; w/o, max = 9
 constexpr double DT_MPC_CTRL = 0.02; // MPC control frequency (50 Hz)
-constexpr double DT_MPC = DT_CTRL*(1 + SWING_PHASE_MAX)/MPC_HORIZON; // MPC horizon time step (ctrl dt * # gait phases / # horizons), should see whole gait
+constexpr double DT_MPC = DT_CTRL * (1 + SWING_PHASE_MAX) / MPC_HORIZON; // MPC horizon time step (ctrl dt * # gait phases / # horizons), should see whole gait
 constexpr double MU = 0.6;
 constexpr double FZ_MIN = 0.0;
 constexpr double FZ_MAX = 500.0;
@@ -73,7 +81,7 @@ constexpr double BETTA = 0.8; // for blending MPC trajectory
 // constexpr double GO1_LUMPED_INERTIA_YZ = -0.000753;
 // constexpr double GO1_LUMPED_INERTIA_ZZ = 0.372901;
 
-// MuJoCo go1_MATLAB.xml model
+// MuJoCo go1_MATLAB.xml model w/o calf
 constexpr double ROBOT_MASS = 11.7914;
 constexpr double GO1_LUMPED_INERTIA_XX = 0.122975;
 constexpr double GO1_LUMPED_INERTIA_XY = 0.000659457;
@@ -81,6 +89,15 @@ constexpr double GO1_LUMPED_INERTIA_XZ = 0.00902957;
 constexpr double GO1_LUMPED_INERTIA_YY = 0.302195;
 constexpr double GO1_LUMPED_INERTIA_YZ = -0.000964625;
 constexpr double GO1_LUMPED_INERTIA_ZZ = 0.286839;
+
+// // Mujoco go1_MATLAB.xml model w/o thigh + calf
+// constexpr double ROBOT_MASS = 11.7914;
+// constexpr double GO1_LUMPED_INERTIA_XX = 0.0794534;
+// constexpr double GO1_LUMPED_INERTIA_XY = -0.000271265;
+// constexpr double GO1_LUMPED_INERTIA_XZ = 0.0003517;
+// constexpr double GO1_LUMPED_INERTIA_YY = 0.150899;
+// constexpr double GO1_LUMPED_INERTIA_YZ = -0.000226049;
+// constexpr double GO1_LUMPED_INERTIA_ZZ = 0.109766;
 
 // // MATLAB magnus_go1.urdf
 // constexpr double ROBOT_MASS = 11.8;
@@ -123,9 +140,9 @@ constexpr double GO1_LUMPED_INERTIA_ZZ = 0.286839;
 /////////////////////
 
 // // Experimental
-// constexpr double q_weight_1 = 1000;
-// constexpr double q_weight_2 = 8000;
-// constexpr double q_weight_3 = 1000;
+// constexpr double q_weight_1 = 500;
+// constexpr double q_weight_2 = 1000;
+// constexpr double q_weight_3 = 500;
 // constexpr double q_weight_4 = 1000;
 // constexpr double q_weight_5 = 1000;
 // constexpr double q_weight_6 = 500;

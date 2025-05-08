@@ -19,6 +19,7 @@
 
 class go1MPC {
     public:
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         go1MPC();
         void reset();
 

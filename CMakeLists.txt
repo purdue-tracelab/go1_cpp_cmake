@@ -7,6 +7,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 cmake_policy(SET CMP0072 NEW)
 
+set(CMAKE_BUILD_TYPE Release) # Release = fast & quiet, Debug = slow & verbose
+
 # check arch and os
 message("-- CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR}")
 if("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "x86_64.*")
@@ -35,12 +37,13 @@ find_package(Eigen3 REQUIRED)
 find_package(osqp REQUIRED)
 find_package(OsqpEigen REQUIRED)
 
+add_definitions(-DEIGEN_STACK_ALLOCATION_LIMIT=0) # Disable stack allocation limit for Eigen if desired
+
+# Find graphics and interaction libraries
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(glfw3 REQUIRED)
-find_package(Curses REQUIRED) # for keyboard control
-
-add_definitions(-DEIGEN_STACK_ALLOCATION_LIMIT=0) # Disable stack allocation limit for Eigen if desired
+find_package(Curses REQUIRED) # for keyboard control through terminal
 
 # Manually define MuJoCo paths
 set(MUJOCO_INCLUDE_DIR /usr/local/mujoco/include)  # Adjust based on your system
@@ -65,7 +68,7 @@ include_directories(
 # Add main Go1 control library
 add_library(go1_main_lib
   include/go1_cpp_cmake/go1Params.h
-  include/go1_cpp_cmake/numericalJacobian.tpp # remove old numericalJacobian function
+  # include/go1_cpp_cmake/numericalJacobian.tpp # remove old numericalJacobian function
   include/go1_cpp_cmake/go1Utils.h
   src/go1Utils.cpp
   include/go1_cpp_cmake/go1FK.h
@@ -74,12 +77,13 @@ add_library(go1_main_lib
   src/go1State.cpp
   include/go1_cpp_cmake/go1StanceMPC.h
   src/go1StanceMPC.cpp
-  include/go1_cpp_cmake/go1StateEstimator.h
+  include/go1_cpp_cmake/go1StateEstimator.h # EKF needs more tuning + needs analytical for faster computation
   src/go1StateEstimator.cpp
   include/go1_cpp_cmake/go1TestFunctions.h
   src/go1TestFunctions.cpp
   include/go1_cpp_cmake/go1FSM.h
   src/go1FSM.cpp
+  include/go1_cpp_cmake/go1DataInterface.h
 )
 target_link_libraries(go1_main_lib
     OsqpEigen::OsqpEigen
@@ -98,30 +102,11 @@ target_link_libraries(run_go1Tests go1_main_lib)
 add_executable(run_go1InertiaCalc src/runGo1InertiaCalc.cpp)
 target_link_libraries(run_go1InertiaCalc 
     go1_main_lib
-    # /usr/lib/x86_64-linux-gnu/libtinyxml2.so
     tinyxml2)
 
 # Basic Go1 MuJoCo simulation executable
 add_executable(run_go1MujocoSim src/runGo1Mujoco.cpp)
 target_link_libraries(run_go1MujocoSim
-    go1_main_lib
-    glfw
-    ${GLEW_LIBRARIES}
-    ${OPENGL_LIBRARIES}
-    ${CURSES_LIBRARIES}
-)
-
-add_executable(run_go1Stand src/runGo1StartupMujoco.cpp)
-target_link_libraries(run_go1Stand
-    go1_main_lib
-    glfw
-    ${GLEW_LIBRARIES}
-    ${OPENGL_LIBRARIES}
-    ${CURSES_LIBRARIES}
-)
-
-add_executable(run_threadedGo1MujocoSim src/runThreadedGo1Mujoco.cpp)
-target_link_libraries(run_threadedGo1MujocoSim
     go1_main_lib
     glfw
     ${GLEW_LIBRARIES}
@@ -139,35 +124,22 @@ target_link_libraries(run_go1FSMMujoco
     ${CURSES_LIBRARIES}
 )
 
-# # Add hardware control executable
-# add_executable(run_go1HardwareControl src/runGo1HardwareControl.cpp)
-# # target_include_directories(run_go1HardwareControl PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/include")
-# target_link_libraries(run_go1HardwareControl
+# # Full Go1 FSM hardware executable (use Curses instead of MuJoCo window for interaction)
+# add_executable(run_go1FSMHardware src/runGo1FSMHardware.cpp)
+# target_link_libraries(run_go1FSMHardware
 #     go1_main_lib
-#     # "${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/lib/cpp/${ARCH}/libunitree_legged_sdk.a"
+#     ${CURSES_LIBRARIES}
 # )
-# target_link_options(run_go1HardwareControl PRIVATE -no-pie)
-
-# Add hardware thread control executable
-add_executable(run_go1HardwareThreadControl src/runGo1HardwareThreadControl.cpp)
-# target_include_directories(run_go1HardwareThreadControl PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/include")
-target_link_libraries(run_go1HardwareThreadControl
-    go1_main_lib
-    # "${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/lib/cpp/${ARCH}/libunitree_legged_sdk.a"
-)
-target_link_options(run_go1HardwareThreadControl PRIVATE -no-pie)
+# target_link_options(run_go1FSMHardware PRIVATE -no-pie)
 
 # Install libraries and executables
 install(TARGETS
     go1_main_lib
+    run_go1InertiaCalc
     run_go1Tests
     run_go1MujocoSim
-    run_go1InertiaCalc
-    run_go1Stand
-    run_threadedGo1MujocoSim
-    # run_go1HardwareControl
-    run_go1HardwareThreadControl
     run_go1FSMMujoco
+    # run_go1HardwareControl
     DESTINATION lib/${PROJECT_NAME}
 )
 

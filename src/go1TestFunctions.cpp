@@ -21,6 +21,28 @@ go1TestFunctions::go1TestFunctions() {
     std::cout << "### go1TestFunctions has been initialized ###\n";
     std::cout << "#############################################\n" << std::endl;
 
+    // Load MuJoCo model
+    char error[1000] = "";
+    std::filesystem::path rel("../models/go1_MATLAB.xml");
+    std::string path = std::filesystem::absolute(rel);
+    tester_model = mj_loadXML(path.c_str(), nullptr, error, sizeof(error));
+    if (!tester_model) {
+        std::cerr << "Model load error: " << error << std::endl;
+        return;
+    }
+    tester_data = mj_makeData(tester_model);
+
+    if (tester_model->nkey > 0) {
+        int keyframe_id = mj_name2id(tester_model, mjOBJ_KEY, "standing");
+        if (keyframe_id == -1) {
+            std::cerr << "Keyframe 'standing' not found!" << std::endl;
+            return;
+        }
+        mj_resetDataKeyframe(tester_model, tester_data, keyframe_id);
+    } else {
+        mj_resetData(tester_model, tester_data);
+    }
+
 }
 
 int go1TestFunctions::testZeroPosErrorGRF() {
@@ -32,15 +54,9 @@ int go1TestFunctions::testZeroPosErrorGRF() {
 */
     // initialize objects
     tester_state.resetState();
-
-    mjtNum temp_joint_angles[19] = {0.0, 0.0, 0.27, 1.0, 0.0, 0.0, 0.0, 0.0, 0.9, -1.8, 0.0, 0.9, -1.8, 0.0, 0.9, -1.8, 0.0, 0.9, -1.8};
-    mjtNum temp_joint_velocities[18] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-
-    std::memcpy(tester_joint_angles, temp_joint_angles, sizeof(temp_joint_angles));
-    std::memcpy(tester_joint_velocities, temp_joint_velocities, sizeof(temp_joint_velocities));
-    Eigen::Vector3d tester_lin_acc (0.0, 0.0, -9.81);
-
-    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc);
+    auto data_src = std::make_unique<mujocoDataReader>(tester_model, tester_data, "trunk", "lin_acc_sensor", "ang_vel_sensor", "touch_FR", "touch_FL", "touch_RR", "touch_RL");
+    data_src->pullSensorData(tester_state);
+    tester_state.updateLocomotionPlan();
     tester_state.root_pos_d << 0, 0, 0.27;
 
     int subtestsPassed = 0;
@@ -62,7 +78,7 @@ int go1TestFunctions::testZeroPosErrorGRF() {
 
     std::cout << "\nMATLAB GRF:\n" << matlabForces << std::endl;
 
-    tester_state.convertForcesToTorquesMujoco(tester_joint_angles);
+    tester_state.convertForcesToTorques();
 
     std::cout << "\nC++ torques:\n" << tester_state.joint_torques << std::endl;
 
@@ -98,8 +114,9 @@ int go1TestFunctions::testZeroPosErrorGRF() {
     std::cout << "\n-- Subtest 2: No feet on ground --" << std::endl;
 
     tester_state.resetState();
-    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc);
-    tester_state.root_pos_d << 0, 0, 0.335;
+    data_src->pullSensorData(tester_state);
+    tester_state.updateLocomotionPlan();
+    tester_state.root_pos_d << 0, 0, 0.27;
 
     for (int i = 0; i < NUM_LEG; ++i) {
         tester_state.contacts[i] = false;
@@ -117,7 +134,7 @@ int go1TestFunctions::testZeroPosErrorGRF() {
 
     std::cout << "\nMATLAB GRF:\n" << matlabForces << std::endl;
 
-    tester_state.convertForcesToTorquesMujoco(tester_joint_angles);
+    tester_state.convertForcesToTorques();
 
     std::cout << "\nC++ torques:\n" << tester_state.joint_torques << std::endl;
 
@@ -153,8 +170,9 @@ int go1TestFunctions::testZeroPosErrorGRF() {
     std::cout << "\n-- Subtest 3: FL + RR --" << std::endl;
 
     tester_state.resetState();
-    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc);
-    tester_state.root_pos_d << 0, 0, 0.335;
+    data_src->pullSensorData(tester_state);
+    tester_state.updateLocomotionPlan();
+    tester_state.root_pos_d << 0, 0, 0.27;
 
     tester_state.contacts[0] = false;
     tester_state.contacts[3] = false;
@@ -171,7 +189,7 @@ int go1TestFunctions::testZeroPosErrorGRF() {
 
     std::cout << "\nMATLAB GRF:\n" << matlabForces << std::endl;
 
-    tester_state.convertForcesToTorquesMujoco(tester_joint_angles);
+    tester_state.convertForcesToTorques();
 
     std::cout << "\nC++ torques:\n" << tester_state.joint_torques << std::endl;
 
@@ -207,8 +225,9 @@ int go1TestFunctions::testZeroPosErrorGRF() {
     std::cout << "\n-- Subtest 4: FR + RL --" << std::endl;
 
     tester_state.resetState();
-    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc);
-    tester_state.root_pos_d << 0, 0, 0.335;
+    data_src->pullSensorData(tester_state);
+    tester_state.updateLocomotionPlan();
+    tester_state.root_pos_d << 0, 0, 0.27;
 
     tester_state.contacts[1] = false;
     tester_state.contacts[2] = false;
@@ -225,7 +244,7 @@ int go1TestFunctions::testZeroPosErrorGRF() {
 
     std::cout << "\nMATLAB GRF:\n" << matlabForces << std::endl;
 
-    tester_state.convertForcesToTorquesMujoco(tester_joint_angles);
+    tester_state.convertForcesToTorques();
 
     std::cout << "\nC++ torques:\n" << tester_state.joint_torques << std::endl;
 
@@ -274,19 +293,14 @@ int go1TestFunctions::testNonzeroPosErrorGRF() {
     but explore with these cases to see if you can figure out why the system breaks
     in MuJoCo at the moment. It could be inertia, mass, rotations, etc.
 */
-    // grfMPC mpc_proctor; // retired until further notice;
-    // initialize current tester state
-    tester_state.resetState();
-
-    mjtNum temp_joint_angles[19] = {0.0, 0.0, 0.27, 1.0, 0.0, 0.0, 0.0, 0.0, 0.9, -1.8, 0.0, 0.9, -1.8, 0.0, 0.9, -1.8, 0.0, 0.9, -1.8};
-    mjtNum temp_joint_velocities[18] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    // initialize desired_pos (not the same as the default desired position of z = 0.27 m)
     Eigen::Vector3d temp_desired_pos (0.0, 0.0, 0.32);
 
-    std::memcpy(tester_joint_angles, temp_joint_angles, sizeof(temp_joint_angles));
-    std::memcpy(tester_joint_velocities, temp_joint_velocities, sizeof(temp_joint_velocities));
-    Eigen::Vector3d tester_lin_acc (0.0, 0.0, -9.81);
-
-    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc);
+    // initialize objects
+    tester_state.resetState();
+    auto data_src = std::make_unique<mujocoDataReader>(tester_model, tester_data, "trunk", "lin_acc_sensor", "ang_vel_sensor", "touch_FR", "touch_FL", "touch_RR", "touch_RL");
+    data_src->pullSensorData(tester_state);
+    tester_state.updateLocomotionPlan();
     tester_state.root_pos_d = temp_desired_pos;
 
     int subtestsPassed = 0;
@@ -309,7 +323,7 @@ int go1TestFunctions::testNonzeroPosErrorGRF() {
 
     std::cout << "\nMATLAB GRF:\n" << matlabForces << std::endl;
 
-    tester_state.convertForcesToTorquesMujoco(tester_joint_angles);
+    tester_state.convertForcesToTorques();
 
     std::cout << "\nC++ torques:\n" << tester_state.joint_torques << std::endl;
 
@@ -345,7 +359,8 @@ int go1TestFunctions::testNonzeroPosErrorGRF() {
     std::cout << "\n-- Subtest 2: No feet on ground --" << std::endl;
 
     tester_state.resetState();
-    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc);
+    data_src->pullSensorData(tester_state);
+    tester_state.updateLocomotionPlan();
     tester_state.root_pos_d = temp_desired_pos;
 
     for (int i = 0; i < NUM_LEG; ++i) {
@@ -364,7 +379,7 @@ int go1TestFunctions::testNonzeroPosErrorGRF() {
 
     std::cout << "\nMATLAB GRF:\n" << matlabForces << std::endl;
 
-    tester_state.convertForcesToTorquesMujoco(tester_joint_angles);
+    tester_state.convertForcesToTorques();
 
     std::cout << "\nC++ torques:\n" << tester_state.joint_torques << std::endl;
 
@@ -400,7 +415,8 @@ int go1TestFunctions::testNonzeroPosErrorGRF() {
     std::cout << "\n-- Subtest 3: FL + RR --" << std::endl;
 
     tester_state.resetState();
-    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc);
+    data_src->pullSensorData(tester_state);
+    tester_state.updateLocomotionPlan();
     tester_state.root_pos_d = temp_desired_pos;
 
     tester_state.contacts[0] = false;
@@ -418,7 +434,7 @@ int go1TestFunctions::testNonzeroPosErrorGRF() {
 
     std::cout << "\nMATLAB GRF:\n" << matlabForces << std::endl;
 
-    tester_state.convertForcesToTorquesMujoco(tester_joint_angles);
+    tester_state.convertForcesToTorques();
 
     std::cout << "\nC++ torques:\n" << tester_state.joint_torques << std::endl;
 
@@ -454,7 +470,8 @@ int go1TestFunctions::testNonzeroPosErrorGRF() {
     std::cout << "\n-- Subtest 4: FR + RL --" << std::endl;
 
     tester_state.resetState();
-    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc);
+    data_src->pullSensorData(tester_state);
+    tester_state.updateLocomotionPlan();
     tester_state.root_pos_d = temp_desired_pos;
 
     tester_state.contacts[1] = false;
@@ -472,7 +489,7 @@ int go1TestFunctions::testNonzeroPosErrorGRF() {
 
     std::cout << "\nMATLAB GRF:\n" << matlabForces << std::endl;
 
-    tester_state.convertForcesToTorquesMujoco(tester_joint_angles);
+    tester_state.convertForcesToTorques();
 
     std::cout << "\nC++ torques:\n" << tester_state.joint_torques << std::endl;
 
@@ -519,18 +536,12 @@ int go1TestFunctions::testZeroPosErrorWalk() {
     This is meant to test the grfMPC + swing PD behavior when there is 
     no error between the current and desired state during walking.
 */
-    // grfMPC mpc_proctor; // retired until further notice;
     // initialize current tester state
     tester_state.resetState();
-    tester_state.walking_mode = true;
-
-    mjtNum temp_joint_angles[19] = {0.0, 0.0, 0.27, 1.0, 0.0, 0.0, 0.0, 0.0, 0.9, -1.8, 0.0, 0.9, -1.8, 0.0, 0.9, -1.8, 0.0, 0.9, -1.8};
-    mjtNum temp_joint_velocities[18] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-
-    std::memcpy(tester_joint_angles, temp_joint_angles, sizeof(temp_joint_angles));
-    std::memcpy(tester_joint_velocities, temp_joint_velocities, sizeof(temp_joint_velocities));
-    Eigen::Vector3d tester_lin_acc (0.0, 0.0, -9.81);
+    auto data_src = std::make_unique<mujocoDataReader>(tester_model, tester_data, "trunk", "lin_acc_sensor", "ang_vel_sensor", "touch_FR", "touch_FL", "touch_RR", "touch_RL");
+    data_src->pullSensorData(tester_state);
     tester_state.root_pos_d << 0, 0, 0.27;
+    tester_state.walking_mode = true;
 
     int subtestsPassed = 0;
 
@@ -539,7 +550,7 @@ int go1TestFunctions::testZeroPosErrorWalk() {
     std::cout << "###################################################################" << std::endl;
     std::cout << "-- Subtest 1: FR + RL stance, FL + RR swing --" << std::endl;
 
-    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc);
+    tester_state.updateLocomotionPlan();
 
     go1MPC tester_mpc1;
     tester_mpc1.solveMPCForState(tester_state);
@@ -554,7 +565,7 @@ int go1TestFunctions::testZeroPosErrorWalk() {
 
     std::cout << "\nMATLAB forces:\n" << matlabForces << std::endl;
 
-    tester_state.convertForcesToTorquesMujoco(tester_joint_angles);
+    tester_state.convertForcesToTorques();
 
     std::cout << "\nC++ torques:\n" << tester_state.joint_torques << std::endl;
 
@@ -590,11 +601,12 @@ int go1TestFunctions::testZeroPosErrorWalk() {
     std::cout << "\n-- Subtest 2: FL + RR stance, FR + RL swing --" << std::endl;
 
     tester_state.resetState();
+    data_src->pullSensorData(tester_state);
     tester_state.walking_mode = true;
     tester_state.swing_phase = SWING_PHASE_MAX/2 + 1;
     tester_state.root_pos_d << 0, 0, 0.27;
 
-    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc);
+    tester_state.updateLocomotionPlan();
 
     go1MPC tester_mpc2;
     tester_mpc2.solveMPCForState(tester_state);
@@ -606,7 +618,7 @@ int go1TestFunctions::testZeroPosErrorWalk() {
 
     std::cout << "\nMATLAB forces:\n" << matlabForces << std::endl;
 
-    tester_state.convertForcesToTorquesMujoco(tester_joint_angles);
+    tester_state.convertForcesToTorques();
 
     std::cout << "\nC++ torques:\n" << tester_state.joint_torques << std::endl;
 
@@ -657,20 +669,16 @@ int go1TestFunctions::testRaibertHeuristic() {
     in the go1State class. It should be able to generate a set of footstep locations
     based on the current state of the robot.
 */
-    mjtNum temp_joint_angles[19] = {0.0, 0.0, 0.27, 1.0, 0.0, 0.0, 0.0, 0.0, 0.9, -1.8, 0.0, 0.9, -1.8, 0.0, 0.9, -1.8, 0.0, 0.9, -1.8};
-    mjtNum temp_joint_velocities[18] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-    Eigen::Vector3d tester_lin_acc (0.0, 0.0, -9.81);
-
-    std::memcpy(tester_joint_angles, temp_joint_angles, sizeof(temp_joint_angles));
-    std::memcpy(tester_joint_velocities, temp_joint_velocities, sizeof(temp_joint_velocities));
+    // initialize tester state object
+    tester_state.resetState();
+    auto data_src = std::make_unique<mujocoDataReader>(tester_model, tester_data, "trunk", "lin_acc_sensor", "ang_vel_sensor", "touch_FR", "touch_FL", "touch_RR", "touch_RL");
+    data_src->pullSensorData(tester_state);
 
     std::cout << "################################################\n";
     std::cout << "### Test: Raibert Heuristic footstep planner ###\n";
     std::cout << "################################################\n" << std::endl;
     std::cout << "-- Subtest 1: 0.1 m/s in x-direction --" << std::endl;
 
-    tester_state.resetState();
-    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc);
     tester_state.root_pos_d << 0.05, 0, 0.27;
     tester_state.root_lin_vel_d << 0.1, 0, 0;
     tester_state.raibertHeuristic();
@@ -681,7 +689,7 @@ int go1TestFunctions::testRaibertHeuristic() {
 
     std::cout << "\n-- Subtest 2: 0.1 m/s in y-direction --" << std::endl;
     tester_state.resetState();
-    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc);
+    data_src->pullSensorData(tester_state);
     tester_state.root_lin_vel_d << 0, 0.1, 0;
     tester_state.raibertHeuristic();
     
@@ -691,7 +699,7 @@ int go1TestFunctions::testRaibertHeuristic() {
 
     std::cout << "\n-- Subtest 3: 0.1 m/s in z-direction --" << std::endl;
     tester_state.resetState();
-    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc);
+    data_src->pullSensorData(tester_state);
     tester_state.root_lin_vel_d << 0, 0, 0.1;
     tester_state.raibertHeuristic();
     
@@ -709,20 +717,16 @@ int go1TestFunctions::testAmirHLIP() {
     in the go1State class. It should be able to generate a set of footstep locations
     based on the current state of the robot.
 */
-    mjtNum temp_joint_angles[19] = {0.0, 0.0, 0.27, 1.0, 0.0, 0.0, 0.0, 0.0, 0.9, -1.8, 0.0, 0.9, -1.8, 0.0, 0.9, -1.8, 0.0, 0.9, -1.8};
-    mjtNum temp_joint_velocities[18] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-    Eigen::Vector3d tester_lin_acc (0.0, 0.0, -9.81);
-
-    std::memcpy(tester_joint_angles, temp_joint_angles, sizeof(temp_joint_angles));
-    std::memcpy(tester_joint_velocities, temp_joint_velocities, sizeof(temp_joint_velocities));
+    // initialize tester state object
+    tester_state.resetState();
+    auto data_src = std::make_unique<mujocoDataReader>(tester_model, tester_data, "trunk", "lin_acc_sensor", "ang_vel_sensor", "touch_FR", "touch_FL", "touch_RR", "touch_RL");
+    data_src->pullSensorData(tester_state);
 
     std::cout << "############################################\n";
     std::cout << "### Test: Amir's HT-LIP footstep planner ###\n";
     std::cout << "############################################\n" << std::endl;
     std::cout << "-- Subtest 1: 0.1 m/s in x-direction --" << std::endl;
 
-    tester_state.resetState();
-    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc);
     tester_state.root_pos_d << 0.05, 0, 0.27;
     tester_state.root_lin_vel_d << 0.1, 0, 0;
     tester_state.amirHLIP();
@@ -733,7 +737,7 @@ int go1TestFunctions::testAmirHLIP() {
 
     std::cout << "\n-- Subtest 2: 0.1 m/s in y-direction --" << std::endl;
     tester_state.resetState();
-    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc);
+    data_src->pullSensorData(tester_state);
     tester_state.root_lin_vel_d << 0, 0.1, 0;
     tester_state.amirHLIP();
 
@@ -743,7 +747,7 @@ int go1TestFunctions::testAmirHLIP() {
 
     std::cout << "\n-- Subtest 3: 0.1 m/s in z-direction --" << std::endl;
     tester_state.resetState();
-    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc);
+    data_src->pullSensorData(tester_state);
     tester_state.root_lin_vel_d << 0, 0, 0.1;
     tester_state.amirHLIP();
 
@@ -760,23 +764,18 @@ int go1TestFunctions::testSwingPD() {
     in the go1State class. It should be able to generate swing leg forces
     for swing legs, and provide no output for stance legs.
 */
-    mjtNum temp_joint_angles[19] = {0.0, 0.0, 0.27, 1.0, 0.0, 0.0, 0.0, 0.0, 0.9, -1.8, 0.0, 0.9, -1.8, 0.0, 0.9, -1.8, 0.0, 0.9, -1.8};
-    mjtNum temp_joint_velocities[18] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-    Eigen::Vector3d tester_lin_acc (0.0, 0.0, -9.81);
-
-    std::memcpy(tester_joint_angles, temp_joint_angles, sizeof(temp_joint_angles));
-    std::memcpy(tester_joint_velocities, temp_joint_velocities, sizeof(temp_joint_velocities));
+    // initialize tester state object
+    tester_state.resetState();
+    auto data_src = std::make_unique<mujocoDataReader>(tester_model, tester_data, "trunk", "lin_acc_sensor", "ang_vel_sensor", "touch_FR", "touch_FL", "touch_RR", "touch_RL");
+    data_src->pullSensorData(tester_state);
 
     std::cout << "##################################\n";
     std::cout << "### Test: Swing leg PD control ###\n";
     std::cout << "##################################\n" << std::endl;
     std::cout << "-- Subtest 1: Swing leg PD for swing leg --" << std::endl;
 
-    tester_state.resetState();
-    tester_state.updateStateFromMujoco(tester_joint_angles, tester_joint_velocities, tester_lin_acc);
-
     tester_state.contacts[1] = false;
-    tester_state.foot_pos_d = tester_state.foot_pos;
+    tester_state.foot_pos_d = tester_state.foot_pos_world_rot;
     tester_state.foot_pos_d.col(1) << 0.1, 0.1, 0.0;
 
     tester_state.swingPD(1, tester_state.foot_pos_d.col(1), Eigen::Vector3d::Zero());
@@ -806,7 +805,7 @@ int go1TestFunctions::testBezierPos() {
     tester_state.foot_deltaY = 0.2;
     tester_state.swing_phase = 30;
 
-    Eigen::Vector3d bezierPos = tester_state.bezierPos();
+    Eigen::Vector3d bezierPos = tester_state.bezierPos(1);
 
     std::cout << "\nBezier curve position: \n" << bezierPos << "\n" << std::endl;
 
@@ -828,7 +827,7 @@ int go1TestFunctions::testBezierVel() {
     tester_state.foot_deltaY = 0.2;
     tester_state.swing_phase = 30;
 
-    Eigen::Vector3d bezierVel = tester_state.bezierVel();
+    Eigen::Vector3d bezierVel = tester_state.bezierVel(1);
 
     std::cout << "\nBezier curve velocity: \n" << bezierVel << "\n" << std::endl;
 

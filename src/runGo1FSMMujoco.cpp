@@ -2,6 +2,7 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <vector>
 #include <filesystem>
 #include <ncurses.h>
@@ -9,49 +10,55 @@
 #include <mutex>
 #include <atomic>
 #include <cstring>
-#include <chrono>
 
 #include "go1_cpp_cmake/go1FSM.h"
 #include "go1_cpp_cmake/go1StateEstimator.h"
 
-// Global variables
-static mjModel* model = nullptr;
-static mjData* mujocoFSMData = nullptr;
+// Global variables for MuJoCo
+static mjModel* mujoco_model = nullptr;
+static mjData* mujoco_data = nullptr;
 static mjvCamera cam;
 static mjvOption opt;
 static mjvScene scn;
 static mjrContext con;
 static GLFWwindow* window = nullptr;
-int window_width = 1600, window_height = 900;
+int window_width = 1600, window_height = 900;  // Default window size
 
 /////////////////////////////
 // MuJoCo simulation setup //
 /////////////////////////////
 
-// Mouse state
+// Mouse state variables
 bool button_left = false, button_middle = false, button_right = false;
 double lastx = 0, lasty = 0;
 
-// GLFW callbacks
+// GLFW window resize callback
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
     window_width = width;
     window_height = height;
+    // mjr_setBuffer(mjFB_WINDOW, &con);
+
     glViewport(0, 0, width, height);
     mjr_setBuffer(mjFB_WINDOW, &con);
 }
 
+// GLFW mouse button callback
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
-    button_left   = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS);
+    button_left = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS);
     button_middle = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_PRESS);
-    button_right  = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS);
+    button_right = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS);
 }
 
+// GLFW scroll callback (Zoom)
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
     cam.distance *= (1.0 - 0.05 * yoffset);
 }
 
+// GLFW cursor position callback (Rotate/Pan)
 void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
-    if (!button_left && !button_middle && !button_right) return;
+    if (!button_left && !button_middle && !button_right)
+        return;
+
     double dx = xpos - lastx;
     double dy = ypos - lasty;
     lastx = xpos;
@@ -70,11 +77,12 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
     }
 }
 
+// GLFW window close callback
 void window_close_callback(GLFWwindow* window) {
     glfwSetWindowShouldClose(window, GLFW_TRUE);
 }
 
-// Visualization setup
+// Function to initialize visualization
 void initVisualization() {
     if (!glfwInit()) {
         std::cerr << "Could not initialize GLFW!" << std::endl;
@@ -97,27 +105,30 @@ void initVisualization() {
 
     mjv_defaultCamera(&cam);
     mjv_defaultOption(&opt);
-    mjv_makeScene(model, &scn, 2000);
+    mjv_makeScene(mujoco_model, &scn, 2000);
+
     mjr_defaultContext(&con);
-    mjr_makeContext(model, &con, mjFONTSCALE_150);
+    mjr_makeContext(mujoco_model, &con, mjFONTSCALE_150);
 
     glfwGetFramebufferSize(window, &window_width, &window_height);
     glViewport(0, 0, window_width, window_height);
     mjr_setBuffer(mjFB_WINDOW, &con);
 }
 
+// Function to render the MuJoCo scene
 void renderScene() {
     int fb_w, fb_h;
     glfwGetFramebufferSize(window, &fb_w, &fb_h);
     glViewport(0, 0, fb_w, fb_h);
     mjr_setBuffer(mjFB_WINDOW, &con);
-    mjv_updateScene(model, mujocoFSMData, &opt, nullptr, &cam, mjCAT_ALL, &scn);
+    mjv_updateScene(mujoco_model, mujoco_data, &opt, nullptr, &cam, mjCAT_ALL, &scn);
     mjrRect viewport = {0, 0, fb_w, fb_h};
     mjr_render(viewport, &scn, &con);
     glfwSwapBuffers(window);
     glfwPollEvents();
 }
 
+// Function to set initial camera position
 void adjustCamera() {
     cam.distance = 2.0;
     cam.azimuth = 235;
@@ -140,7 +151,7 @@ void write_vector(const Eigen::MatrixBase<VectorType> &vec, std::ostream &os) {
 }
 
 // Functions to store data in CSV file
-void storeData(const go1State &state, std::ostream &os, const Eigen::Vector3d &lin_acc_meas, const Eigen::Vector3d &ang_vel_meas) {
+void storeData(const go1State &state, std::ostream &os) {
     // Position
     write_vector(state.root_pos, os); os << ",";
     write_vector(state.root_pos_d, os); os << ",";
@@ -158,7 +169,7 @@ void storeData(const go1State &state, std::ostream &os, const Eigen::Vector3d &l
     write_vector(state.root_ang_vel_d, os); os << ",";
  
     // Foot positions and velocities
-    write_vector(state.foot_pos, os); os << ",";
+    write_vector(state.foot_pos_world_rot, os); os << ",";
     write_vector(state.foot_pos_abs, os); os << ",";
     write_vector(state.foot_pos_liftoff, os); os << ",";
     write_vector(state.foot_pos_d, os); os << ",";
@@ -209,9 +220,9 @@ void storeData(const go1State &state, std::ostream &os, const Eigen::Vector3d &l
     write_vector(state.root_rpy_est, os); os << ",";
     
     // Sensor measurements
-    write_vector(lin_acc_meas, os); os << ",";
-    write_vector(ang_vel_meas, os); os << "\n";
-    
+    write_vector(state.root_lin_acc_meas, os); os << ",";
+    write_vector(state.root_ang_vel_meas, os); os << ",";
+    write_vector(state.est_contacts, os); os << "\n";
 }
 
 void storeCalcTimeData(double update_time, double est_time, double MPC_calc_time, std::ostream &os) {
@@ -250,7 +261,8 @@ void writeCSVHeader(std::ostream &os) {
             "root_lin_acc_est_x,root_lin_acc_est_y,root_lin_acc_est_z,"
             "root_rpy_est_x,root_rpy_est_y,root_rpy_est_z,"
             "root_lin_acc_meas_x,root_lin_acc_meas_y,root_lin_acc_meas_z,"
-            "root_ang_vel_meas_x,root_ang_vel_meas_y,root_ang_vel_meas_z\n";
+            "root_ang_vel_meas_x,root_ang_vel_meas_y,root_ang_vel_meas_z,"
+            "FR_contact_meas,FL_contact_meas,RR_contact_meas,RL_contact_meas\n";
 
 }
 
@@ -258,192 +270,108 @@ void writeCalcTimeCSVHeader(std::ostream &os) {
     os << "state_update_time,estimation_time,MPC_calc_time\n";
 }
 
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-    if (action == GLFW_PRESS || action == GLFW_REPEAT) {
-        auto fsm = static_cast<go1FSM*>(glfwGetWindowUserPointer(window));
-        if (!fsm) return;
-
-        switch (key) {
-            case GLFW_KEY_I:
-                fsm->requestShutdown();
-                break;
-            case GLFW_KEY_P:
-                fsm->requestWalk(true);
-                break;
-            case GLFW_KEY_O:
-                fsm->requestWalk(false);
-                break;
-        }
-    }
-}
-
-// Function to start the state estimator thread
-void startEstimatorThread(go1State& state, go1StateEstimator& estimator, std::mutex& mtx, std::atomic<bool>& running, std::thread& thread_out) {
-    thread_out = std::thread([&]() {
-        const auto dt = std::chrono::milliseconds(2); // 500 Hz
-        auto next_tick = std::chrono::steady_clock::now();
-
-        while (running.load()) {
-            Eigen::Vector3d accel, gyro;
-            {
-                std::lock_guard<std::mutex> lk(mtx);
-                accel = state.root_lin_acc_meas;
-                gyro = state.root_ang_vel_meas;
-            }
-
-            {
-                std::lock_guard<std::mutex> lk(mtx);
-                estimator.estimateState(state, accel, gyro);
-            }
-
-            next_tick += dt;
-            auto now = std::chrono::steady_clock::now();
-
-            if (next_tick > now)    
-                std::this_thread::sleep_for(next_tick - now);
-        }
-    });
-}
+///////////////////
+// Main function //
+///////////////////
 
 int main(int argc, char** argv) {
-    std::cout << "Initializing MuJoCo..." << std::endl;
-
     // Load MuJoCo model
     char error[1000] = "";
-    std::filesystem::path relative_model_path("../models/go1_MATLAB.xml");
-    std::string model_path = std::filesystem::absolute(relative_model_path);
-
-    mjVFS vfs;
-    mj_defaultVFS(&vfs);
-
-    if (mj_addFileVFS(&vfs, model_path.c_str(), model_path.c_str()) != 0) {
-        std::cerr << "Failed to add XML to VFS: " << model_path << std::endl;
-        mj_deleteVFS(&vfs);
+    std::filesystem::path rel("../models/go1_MATLAB.xml");
+    std::string path = std::filesystem::absolute(rel);
+    mujoco_model = mj_loadXML(path.c_str(), nullptr, error, sizeof(error));
+    if (!mujoco_model) {
+        std::cerr << "Model load error: " << error << std::endl;
         return -1;
     }
+    mujoco_data = mj_makeData(mujoco_model);
 
-    model = mj_loadXML(model_path.c_str(), &vfs, error, 1000);
-    mj_deleteVFS(&vfs);
-
-    if (!model) {
-        std::cerr << "Failed to load MuJoCo model: " << error << std::endl;
-        return -1;
-    }
-
-    mujocoFSMData = mj_makeData(model);
-
-    if (model->nkey > 0) {
-        int keyframe_id = mj_name2id(model, mjOBJ_KEY, "prone");
+    if (mujoco_model->nkey > 0) {
+        int keyframe_id = mj_name2id(mujoco_model, mjOBJ_KEY, "prone");
         if (keyframe_id == -1) {
             std::cerr << "Keyframe 'prone' not found!" << std::endl;
             return -1;
         }
-        mj_resetDataKeyframe(model, mujocoFSMData, keyframe_id);
+        mj_resetDataKeyframe(mujoco_model, mujoco_data, keyframe_id);
     } else {
-        mj_resetData(model, mujocoFSMData);
+        mj_resetData(mujoco_model, mujoco_data);
     }
 
     initVisualization();
     adjustCamera();
 
-    int base_id = mj_name2id(model, mjOBJ_BODY, "trunk");
-    int sensor_id1 = mj_name2id(model, mjOBJ_SENSOR, "lin_acc_sensor");
-    int sensor_id2 = mj_name2id(model, mjOBJ_SENSOR, "ang_vel_sensor");
-    int sensor_adr1 = model->sensor_adr[sensor_id1];
-    int sensor_adr2 = model->sensor_adr[sensor_id2];
+    std::ostringstream mujoco_datastream;
+    writeCSVHeader(mujoco_datastream);
 
-    // Create go1State & go1FSM objects & associated thread
-    auto state = std::make_unique<go1State>();
-    auto fsm   = std::make_unique<go1FSM>(*state);
-    auto estimator = makeEstimator();
-
-    std::mutex est_mutex;
-    std::atomic<bool> est_running{true};
-    std::thread est_thread;
-
-    std::ostringstream mujoco_data, calc_time_data;
-    writeCSVHeader(mujoco_data);
-    // writeCalcTimeCSVHeader(calc_time_data);
-
-    AsyncLogger data_log("../data/go1_mujoco_data.csv", mujoco_data.str());
+    AsyncLogger data_log("../data/go1_mujoco_data.csv", mujoco_datastream.str());
     std::ostringstream mujoco_data_row;
 
-    glfwSetWindowUserPointer(window, fsm.get());
-    glfwSetKeyCallback(window, key_callback);
+    auto data_src = std::make_unique<mujocoDataReader>(
+                      mujoco_model, mujoco_data,
+                      "trunk",
+                      "lin_acc_sensor",
+                      "ang_vel_sensor",
+                      "touch_FR",
+                      "touch_FL",
+                      "touch_RR",
+                      "touch_RL");
+    auto estimator = makeEstimator();
+    auto command_sender = std::make_unique<mujocoCommandSender>(mujoco_model, mujoco_data);
 
-    {
-        std::lock_guard<std::mutex> lk(est_mutex);
-        state->updateStateFromMujoco(mujocoFSMData->qpos, mujocoFSMData->qvel, Eigen::Map<const Eigen::Vector3d>(mujocoFSMData->cacc + 3*base_id));
-        state->root_lin_acc_meas = Eigen::Map<const Eigen::Vector3d>(mujocoFSMData->sensordata + sensor_adr1);
-        state->root_ang_vel_meas = Eigen::Map<const Eigen::Vector3d>(mujocoFSMData->sensordata + sensor_adr2);
-        storeData(*state, mujoco_data_row, state->root_lin_acc_meas, state->root_ang_vel_meas);
-        data_log.logLine(mujoco_data_row.str());
-    }
+    // Instantiate FSM at 500 Hz state loop, 50 Hz MPC
+    go1FSM fsm(DT_CTRL, DT_MPC_CTRL, std::move(data_src), std::move(estimator), std::move(command_sender));
+    fsm.collectInitialState();
+    fsm.step();
+    storeData(fsm.getState(), mujoco_data_row);
+    data_log.logLine(mujoco_data_row.str());
 
-    estimator->collectInitialState(*state);
-    startEstimatorThread(*state, *estimator, est_mutex, est_running, est_thread);
-    fsm->start();
+    // Hook key callbacks
+    glfwSetWindowUserPointer(window, &fsm);
+    glfwSetKeyCallback(window, [](GLFWwindow* w, int key, int sc, int action, int mods) {
+        if (action != GLFW_PRESS) return;
+        auto f = static_cast<go1FSM*>(glfwGetWindowUserPointer(w));
+        if (!f) return;
+        switch (key) {
+            case GLFW_KEY_P: f->requestWalk(true);  break;
+            case GLFW_KEY_O: f->requestWalk(false); break;
+            case GLFW_KEY_I: f->requestShutdown();  break;
+            case GLFW_KEY_U: f->requestStartup();   break;
+        }
+    });
 
-    const double timestep = model->opt.timestep;
-    const auto sim_dt = std::chrono::duration<double>(timestep);
-    const auto render_dt = std::chrono::milliseconds(16);
-    auto next_render_time = std::chrono::steady_clock::now();
+    // Main loop: step simulation and FSM, then render
+    const std::chrono::milliseconds loop_time(static_cast<long>(1000 * mujoco_model->opt.timestep)); // 500 Hz loop time
+    bool running = true;
+    const auto render_interval = std::chrono::milliseconds(16); // ~60 FPS
+    auto last_render_time = std::chrono::steady_clock::now();
 
     while (!glfwWindowShouldClose(window)) {
-        mj_step(model, mujocoFSMData);
+        mj_step(mujoco_model, mujoco_data);
+        fsm.step();
+
         {
-            std::lock_guard<std::mutex> lk(est_mutex);
-            state->updateStateFromMujoco(mujocoFSMData->qpos, mujocoFSMData->qvel, Eigen::Map<const Eigen::Vector3d>(mujocoFSMData->cacc + 3*base_id));
-            state->root_lin_acc_meas = Eigen::Map<const Eigen::Vector3d>(mujocoFSMData->sensordata + sensor_adr1);
-            state->root_ang_vel_meas = Eigen::Map<const Eigen::Vector3d>(mujocoFSMData->sensordata + sensor_adr2);
-        }
-
-        switch (fsm->getFiniteState()) {
-            case go1FiniteState::Startup:
-                state->computeStartupPDMujoco(mujocoFSMData->qpos, mujocoFSMData->qvel);
-                break;
-            case go1FiniteState::Shutdown:
-                state->computeShutdownPDMujoco(mujocoFSMData->qpos, mujocoFSMData->qvel);
-                break;
-            default:
-                break;
-        }
-
-        if (fsm->getFiniteState() == go1FiniteState::Locomotion)
-            state->convertForcesToTorquesMujoco(mujocoFSMData->qpos);
-        for (int i = 0; i < model->nu; ++i)
-            mujocoFSMData->ctrl[i] = state->joint_torques(i%3, i/3);
-
-        {   
             mujoco_data_row.str("");
             mujoco_data_row.clear();
-            storeData(*state, mujoco_data_row, state->root_lin_acc_meas, state->root_ang_vel_meas);
+            storeData(fsm.getState(), mujoco_data_row);
             data_log.logLine(mujoco_data_row.str());
         }
-        
-        {
-            auto now = std::chrono::steady_clock::now();
-            if (now >= next_render_time) {
-                // std::cout << "FSM state (number): " << static_cast<int>(fsm->getFiniteState()) << std::endl;
-                renderScene();
-                next_render_time += render_dt;
-            }
+
+        auto now = std::chrono::steady_clock::now();
+        if (now - last_render_time >= render_interval) {
+            renderScene();
+            last_render_time = now;
+            std::cout << "FSM state: " << static_cast<int>(fsm.getFiniteState()) << std::endl;
         }
 
-        if (fsm->getFiniteState() == go1FiniteState::Shutdown && state->isShutdownComplete()) break;
-
-        std::this_thread::sleep_for(sim_dt);
+        std::this_thread::sleep_for(loop_time);
     }
 
-    est_running = false;
-    est_thread.join();
-
-    fsm->stop();
-    mj_deleteData(mujocoFSMData);
-    mj_deleteModel(model);
-    mjv_freeScene(&scn);
-    mjr_freeContext(&con);
+    // Cleanup
     glfwDestroyWindow(window);
     glfwTerminate();
+    mj_deleteData(mujoco_data);
+    mj_deleteModel(mujoco_model);
+    mjv_freeScene(&scn);
+    mjr_freeContext(&con);
     return 0;
 }

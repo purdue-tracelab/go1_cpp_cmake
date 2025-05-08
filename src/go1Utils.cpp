@@ -97,7 +97,7 @@ Eigen::Vector3d rotM2Euler(const Eigen::Matrix3d &rotMat) {
 /*
     Converts a rotation matrix to roll-pitch-yaw (Euler) angles.
 */
-   if (std::abs(rotMat(2, 0)) < 1.0) {
+    if (std::abs(rotMat(2, 0)) < 1.0) {
         double yaw = std::atan2(rotMat(1, 0), rotMat(0, 0));    // Rotation around Z-axis
         double pitch = std::asin(-rotMat(2, 0));                // Rotation around Y-axis
         double roll = std::atan(rotMat(2, 1)/ rotMat(2, 2));    // Rotation around X-axis
@@ -155,12 +155,85 @@ Eigen::Matrix3d computeGamma0(const Eigen::Vector3d& gyro) {
     return term1 * gyroSkew + term2 * gyroSkew * gyroSkew;
 }
 
+double hipJointIK(double pFutY, double pFutZ, double hipLength) {
+/*
+    Calculates the hip joint angle based on the desired foot position
+    and the length of the hip link (notice that the hip link does not
+    start at the origin of the quadruped).
+*/
+    double L = sqrt(std::pow(pFutY, 2) + std::pow(pFutZ, 2) - std::pow(hipLength + DELTA_Y_HIP, 2));
+    double hipTheta = std::atan2(pFutZ*hipLength + pFutY*L, pFutY*hipLength - pFutZ*L);
+
+    return hipTheta;
+}
+
+double calfJointIK(double thighLength, double calfLength, double futDistEff) {
+/*
+    Calculates the calf joint angle based on the effective foot distance
+    from the hip joint and the lengths of the thigh and calf links.
+*/
+    double cosCalfTheta = (std::pow(thighLength, 2) + std::pow(calfLength, 2) - std::pow(futDistEff, 2)) / (2 * fabs(thighLength * calfLength));
+    cosCalfTheta = std::clamp(cosCalfTheta, -1.0, 1.0); // Clamp to avoid NaN
+    double calfTheta = -(M_PI - acos(cosCalfTheta));
+
+    return calfTheta;
+}
+
+double thighJointIK(double hipTheta, double calfTheta, Eigen::Vector3d pFut, double thighLength, double calfLength) {
+/*
+    Calculates the thigh joint angle based on the desired foot position,
+    the previously solved hip and calf joint angles, and the lengths of
+    the thigh and calf links.
+*/
+    double predFutZQ1 = pFut.y() * sin(hipTheta) - pFut.z() * cos(hipTheta);
+    double predFutXQ1 = pFut.x();
+    double predFutXQ3 = calfLength * sin(calfTheta);
+    double predFutZQ3 = thighLength + calfLength * cos(calfTheta);
+
+    double thighTheta = std::atan2(predFutXQ3 * predFutZQ1 + predFutZQ3 * predFutXQ1,
+                                    predFutXQ3 * predFutXQ1 - predFutZQ3 * predFutZQ1);
+
+    return thighTheta;
+}
+
+Eigen::Vector3d computeFutIK(int leg_idx, Eigen::Vector3d pFut) {
+/*
+    Computes the desired joint angles for each leg based on the relative 
+    desired foot positions and the leg index. Don't use this for finding 
+    the desired joint velocities, just multiply the Jacobian transpose with 
+    the desired foot velocities.
+
+    REMEMBER LEG ORDER: FR, FL, RR, RL
+*/
+    double l1 = DELTA_Y_HIP_JOINT;
+    double l2 = THIGH_LENGTH;
+    double l3 = CALF_LENGTH;
+
+    double sideSign = 1.0;
+    if (leg_idx == 0 || leg_idx == 2)
+        sideSign = -1.0;
+
+    double base2Hip = DELTA_Y_HIP_JOINT * sideSign;
+    double thighLength = -THIGH_LENGTH;
+    double calfLength = -CALF_LENGTH;
+
+    double futDist = pFut.norm();
+    double futDistEff = sqrt(std::pow(futDist, 2) - std::pow(DELTA_Y_HIP_JOINT, 2));
+
+    Eigen::Vector3d futJointAngles;
+    futJointAngles(0) = hipJointIK(pFut.y(), pFut.z(), base2Hip);
+    futJointAngles(2) = calfJointIK(thighLength, calfLength, futDistEff);
+    futJointAngles(1) = thighJointIK(futJointAngles(0), futJointAngles(2), pFut, thighLength, calfLength);
+
+    return futJointAngles;
+}
+
 /////////////////////////////////////
 // Asynchronous data storage class //
 /////////////////////////////////////
 
 AsyncLogger::AsyncLogger(const std::string &path, const std::string &header)
-  : out_(), queue_(), mtx_(), cv_(), running_(true)
+    : out_(), queue_(), mtx_(), cv_(), running_(true)
 {
     // Open file and write header
     out_.open(path, std::ios::out | std::ios::trunc);

@@ -1,18 +1,19 @@
 #include "go1_cpp_cmake/go1State.h"
 
 /*
-    go1State.cpp handles the information storage between the different
-    scripts for storing current information about the Unitree Go1 robot
-    (position, orientation, target and current foot positions, foot forces, 
-    velocities, accelerations, contacts, etc.). This is the main focus of
-    translation into hardware from MuJoCo simulation state update and
-    management.
+    go1State.cpp handles the swing leg PD control, and stores all the
+    necessary information for all other related functions in the go1MPC
+    and go1StateEstimator classes. It relies on the lowLevelDataInterface
+    struct to access data from the MuJoCo simulation or UNITREE_LEGGED_SDK
+    hardware data.
 */
 
 go1State::go1State() {
 /*
     Sets the average lumped inertia to macro values defined in go1Params.h,
-    and then resets the state.
+    sets default foot positions to xy positions of the hips and the walk
+    height negated, and then resets the go1State object to free up important
+    information for swing PD planning and state estimation.
 */
     go1_lumped_inertia << GO1_LUMPED_INERTIA_XX, GO1_LUMPED_INERTIA_XY, GO1_LUMPED_INERTIA_XZ,
                             GO1_LUMPED_INERTIA_XY, GO1_LUMPED_INERTIA_YY, GO1_LUMPED_INERTIA_YZ,
@@ -22,11 +23,10 @@ go1State::go1State() {
                         -0.12675, 0.12675, -0.12675, 0.12675,
                         -WALK_HEIGHT, -WALK_HEIGHT, -WALK_HEIGHT, -WALK_HEIGHT;
 
-    root_hip_pos_abs << 0.1881, 0.1881, -0.1881, -0.1881,
-                    -0.12675, 0.12675, -0.12675, 0.12675,
-                    0, 0, 0, 0;
-
-    root_hip_pos = root_hip_pos_abs;
+    joint_torques_limits << TORQUE_MAX_HIP, TORQUE_MAX_THIGH, TORQUE_MAX_CALF,
+                            TORQUE_MAX_HIP, TORQUE_MAX_THIGH, TORQUE_MAX_CALF,
+                            TORQUE_MAX_HIP, TORQUE_MAX_THIGH, TORQUE_MAX_CALF,
+                            TORQUE_MAX_HIP, TORQUE_MAX_THIGH, TORQUE_MAX_CALF;
 
     resetState();
 }
@@ -37,30 +37,29 @@ void go1State::resetState() {
     all the forces to zero, and marks all foot contacts as true (Go1 is likely
     laying on the ground, so highly probable all the feet are touching the floor).
 */
+    // Root "truth" variables
     root_pos.setZero();
-    root_pos_old.setZero();
     root_pos_d.setZero();
-    root_pos_est.setZero();
     root_lin_vel.setZero();
     root_lin_vel_d.setZero();
-    root_lin_vel_est.setZero();
-    root_lin_acc.setZero();
-    root_lin_acc_est.setZero();
+    root_lin_acc << 0, 0, 9.81;
     root_lin_acc_meas.setZero();
-
-    root_quat = Eigen::Quaterniond::Identity();
-    root_quat_old = Eigen::Quaterniond::Identity();
-    root_quat_est = Eigen::Quaterniond::Identity();
+    root_ang_vel_meas.setZero();
     root_rpy.setZero();
-    root_rpy_old.setZero();
     root_rpy_d.setZero();
     root_ang_vel.setZero();
     root_ang_vel_d.setZero();
-    root_ang_vel_est.setZero();
-    root_ang_vel_meas.setZero();
 
+    // Root "estimation" variables
+    root_pos_est.setZero();
+    root_lin_vel_est.setZero();
+    root_lin_acc_est.setZero();
+    root_quat_est = Eigen::Quaterniond::Identity();
+    root_ang_vel_est.setZero();
+
+    // Foot tracking variables
     // VERY IMPORTANT FOOT ORDER: FR, FL, RR, RL
-    foot_pos.setZero();
+    foot_pos_world_rot.setZero();
     foot_pos_old.setZero();
     foot_pos_abs.setZero();
     foot_pos_abs_est.setZero();
@@ -68,11 +67,17 @@ void go1State::resetState() {
     foot_pos_d.setZero();
     foot_vel_d.setZero();
 
+    // Foot control variables
+    contactJacobian.setZero();
     foot_forces_grf.setZero();
+    foot_forces_grf_stacked.setZero();
     foot_forces_swing.setZero();
+    joint_torques_swing.setZero();
     joint_torques.setZero();
+    joint_torques_stacked.setZero();
     joint_pos_init.setZero();
 
+    // Movement mode trackers
     walking_mode = false;
     squat_prog = 0.0;
     swing_phase = 0; // ranges from 0 to SWING_PHASE_MAX
@@ -80,201 +85,40 @@ void go1State::resetState() {
     foot_deltaY = 0;
 
     std::fill(std::begin(contacts), std::end(contacts), true);
+    std::fill(std::begin(contacts_old), std::end(contacts_old), true);
+    // std::fill(std::begin(est_contacts), std::end(est_contacts), true);
+    est_contacts.setZero();
     init = true;
-    
 }
 
-void go1State::updateStateFromHardware(UNITREE_LEGGED_SDK::LowState& state) {
-    // Get updated joint position
-    // order is FR_0, FR_1, FR_2, FL_0, FL_1, FL_2, RR_0, RR_1, RR_2, RL_0, RL_1, RL_2
-    for (int i = 0; i < joint_pos.size(); i++) {
-        joint_pos[i] = state.motorState[i].q;
-    }
-    
-    // Push back old states of the root pose and feet (figure out when estimation will send information back to go1State object)
-    root_pos_old = root_pos;
-    root_lin_acc << state.imu.accelerometer[0], state.imu.accelerometer[1], state.imu.accelerometer[2];
-
-    root_rpy_old = root_rpy;
-    root_quat_old = root_quat;
-
-    foot_pos_old = foot_pos;
-    foot_pos = go1FKHardware(joint_pos, root_rpy); // implemented go1FK using Muqun and Leo's work
-
-    if (init) {
-        root_pos_old = root_pos;
-        root_rpy_old = root_rpy;
-        foot_pos_old = foot_pos;
-    }
-    
-    for (int i = 0; i < NUM_LEG; i++) {
-        foot_pos_abs.block<3, 1>(0, i) = foot_pos.block<3, 1>(0, i) + root_pos;
-    }
-
-    Eigen::Matrix3d rootRotMat = rotZ(root_rpy(2))*rotY(root_rpy(1))*rotX(root_rpy(0));
-    Eigen::Matrix3d hipRotMat = rotZ(root_rpy(2))*rotY(root_rpy(1));
-
-    root_hip_pos.block<3, 1>(0, 0) = rootRotMat*Eigen::Vector3d(DELTA_X_HIP, -DELTA_Y_HIP, 0) + hipRotMat*Eigen::Vector3d(0, -DELTA_Y_HIP_JOINT, 0);
-    root_hip_pos.block<3, 1>(0, 1) = rootRotMat*Eigen::Vector3d(DELTA_X_HIP, DELTA_Y_HIP, 0) + hipRotMat*Eigen::Vector3d(0, DELTA_Y_HIP_JOINT, 0);
-    root_hip_pos.block<3, 1>(0, 2) = rootRotMat*Eigen::Vector3d(-DELTA_X_HIP, -DELTA_Y_HIP, 0) + hipRotMat*Eigen::Vector3d(0, -DELTA_Y_HIP_JOINT, 0);
-    root_hip_pos.block<3, 1>(0, 3) = rootRotMat*Eigen::Vector3d(-DELTA_X_HIP, DELTA_Y_HIP, 0) + hipRotMat*Eigen::Vector3d(0, DELTA_Y_HIP_JOINT, 0);
-
-    root_hip_pos_abs.block<3, 1>(0, 0) = root_pos + rootRotMat*Eigen::Vector3d(DELTA_X_HIP, -DELTA_Y_HIP, 0) + hipRotMat*Eigen::Vector3d(0, -DELTA_Y_HIP_JOINT, 0);
-    root_hip_pos_abs.block<3, 1>(0, 1) = root_pos + rootRotMat*Eigen::Vector3d(DELTA_X_HIP, DELTA_Y_HIP, 0) + hipRotMat*Eigen::Vector3d(0, DELTA_Y_HIP_JOINT, 0);
-    root_hip_pos_abs.block<3, 1>(0, 2) = root_pos + rootRotMat*Eigen::Vector3d(-DELTA_X_HIP, -DELTA_Y_HIP, 0) + hipRotMat*Eigen::Vector3d(0, -DELTA_Y_HIP_JOINT, 0);
-    root_hip_pos_abs.block<3, 1>(0, 3) = root_pos + rootRotMat*Eigen::Vector3d(-DELTA_X_HIP, DELTA_Y_HIP, 0) + hipRotMat*Eigen::Vector3d(0, DELTA_Y_HIP_JOINT, 0);
-
-    if (walking_mode) {
-        // Determine foot contacts based on swing_phase
-        if (swing_phase >= 0 && swing_phase <= SWING_PHASE_MAX/2) {
-            contacts[0] = true;  // FR stance
-            contacts[1] = false;  // FL swing
-            contacts[2] = false;  // RR swing
-            contacts[3] = true;  // RL stance
-
-        } else if (swing_phase > SWING_PHASE_MAX/2 && swing_phase <= SWING_PHASE_MAX) {
-            contacts[0] = false;  // FR swing
-            contacts[1] = true;  // FL stance
-            contacts[2] = true;  // RR stance
-            contacts[3] = false;  // RL swing
-
-        }
-
-        if (swing_phase == 0 || swing_phase == SWING_PHASE_MAX + 1) {
-            swing_phase = 0;
-
-            contacts[0] = true;  // FR stance
-            contacts[1] = false;  // FL swing
-            contacts[2] = false;  // RR swing
-            contacts[3] = true;  // RL stance
-
-            foot_forces_swing.setZero();
-            joint_torques.setZero();
-            foot_pos_liftoff.setZero();
-        
-            for (int i = 0; i < NUM_LEG; i++) {
-                if (!contacts[i]) {
-                    foot_pos_liftoff.block<3, 1>(0, i) = foot_pos_abs.block<3, 1>(0, i);
-                }
-            }
-
-        } else if (swing_phase == SWING_PHASE_MAX/2 + 1) { // swap swing legs and contact legs
-            contacts[0] = false;  // FR swing
-            contacts[1] = true;  // FL stance
-            contacts[2] = true;  // RR stance
-            contacts[3] = false;  // RL swing
-
-            foot_forces_swing.setZero();
-            joint_torques.setZero();
-            foot_pos_liftoff.setZero();
-        
-            for (int i = 0; i < NUM_LEG; i++) {
-                if (!contacts[i]) {
-                    foot_pos_liftoff.block<3, 1>(0, i) = foot_pos_abs.block<3, 1>(0, i);
-                }
-            }
-
-        }
-
-        // Pick planner based on PLANNER_SELECT
-        if (PLANNER_SELECT == 0) {
-            go1State::raibertHeuristic(false);
-        } else if (PLANNER_SELECT == 1) {
-            go1State::raibertHeuristic(true); // w/ Capture Point
-        } else {
-            go1State::amirHLIP();
-        }
-
-        // Find desired foot positions and velocities based on swing_phase, then compute swing leg PD forces
-        Eigen::Vector3d bezierPosVec = bezierPos();
-        Eigen::Vector3d bezierVelVec = bezierVel();
-        bool absolute = false; // toggle for foot positions in absolute or relative frame
-
-        for (int i = 0; i < NUM_LEG; i++) {
-            if (!contacts[i] && absolute) {
-                foot_pos_d.block<3, 1>(0, i) << root_hip_pos_abs(0, i) + bezierPosVec.x(), root_hip_pos_abs(1, i) + bezierPosVec.y(), bezierPosVec.z(); 
-                foot_vel_d.block<3, 1>(0, i) = bezierVelVec;
-
-                go1State::swingPD(i, foot_pos_d.block<3, 1>(0, i), foot_vel_d.block<3, 1>(0, i), true);
-
-            } else if (!contacts[i] && !absolute) {
-                foot_pos_d.block<3, 1>(0, i) << root_hip_pos(0, i) + bezierPosVec.x(), root_hip_pos(1, i) + bezierPosVec.y(), bezierPosVec.z() - WALK_HEIGHT; 
-                foot_vel_d.block<3, 1>(0, i) = bezierVelVec;
-
-                go1State::swingPD(i, foot_pos_d.block<3, 1>(0, i), foot_vel_d.block<3, 1>(0, i), false);
-            }
-        }
-
-        if (!init) {
-            swing_phase++;
-        }
-
-    }
-
-    // Flip init to false for actual planning
-    if (init) {
-        init = false;
-    }
-}
-
-void go1State::updateStateFromMujoco(const mjtNum* q_vec, const mjtNum* q_vel, const Eigen::Vector3d &lin_acc) {
+void go1State::updateLocomotionPlan() {
 /*
-    Reads the current state from the MuJoCo simulation and updates the
-    go1State object with position, rotation, velocities, and foot 
-    location updates. Also ticks swing_phase forward for tracking with
-    swing leg PD functionality.
+    Steps forward the locomotion plan for the Go1 robot if in walking mode.
+    Uses the state update from the pullSensorData to calculate foot positions
+    and contact Jacobians, as well as update the general walking plan.
 */
-    if (!q_vec || !q_vel) {
-        std::cerr << "Error: q_vec or q_vel is NULL!" << std::endl;
-        return;
-    }
-    
-    // Update current and old states of the root and feet
-    root_pos_old = root_pos;
-    root_pos << q_vec[0], q_vec[1], q_vec[2];
-    root_lin_vel << q_vel[0], q_vel[1], q_vel[2];
-    root_lin_acc = lin_acc;
+    // Calculate foot position & Jacobian after state estimation
+    const auto& root_rpy_ctrl = USE_EST_FOR_CONTROL ? root_rpy_est : root_rpy;
+    const auto& root_pos_ctrl = USE_EST_FOR_CONTROL ? root_pos_est : root_pos;
+    Eigen::Matrix3d rootRotMat = rotZ(root_rpy_ctrl(2))*rotY(root_rpy_ctrl(1))*rotX(root_rpy_ctrl(0));
 
-    root_rpy_old = root_rpy;
-    root_quat_old = root_quat;
-
-    root_quat.w() = q_vec[3];
-    root_quat.x() = q_vec[4];
-    root_quat.y() = q_vec[5];
-    root_quat.z() = q_vec[6];
-
-    // root_rpy = rotM2Euler(root_quat.toRotationMatrix());
-    root_rpy = quat2Euler(root_quat);
-    root_ang_vel << q_vel[3], q_vel[4], q_vel[5];
-
+    foot_pos_world_rot = go1FwdKin(joint_pos, root_rpy_ctrl); // implemented go1FwdKin using Muqun and Leo's work
+    foot_pos_abs = foot_pos_world_rot.colwise() + root_pos_ctrl;
     foot_pos_old = foot_pos;
-    foot_pos = go1FKMujoco(q_vec, root_rpy); // implemented go1FK using Muqun and Leo's work
+    foot_pos = rootRotMat.transpose() * foot_pos_world_rot;
+    contactJacobian = go1ContactJacobian(joint_pos, root_rpy_ctrl);
 
-    if (init) {
-        root_pos_old = root_pos;
-        root_rpy_old = root_rpy;
-        foot_pos_old = foot_pos;
-        joint_pos_init << q_vec[7], q_vec[8], q_vec[9], q_vec[10], q_vec[11], q_vec[12],
-                            q_vec[13], q_vec[14], q_vec[15], q_vec[16], q_vec[17], q_vec[18];
-    }
-    
+    // Update contacts based on sensor measurements
+    contacts_old = contacts;
     for (int i = 0; i < NUM_LEG; i++) {
-        foot_pos_abs.block<3, 1>(0, i) = foot_pos.block<3, 1>(0, i) + root_pos;
+        if (est_contacts(i) > 3.0 && contacts_old[i] == true) {
+            contacts[i] = true;
+        } else {
+            contacts[i] = false;
+        }
     }
 
-    Eigen::Matrix3d rootRotMat = rotZ(root_rpy(2))*rotY(root_rpy(1))*rotX(root_rpy(0));
-    Eigen::Matrix3d hipRotMat = rotZ(root_rpy(2))*rotY(root_rpy(1));
-
-    root_hip_pos.block<3, 1>(0, 0) = rootRotMat*Eigen::Vector3d(DELTA_X_HIP, -DELTA_Y_HIP, 0) + hipRotMat*Eigen::Vector3d(0, -DELTA_Y_HIP_JOINT, 0);
-    root_hip_pos.block<3, 1>(0, 1) = rootRotMat*Eigen::Vector3d(DELTA_X_HIP, DELTA_Y_HIP, 0) + hipRotMat*Eigen::Vector3d(0, DELTA_Y_HIP_JOINT, 0);
-    root_hip_pos.block<3, 1>(0, 2) = rootRotMat*Eigen::Vector3d(-DELTA_X_HIP, -DELTA_Y_HIP, 0) + hipRotMat*Eigen::Vector3d(0, -DELTA_Y_HIP_JOINT, 0);
-    root_hip_pos.block<3, 1>(0, 3) = rootRotMat*Eigen::Vector3d(-DELTA_X_HIP, DELTA_Y_HIP, 0) + hipRotMat*Eigen::Vector3d(0, DELTA_Y_HIP_JOINT, 0);
-
-    root_hip_pos_abs.block<3, 1>(0, 0) = root_pos + rootRotMat*Eigen::Vector3d(DELTA_X_HIP, -DELTA_Y_HIP, 0) + hipRotMat*Eigen::Vector3d(0, -DELTA_Y_HIP_JOINT, 0);
-    root_hip_pos_abs.block<3, 1>(0, 1) = root_pos + rootRotMat*Eigen::Vector3d(DELTA_X_HIP, DELTA_Y_HIP, 0) + hipRotMat*Eigen::Vector3d(0, DELTA_Y_HIP_JOINT, 0);
-    root_hip_pos_abs.block<3, 1>(0, 2) = root_pos + rootRotMat*Eigen::Vector3d(-DELTA_X_HIP, -DELTA_Y_HIP, 0) + hipRotMat*Eigen::Vector3d(0, -DELTA_Y_HIP_JOINT, 0);
-    root_hip_pos_abs.block<3, 1>(0, 3) = root_pos + rootRotMat*Eigen::Vector3d(-DELTA_X_HIP, DELTA_Y_HIP, 0) + hipRotMat*Eigen::Vector3d(0, DELTA_Y_HIP_JOINT, 0);
-
+    // Update walking plan if walking_mode is requested
     if (walking_mode) {
         // Determine foot contacts based on swing_phase
         if (swing_phase >= 0 && swing_phase <= SWING_PHASE_MAX/2) {
@@ -288,7 +132,6 @@ void go1State::updateStateFromMujoco(const mjtNum* q_vec, const mjtNum* q_vel, c
             contacts[1] = true;  // FL stance
             contacts[2] = true;  // RR stance
             contacts[3] = false;  // RL swing
-
         }
 
         if (swing_phase == 0 || swing_phase == SWING_PHASE_MAX + 1) {
@@ -300,12 +143,13 @@ void go1State::updateStateFromMujoco(const mjtNum* q_vec, const mjtNum* q_vel, c
             contacts[3] = true;  // RL stance
 
             foot_forces_swing.setZero();
+            joint_torques_swing.setZero();
             joint_torques.setZero();
             foot_pos_liftoff.setZero();
         
             for (int i = 0; i < NUM_LEG; i++) {
                 if (!contacts[i]) {
-                    foot_pos_liftoff.block<3, 1>(0, i) = foot_pos_abs.block<3, 1>(0, i);
+                    foot_pos_liftoff.col(i) = foot_pos.col(i);
                 }
             }
 
@@ -316,143 +160,115 @@ void go1State::updateStateFromMujoco(const mjtNum* q_vec, const mjtNum* q_vel, c
             contacts[3] = false;  // RL swing
 
             foot_forces_swing.setZero();
+            joint_torques_swing.setZero();
             joint_torques.setZero();
             foot_pos_liftoff.setZero();
         
             for (int i = 0; i < NUM_LEG; i++) {
                 if (!contacts[i]) {
-                    foot_pos_liftoff.block<3, 1>(0, i) = foot_pos_abs.block<3, 1>(0, i);
+                    foot_pos_liftoff.col(i) = foot_pos.col(i);
                 }
             }
-
         }
 
         // Pick planner based on PLANNER_SELECT
-        if (PLANNER_SELECT == 0) {
-            go1State::raibertHeuristic(false);
-        } else if (PLANNER_SELECT == 1) {
-            go1State::raibertHeuristic(true); // w/ Capture Point
-        } else {
-            go1State::amirHLIP();
+        switch (PLANNER_SELECT) {
+            case 0: raibertHeuristic(false); break;
+            case 1: raibertHeuristic(); break;
+            case 2: amirHLIP(); break;
+            default: 
+                std::cerr << "Error: Invalid PLANNER_SELECT value, check go1Params.h" << std::endl; 
+                return;
         }
 
-        // Find desired foot positions and velocities based on swing_phase, then compute swing leg PD forces
-        Eigen::Vector3d bezierPosVec = bezierPos();
-        Eigen::Vector3d bezierVelVec = bezierVel();
-        bool absolute = false; // toggle for foot positions in absolute or relative frame
+        // Find desired foot positions and velocities based on swing_phase
+        Eigen::Vector3d futPosRef;
+        Eigen::Vector3d futVelRef;
 
         for (int i = 0; i < NUM_LEG; i++) {
-            if (!contacts[i] && absolute) {
-                foot_pos_d.block<3, 1>(0, i) << root_hip_pos_abs(0, i) + bezierPosVec.x(), root_hip_pos_abs(1, i) + bezierPosVec.y(), bezierPosVec.z(); 
-                foot_vel_d.block<3, 1>(0, i) = bezierVelVec;
+            if (SWING_TRAJ_SELECT == 0) {
+                futPosRef = bezierPos(i);
+                futVelRef = bezierVel(i);
+                
+            } else if (SWING_TRAJ_SELECT == 1) {
+                futPosRef = sinusoidalPos(i);
+                futVelRef = sinusoidalVel(i);
+            }
 
-                go1State::swingPD(i, foot_pos_d.block<3, 1>(0, i), foot_vel_d.block<3, 1>(0, i), true);
+            if (!contacts[i]) { // only relative frame tracking for swing PD (use default foot pos?)
+                foot_pos_d.col(i) = futPosRef;
+                foot_vel_d.col(i) = futVelRef;
 
-            } else if (!contacts[i] && !absolute) {
-                foot_pos_d.block<3, 1>(0, i) << root_hip_pos(0, i) + bezierPosVec.x(), root_hip_pos(1, i) + bezierPosVec.y(), bezierPosVec.z() - WALK_HEIGHT; 
-                foot_vel_d.block<3, 1>(0, i) = bezierVelVec;
-
-                go1State::swingPD(i, foot_pos_d.block<3, 1>(0, i), foot_vel_d.block<3, 1>(0, i), false);
+                swingPD(i, foot_pos_d.col(i), foot_vel_d.col(i));
             }
         }
 
         if (!init) {
             swing_phase++;
         }
-
-    } 
-
-    // Flip init to false since old states have been populated in first function call
-    if (init) {
-        init = false;
     }
 
 }
 
-void go1State::convertForcesToTorquesMujoco(const mjtNum* q_vec) {
+void go1State::convertForcesToTorques() {
 /*
     Converts all the foot forces from MPC and swing leg PD to torques for
     the lowest level of control, our joint motor actuators. Based on the
     joint positions relayed to it by MuJoCo simulation.
 */
-    if (!q_vec) {
-        std::cerr << "Error: q_vec is NULL!" << std::endl;
-        return;
-    }
+    // Convert stance leg forces to torques
+    foot_forces_grf_stacked << foot_forces_grf.col(0), // FR
+                                foot_forces_grf.col(1), // FL
+                                foot_forces_grf.col(2), // RR
+                                foot_forces_grf.col(3); // RL
 
-    Eigen::Matrix<double, 3, NUM_LEG> foot_forces = foot_forces_grf + foot_forces_swing;
-    Eigen::Matrix<double, 12, 1> foot_forces_stacked;
+    Eigen::Matrix<double, 18, 1> tau_grf_stacked = contactJacobian.transpose() * foot_forces_grf_stacked;
+    joint_torques_stacked = tau_grf_stacked.tail<12>();
 
-    foot_forces_stacked << foot_forces.block<3, 1>(0, 0), // FR
-                            foot_forces.block<3, 1>(0, 1), // FL
-                            foot_forces.block<3, 1>(0, 2), // RR
-                            foot_forces.block<3, 1>(0, 3); // RL
+    // Convert swing leg forces to torques if using Cartesian space PD
+    if (SWING_PD_SELECT == 0) {
+        Eigen::Matrix3d rootRotMat;
+        Eigen::Matrix3d rootRotMatT;
 
-    Eigen::MatrixXd jac = go1FootJacMujoco(q_vec, root_rpy);
-    Eigen::Matrix<double, 18, 1> joint_torques_stacked = jac.transpose() * foot_forces_stacked;
+        if (USE_EST_FOR_CONTROL) {
+            Eigen::Matrix3d rootRotMat = rotZ(root_rpy_est(2))*rotY(root_rpy_est(1))*rotX(root_rpy_est(0));
+            Eigen::Matrix3d rootRotMatT = rootRotMat.transpose();
+        } else {
+            Eigen::Matrix3d rootRotMat = rotZ(root_rpy(2))*rotY(root_rpy(1))*rotX(root_rpy(0));
+            Eigen::Matrix3d rootRotMatT = rootRotMat.transpose();
+        }
 
-    // Apply torque limits (safety measure)
-    Eigen::Matrix<double, 12, 1> joint_torques_limits;
-    joint_torques_limits << TORQUE_MAX_HIP, TORQUE_MAX_THIGH, TORQUE_MAX_CALF,
-                            TORQUE_MAX_HIP, TORQUE_MAX_THIGH, TORQUE_MAX_CALF,
-                            TORQUE_MAX_HIP, TORQUE_MAX_THIGH, TORQUE_MAX_CALF,
-                            TORQUE_MAX_HIP, TORQUE_MAX_THIGH, TORQUE_MAX_CALF;
-
-    for (int i = 0; i < 3*NUM_LEG; i++) {
-        if (joint_torques_stacked(i+6, 0) > joint_torques_limits(i, 0)) {
-            joint_torques_stacked(i+6, 0) = joint_torques_limits(i, 0);
-        } else if (joint_torques_stacked(i+6, 0) < -joint_torques_limits(i, 0)) {
-            joint_torques_stacked(i+6, 0) = -joint_torques_limits(i, 0);
+        for (int i = 0; i < NUM_LEG; i++) {
+            Eigen::Matrix3d contactJacobian_i = contactJacobian.block<3, 3>(i*3, 6 + i*3).transpose();
+            Eigen::Matrix3d legJacobian_i = rootRotMatT * contactJacobian_i;
+            joint_torques_swing.col(i) = legJacobian_i * foot_forces_swing.col(i);
         }
     }
 
-    joint_torques << joint_torques_stacked.block<3, 1>(6, 0), // FR
-                    joint_torques_stacked.block<3, 1>(9, 0), // FL
-                    joint_torques_stacked.block<3, 1>(12, 0), // RR
-                    joint_torques_stacked.block<3, 1>(15, 0); // RL
-
-}
-
-void go1State::convertForcesToTorquesHardware(const Eigen::VectorXd &jointPos) {
-/*
-    Converts all the foot forces from MPC and swing leg PD to torques for
-    the lowest level of control, our joint motor actuators. Based on the 
-    joint positions relayed to it by hardware.
-*/
-    Eigen::Matrix<double, 3, NUM_LEG> foot_forces = foot_forces_grf + foot_forces_swing;
-    Eigen::Matrix<double, 12, 1> foot_forces_stacked;
-
-    foot_forces_stacked << foot_forces.block<3, 1>(0, 0), // FR
-                            foot_forces.block<3, 1>(0, 1), // FL
-                            foot_forces.block<3, 1>(0, 2), // RR
-                            foot_forces.block<3, 1>(0, 3); // RL
-
-    Eigen::MatrixXd jac = go1FootJacHardware(jointPos, root_rpy);
-    Eigen::Matrix<double, 18, 1> joint_torques_stacked = jac.transpose() * foot_forces_stacked;
+    // Combine stance and swing leg torques
+    for (int i = 0; i < NUM_LEG; i++) {
+        joint_torques_stacked.block<3, 1>(i*3, 0) += joint_torques_swing.col(i);
+    }
 
     // Apply torque limits (safety measure)
-    Eigen::Matrix<double, 12, 1> joint_torques_limits;
-    joint_torques_limits << TORQUE_MAX_HIP, TORQUE_MAX_THIGH, TORQUE_MAX_CALF,
-                            TORQUE_MAX_HIP, TORQUE_MAX_THIGH, TORQUE_MAX_CALF,
-                            TORQUE_MAX_HIP, TORQUE_MAX_THIGH, TORQUE_MAX_CALF,
-                            TORQUE_MAX_HIP, TORQUE_MAX_THIGH, TORQUE_MAX_CALF;
-
     for (int i = 0; i < 3*NUM_LEG; i++) {
-        if (joint_torques_stacked(i+6, 0) > joint_torques_limits(i, 0)) {
-            joint_torques_stacked(i+6, 0) = joint_torques_limits(i, 0);
-        } else if (joint_torques_stacked(i+6, 0) < -joint_torques_limits(i, 0)) {
-            joint_torques_stacked(i+6, 0) = -joint_torques_limits(i, 0);
+        if (joint_torques_stacked(i, 0) > joint_torques_limits(i, 0)) {
+            joint_torques_stacked(i, 0) = joint_torques_limits(i, 0);
+        } else if (joint_torques_stacked(i, 0) < -joint_torques_limits(i, 0)) {
+            joint_torques_stacked(i, 0) = -joint_torques_limits(i, 0);
         }
     }
 
-    joint_torques << joint_torques_stacked.block<3, 1>(6, 0), // FR
-                    joint_torques_stacked.block<3, 1>(9, 0), // FL
-                    joint_torques_stacked.block<3, 1>(12, 0), // RR
-                    joint_torques_stacked.block<3, 1>(15, 0); // RL
+    joint_torques << joint_torques_stacked.block<3, 1>(0, 0), // FR
+                    joint_torques_stacked.block<3, 1>(3, 0), // FL
+                    joint_torques_stacked.block<3, 1>(6, 0), // RR
+                    joint_torques_stacked.block<3, 1>(9, 0); // RL
 
+    // Zero out swing leg torques for next iteration
+    joint_torques_swing.setZero();
 }
 
-Eigen::Vector3d go1State::bezierPos() {
+Eigen::Vector3d go1State::bezierPos(int leg_idx) {
 /*
     Computes the reference position along a Bezier curve between zero pos
     and a foot position ahead by foot_deltaX and foot_deltaY. The z height
@@ -461,11 +277,11 @@ Eigen::Vector3d go1State::bezierPos() {
     double phi = swing_phase % (SWING_PHASE_MAX/2);
     double phi_max = SWING_PHASE_MAX/2;
 
-    Eigen::Vector3d p0 = Eigen::Vector3d::Zero();
+    Eigen::Vector3d p0 = foot_pos_liftoff.col(leg_idx);
     Eigen::Vector3d p_c1 = p0;
-    Eigen::Vector3d p1(p0.x() + foot_deltaX/2, p0.y() + foot_deltaY/2, STEP_HEIGHT*2);
-    Eigen::Vector3d p_c2(p0.x() + foot_deltaX, p0.y() + foot_deltaY, 0);
+    Eigen::Vector3d p_c2 = default_foot_pos.col(leg_idx) + Eigen::Vector3d(foot_deltaX, foot_deltaY, 0);
     Eigen::Vector3d p2 = p_c2;
+    Eigen::Vector3d p1 = (p0 + p2)/2.0 + Eigen::Vector3d(0, 0, STEP_HEIGHT*2);
 
     double t = phi/phi_max;
     double oneMinusT = 1.0 - t;
@@ -479,7 +295,7 @@ Eigen::Vector3d go1State::bezierPos() {
     return fut_posDes;
 }
 
-Eigen::Vector3d go1State::bezierVel() {
+Eigen::Vector3d go1State::bezierVel(int leg_idx) {
 /*
     Computes the reference velocity along a Bezier curve between zero pos
     and a foot position ahead by foot_deltaX and foot_deltaY. Essentially
@@ -488,11 +304,11 @@ Eigen::Vector3d go1State::bezierVel() {
     double phi = swing_phase % (SWING_PHASE_MAX/2);
     double phi_max = SWING_PHASE_MAX/2;
 
-    Eigen::Vector3d p0 = Eigen::Vector3d::Zero();
+    Eigen::Vector3d p0 = foot_pos_liftoff.col(leg_idx);
     Eigen::Vector3d p_c1 = p0;
-    Eigen::Vector3d p1(p0.x() + foot_deltaX/2, p0.y() + foot_deltaY/2, STEP_HEIGHT*2);
-    Eigen::Vector3d p_c2(p0.x() + foot_deltaX, p0.y() + foot_deltaY, 0);
+    Eigen::Vector3d p_c2 = default_foot_pos.col(leg_idx) + Eigen::Vector3d(foot_deltaX, foot_deltaY, 0);
     Eigen::Vector3d p2 = p_c2;
+    Eigen::Vector3d p1 = (p0 + p2)/2.0 + Eigen::Vector3d(0, 0, STEP_HEIGHT*2);
 
     double t = phi/phi_max;
     double oneMinusT = 1.0 - t;
@@ -505,30 +321,85 @@ Eigen::Vector3d go1State::bezierVel() {
     return fut_velDes;
 }
 
+Eigen::Vector3d go1State::sinusoidalPos(int leg_idx) {
+/*
+    Computes the reference position along a sinusoidal curve between the
+    initial and final positions of the foot. Meant to mimic Muqun's hardware
+    code performance to bridge sim2real gap.
+*/
+    double phi = swing_phase % (SWING_PHASE_MAX/2);
+    double phi_max = SWING_PHASE_MAX/2;
+    double phi_pi = 2 * M_PI * phi / phi_max;
+
+    Eigen::Vector3d p0 = foot_pos_liftoff.col(leg_idx);
+    Eigen::Vector3d p1 = default_foot_pos.col(leg_idx) + Eigen::Vector3d(foot_deltaX, foot_deltaY, 0);
+
+    double alphaXY = (phi_pi - sin(phi_pi)) / (2 * M_PI);
+    double alphaZ = (1 - cos(phi_pi)) / 2;
+
+    Eigen::Vector3d fut_posDes = p0 + alphaXY * (p1 - p0);
+    fut_posDes.z() = alphaZ * STEP_HEIGHT;
+
+    return fut_posDes;
+}
+
+Eigen::Vector3d go1State::sinusoidalVel(int leg_idx) {
+/*
+    Computes the reference velocity along a sinusoidal curve between the
+    initial and final positions of the foot. Meant to mimic Muqun's hardware
+    code performance to bridge sim2real gap.
+*/
+    double phi = swing_phase % (SWING_PHASE_MAX/2);
+    double phi_max = SWING_PHASE_MAX/2;
+    double phi_pi = 2 * M_PI * phi / phi_max;
+    double t_swing = (phi_max + 1) * DT_CTRL;
+
+    Eigen::Vector3d p0 = foot_pos_liftoff.col(leg_idx);
+    Eigen::Vector3d p1 = default_foot_pos.col(leg_idx) + Eigen::Vector3d(foot_deltaX, foot_deltaY, 0);
+
+    double alphaXY = (phi_pi - cos(phi_pi)) / (2 * M_PI * t_swing);
+    double alphaZ = M_PI * sin(phi_pi) / t_swing;
+
+    Eigen::Vector3d fut_velDes = alphaXY * (p1 - p0);
+    fut_velDes.z() = alphaZ * STEP_HEIGHT;
+
+    return fut_velDes;
+}
+
 void go1State::raibertHeuristic(bool withCapturePoint) {
 /*
     Calculates foot_deltaX and foot_deltaY by using a simple Raibert
     Heuristic footstep planner. If you also want capture point, use "true"
     as input; if not, leave input blank or use "false".
 */
-    Eigen::Matrix3d rootRotMatZ = rotZ(root_rpy(2));
-    Eigen::Vector3d lin_vel_rel = rootRotMatZ.transpose() * root_lin_vel;
+    Eigen::Matrix3d rootRotMatZ; // assumes small roll + pitch only (should I keep this assumption?)
+    Eigen::Vector3d lin_vel_rel;
+
+    if (USE_EST_FOR_CONTROL) {
+        rootRotMatZ = rotZ(root_rpy_est(2));
+        lin_vel_rel = rootRotMatZ.transpose() * root_lin_vel_est;
+
+    } else {
+        rootRotMatZ = rotZ(root_rpy(2));
+        lin_vel_rel = rootRotMatZ.transpose() * root_lin_vel;
+    }
+    
     double delta_x;
     double delta_y;
     double swingTime = (SWING_PHASE_MAX + 1)/2.0;
 
     if (withCapturePoint) {
         // Step lengths delta_* = sqrt(base_height/gravity)*(base_vel_* - base_vel_*_d) + (swing_duration/2)*base_vel_*_d
-        double delta_x = std::sqrt(WALK_HEIGHT/9.8) * (lin_vel_rel(0) - root_lin_vel_d(0)) +
+        delta_x = std::sqrt(WALK_HEIGHT/9.8) * (lin_vel_rel(0) - root_lin_vel_d(0)) +
                             (swingTime * DT_CTRL) / 2.0 * lin_vel_rel(0);
 
-        double delta_y = std::sqrt(WALK_HEIGHT/9.8) * (lin_vel_rel(1) - root_lin_vel_d(1)) +
+        delta_y = std::sqrt(WALK_HEIGHT/9.8) * (lin_vel_rel(1) - root_lin_vel_d(1)) +
                             (swingTime * DT_CTRL) / 2.0 * lin_vel_rel(1);
 
     } else {
         // Step lengths delta_* = (swing_duration/2)*base_vel_*_d
-        double delta_x = (swingTime* DT_CTRL) / 2.0 * lin_vel_rel(0);
-        double delta_y = (swingTime * DT_CTRL) / 2.0 * lin_vel_rel(1);
+        delta_x = (swingTime * DT_CTRL) / 2.0 * lin_vel_rel(0);
+        delta_y = (swingTime * DT_CTRL) / 2.0 * lin_vel_rel(1);
     }
     
     // Step length clipping/saturation
@@ -548,7 +419,6 @@ void go1State::raibertHeuristic(bool withCapturePoint) {
     // Updating the desired foot position
     foot_deltaX = delta_x;
     foot_deltaY = delta_y;
-
 }
 
 void go1State::amirHLIP() {
@@ -560,9 +430,18 @@ void go1State::amirHLIP() {
     based on a QP formulation of HT-LIP dynamics. Need to ask I-Chia if
     correct or incorrect, may take a while to debug if incorrect.
 */
-    Eigen::Matrix3d rootRotMatZ = rotZ(root_rpy(2));
-    Eigen::Vector3d lin_vel_rel = rootRotMatZ.transpose() * root_lin_vel;
-    
+    Eigen::Matrix3d rootRotMatZ; // assumes small roll + pitch only (should I keep this assumption?)
+    Eigen::Vector3d lin_vel_rel;
+
+    if (USE_EST_FOR_CONTROL) {
+        rootRotMatZ = rotZ(root_rpy_est(2));
+        lin_vel_rel = rootRotMatZ.transpose() * root_lin_vel_est;
+
+    } else {
+        rootRotMatZ = rotZ(root_rpy(2));
+        lin_vel_rel = rootRotMatZ.transpose() * root_lin_vel;
+    }
+
     double swingProg = 0.0;
     stanceFeetSumXY.setZero(); // sum of stance feet xy positions
     int twoFootContact = 0;
@@ -570,7 +449,7 @@ void go1State::amirHLIP() {
     // Swing progress for each swing leg in the gait cycle, calculates xy sum of stance feet
     for (int i = 0; i < NUM_LEG; i++) {
         if (contacts[i]) {
-            stanceFeetSumXY += foot_pos.block<2, 1>(0, i);
+            stanceFeetSumXY += foot_pos_world_rot.block<2, 1>(0, i);
         } else {
             swingProg += double(swing_phase % (SWING_PHASE_MAX/2)) / (SWING_PHASE_MAX/2); // ranges from 0 to 2
             twoFootContact += 1;
@@ -590,36 +469,36 @@ void go1State::amirHLIP() {
         StanceFeetMP = StanceFeetMP_prev;
     }
 
-    // std::cout << "StanceFeetMP: " << StanceFeetMP.transpose() << std::endl;
-
     rel_error_pos = root_lin_vel_d.segment<2>(0) * DT_CTRL * (1.0 - swingProg)/2.0 - StanceFeetSumXY; // double check the (1 - swingProg) expression
     rel_error_vel = lin_vel_rel.segment<2>(0) - root_lin_vel_d.segment<2>(0);
     u_ref = root_lin_vel_d.segment<2>(0) * DT_CTRL * (SWING_PHASE_MAX/2);
 
     // Finds the effective LIP frequency and adjusts it based on the vertical acceleration
-    double a_ver_plus_g = root_lin_acc(2) - 9.81;
+    double a_ver_plus_g = root_lin_acc_meas(2) - 9.81; // isn't used anywhere else, what's the point of this? only comparison?
     double f_M; // effective LIP frequency
 
-    if (root_lin_acc(2) > 0){
-        f_M = root_lin_acc(2) / root_pos_d (2);
+    if (root_lin_acc_meas(2) > 0){ // Amir uses world frame acc instead of body frame acc, maybe change?
+        // f_M = root_lin_acc(2) / root_pos_d(2);
+        f_M = root_lin_acc_meas(2) / WALK_HEIGHT; // either use hard-coded walk height or estimated height
     } 
-    if(root_lin_acc(2) > 15.0){
-        f_M = 15.0 / root_pos_d(2);
+    if(root_lin_acc_meas(2) > 15.0){
+        // f_M = 15.0 / root_pos_d(2);
+        f_M = 15.0 / WALK_HEIGHT;
     }
-    if(root_lin_acc(2) < 5.0){
+    if(root_lin_acc_meas(2) < 5.0){
         f_M = 25.0;
     }
 
     // State transition matrix for entire swing duration
     double a1 = cosh(DT_CTRL * (SWING_PHASE_MAX/2) * sqrt(f_M));
-    double a2 = sinh(DT_CTRL * (SWING_PHASE_MAX/2) * sqrt(f_M))/sqrt(f_M);
-    double a3 = sinh(DT_CTRL * (SWING_PHASE_MAX/2) * sqrt(f_M))*sqrt(f_M);
+    double a2 = sinh(DT_CTRL * (SWING_PHASE_MAX/2) * sqrt(f_M)) / sqrt(f_M);
+    double a3 = sinh(DT_CTRL * (SWING_PHASE_MAX/2) * sqrt(f_M)) * sqrt(f_M);
     double a4 = cosh(DT_CTRL * (SWING_PHASE_MAX/2) * sqrt(f_M));
     
     // State transition matrix for remaining swing duration
     double a1r = cosh((1.0 - 0.5*swingProg) * DT_CTRL * (SWING_PHASE_MAX/2) * sqrt(f_M)); // 0.5 because swing_progress_pram is averaged for the nominally 2 swinging legs
-    double a2r = sinh((1.0 - 0.5*swingProg) * DT_CTRL * (SWING_PHASE_MAX/2) * sqrt(f_M))/sqrt(f_M);
-    double a3r = sinh((1.0 - 0.5*swingProg) * DT_CTRL * (SWING_PHASE_MAX/2) * sqrt(f_M))*sqrt(f_M);
+    double a2r = sinh((1.0 - 0.5*swingProg) * DT_CTRL * (SWING_PHASE_MAX/2) * sqrt(f_M)) / sqrt(f_M);
+    double a3r = sinh((1.0 - 0.5*swingProg) * DT_CTRL * (SWING_PHASE_MAX/2) * sqrt(f_M)) * sqrt(f_M);
     double a4r = cosh((1.0 - 0.5*swingProg) * DT_CTRL * (SWING_PHASE_MAX/2) * sqrt(f_M));
 
     Phi_rem << a1r, a2r, 
@@ -643,13 +522,13 @@ void go1State::amirHLIP() {
 
     // HLIP Hessian, gradient, linear constraints, and bounds
     // e << root (<-- incomplete line, double check Amir's HLIP formulation)
-    for (int i=0; i<4; ++i){
-        hlip_dense_hessian(i,i) = 2.0*(a1*a1+a3*a3);
-        hlip_dense_linearConst(i+2,i) =1.0;
+    for (int i = 0; i < 4; i++){
+        hlip_dense_hessian(i,i) = 2.0 * (a1*a1 + a3*a3);
+        hlip_dense_linearConst(i+2,i) = 1.0;
     }
 
     hlip_gradient.resize(4);
-    hlip_gradient << -2*(a1*a1+a3*a3), -2*(a1*a2+a3*a4),-2*(a1*a1+a3*a3), -2*(a1*a2+a3*a4);
+    hlip_gradient << -2*(a1*a1 + a3*a3), -2*(a1*a2 + a3*a4),-2*(a1*a1 + a3*a3), -2*(a1*a2 + a3*a4);
 
     hlip_dense_linearConst(0,0) = X_hlip_error_minus(0);
     hlip_dense_linearConst(0,1) = X_hlip_error_minus(1);
@@ -666,7 +545,6 @@ void go1State::amirHLIP() {
 
     // instantiate HLIP QP solver
     OsqpEigen::Solver solver_hlip;
-    // QP solver settings
     solver_hlip.settings()->setVerbosity(false);
     solver_hlip.settings()->setWarmStart(false);
     solver_hlip.data()->setNumberOfVariables(4);
@@ -702,32 +580,53 @@ void go1State::amirHLIP() {
 
     foot_deltaX = stepLengthX;
     foot_deltaY = stepLengthY;
-
 }
 
-void go1State::swingPD(int leg_idx, Eigen::Vector3d footPosRef, Eigen::Vector3d footVelRef, bool absolute) {
+void go1State::swingPD(int leg_idx, Eigen::Vector3d footPosRef, Eigen::Vector3d footVelRef) {
 /*
     Calculates the forces for swing legs using PD control with
-    the foot positions, velocities, and their respective Bezier 
+    relative foot positions, velocities, and their respective Bezier 
     curve references for smooth and precise swing leg control.
 */
-    if (contacts[leg_idx] == false && !absolute && walking_mode) { // relative frame swing PD
-        Eigen::Vector3d foot_posN = foot_pos.block<3, 1>(0, leg_idx);
-        Eigen::Vector3d foot_velN = (foot_pos.block<3, 1>(0, leg_idx) - foot_pos_old.block<3, 1>(0, leg_idx))/DT_CTRL;
+    if (contacts[leg_idx] == false && walking_mode) {
+        Eigen::Vector3d foot_posN = foot_pos.col(leg_idx);
+        Eigen::Vector3d foot_velN = (foot_pos.col(leg_idx) - foot_pos_old.col(leg_idx))/DT_CTRL;
 
-        Eigen::Matrix3d kp = SWING_KP * Eigen::Matrix3d::Identity();
-        Eigen::Matrix3d kd = SWING_KD * Eigen::Matrix3d::Identity();
+        if (SWING_PD_SELECT == 0) {
+            Eigen::Matrix3d kp = SWING_KP_CART * Eigen::Matrix3d::Identity();
+            Eigen::Matrix3d kd = SWING_KD_CART * Eigen::Matrix3d::Identity();
 
-        foot_forces_swing.block<3, 1>(0, leg_idx) = kp * (footPosRef - foot_posN) + kd * (footVelRef - foot_velN);
+            foot_forces_swing.col(leg_idx) = kp * (footPosRef - foot_posN) + kd * (footVelRef - foot_velN);
+        
+        } else {
+            Eigen::Matrix3d rootRotMat;
+            Eigen::Matrix3d rootRotMatT;
+    
+            if (USE_EST_FOR_CONTROL) {
+                rootRotMat = rotZ(root_rpy_est(2))*rotY(root_rpy_est(1))*rotX(root_rpy_est(0));
+                rootRotMatT = rootRotMat.transpose();
+            } else {
+                rootRotMat = rotZ(root_rpy(2))*rotY(root_rpy(1))*rotX(root_rpy(0));
+                rootRotMatT = rootRotMat.transpose();
+            }
 
-    } else if (contacts[leg_idx] == false && absolute && walking_mode) { // absolute frame swing PD
-        Eigen::Vector3d foot_posN = foot_pos_abs.block<3, 1>(0, leg_idx);
-        Eigen::Vector3d foot_velN = (foot_pos.block<3, 1>(0, leg_idx) - foot_pos_old.block<3, 1>(0, leg_idx))/DT_CTRL;
+            Eigen::Vector3d jointPosRef = computeFutIK(leg_idx, footPosRef);
+            Eigen::Vector3d jointPosN = computeFutIK(leg_idx, foot_posN);
+            Eigen::Vector3d jointVelRef = rootRotMatT * contactJacobian.block<3, 3>(leg_idx*3, 6 + leg_idx*3).transpose() * footVelRef;
+            Eigen::Vector3d jointVelN = rootRotMatT * contactJacobian.block<3, 3>(leg_idx*3, 6 + leg_idx*3).transpose() * foot_velN;
 
-        Eigen::Matrix3d kp = SWING_KP * Eigen::Matrix3d::Identity();
-        Eigen::Matrix3d kd = SWING_KD * Eigen::Matrix3d::Identity();
+            Eigen::Matrix3d kp = SWING_KP_JOINT * Eigen::Matrix3d::Identity();
+            Eigen::Matrix3d kd = SWING_KD_JOINT * Eigen::Matrix3d::Identity();
 
-        foot_forces_swing.block<3, 1>(0, leg_idx) = kp * (footPosRef - foot_posN) + kd * (footVelRef - foot_velN);
+            joint_torques_swing.col(leg_idx) = kp * (jointPosRef - jointPosN) + kd * (jointVelRef - jointVelN);
+
+            Eigen::Vector3d gravity_torque_comp(-0.66, -0.37, 0.16);
+            if (leg_idx == 1 || leg_idx == 3) {
+                gravity_torque_comp(0) *= -1;
+            }
+
+            joint_torques_swing.col(leg_idx) += gravity_torque_comp;
+        }
 
     } else if (contacts[leg_idx] == true && walking_mode) { // applying swing PD to stance legs: FORBIDDEN
         std::cerr << "Error: Invalid foot index for swing leg PD! control" << std::endl;
@@ -748,15 +647,18 @@ void go1State::jointPD(int joint_idx, double jointPos, double jointVel, bool sta
                 jointInterp = (1.0 - squat_prog) * joint_pos_init(joint_idx);
                 joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(JOINT_KP * (jointInterp - jointPos) + JOINT_KD * (0 - jointVel), -TORQUE_MAX_HIP, TORQUE_MAX_HIP);
                 return;
+
             } else {
                 joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(JOINT_KP * (0.0 - jointPos) + JOINT_KD * (0.0 - jointVel), -TORQUE_MAX_HIP, TORQUE_MAX_HIP);
                 return;
             }
+
         case 1:
             if (startup) {
                 jointInterp = (1.0 - squat_prog) * joint_pos_init(joint_idx) + squat_prog * THIGH_RAD_STAND;
                 joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(JOINT_KP * (jointInterp - jointPos) + JOINT_KD * (0 - jointVel), -TORQUE_MAX_THIGH, TORQUE_MAX_THIGH);
                 return;
+
             } else {
                 jointInterp = (1.0 - squat_prog) * joint_pos_init(joint_idx) + squat_prog * THIGH_RAD_STAND;
                 joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(JOINT_KP * (jointInterp - jointPos) + JOINT_KD * (0.0 - jointVel), -TORQUE_MAX_THIGH, TORQUE_MAX_THIGH);
@@ -768,6 +670,7 @@ void go1State::jointPD(int joint_idx, double jointPos, double jointVel, bool sta
                 jointInterp = (1.0 - squat_prog) * joint_pos_init(joint_idx) + squat_prog * CALF_RAD_STAND;
                 joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(JOINT_KP * (jointInterp - jointPos) + JOINT_KD * (0 - jointVel), -TORQUE_MAX_CALF, TORQUE_MAX_CALF);
                 return;
+
             } else {
                 jointInterp = (1.0 - squat_prog) * joint_pos_init(joint_idx) + squat_prog * CALF_RAD_STAND;
                 joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(JOINT_KP * (jointInterp - jointPos) + JOINT_KD * (0.0 - jointVel), -TORQUE_MAX_CALF, TORQUE_MAX_CALF);
@@ -778,6 +681,7 @@ void go1State::jointPD(int joint_idx, double jointPos, double jointVel, bool sta
 }
 
 bool go1State::isStartupComplete() const {
+    // std::cout << "squat_prog: " << squat_prog << std::endl;
     return squat_prog >= 1.0;
 }
 
@@ -785,71 +689,55 @@ bool go1State::isShutdownComplete() const {
     return squat_prog <= 0.0;
 }
 
-void go1State::computeStartupPDMujoco(const mjtNum* q_vec, const mjtNum* q_vel) {
+void go1State::computeStartupPDMujoco() {
 /*
     Activate simple joint PD for startup mode in MuJoCo.
 */
     for (int i = 0; i < 3*NUM_LEG; i++) {
-        go1State::jointPD(i, q_vec[7 + i], q_vel[i + 6]);
+        go1State::jointPD(i, joint_pos(i, 0), joint_vel(i, 0));
     }
 
     if (!isStartupComplete()) squat_prog += 0.002;
 }
 
-void go1State::computeShutdownPDMujoco(const mjtNum* q_vec, const mjtNum* q_vel) {
+void go1State::computeShutdownPDMujoco() {
 /*
     Activate simple joint PD for shutdown mode in MuJoCo.
 */
     for (int i = 0; i < 3*NUM_LEG; i++) {
-        go1State::jointPD(i, q_vec[7 + i], q_vel[i + 6], false);
+        go1State::jointPD(i, joint_pos(i, 0), joint_vel(i, 0), false);
     }
 
-    if (!isShutdownComplete()) squat_prog -= 0.002;
-}
-
-void go1State::computeStartupPDHardware(UNITREE_LEGGED_SDK::LowState& state) {
-/*
-    Activate simple joint PD for startup mode in MuJoCo.
-*/
-    for (int i = 0; i < 3*NUM_LEG; i++) {
-        go1State::jointPD(i, state.motorState[i].q, state.motorState[i].dq);
+    if (!isShutdownComplete()) {
+        squat_prog -= 0.002;
+    } else {
+        joint_pos_init = joint_pos;
     }
-
-    if (!isStartupComplete()) squat_prog += 0.002;
-}
-
-
-void go1State::computeShutdownPDHardware(UNITREE_LEGGED_SDK::LowState& state) {
-/*
-    Activate simple joint PD for shutdown mode in MuJoCo.
-*/
-    for (int i = 0; i < 3*NUM_LEG; i++) {
-        go1State::jointPD(i, state.motorState[i].q, state.motorState[i].dq, false);
-    }
-
-    if (!isShutdownComplete()) squat_prog -= 0.002;
 }
 
 go1StateSnapshot go1State::getSnapshot() const {
     std::lock_guard<std::mutex> lock(mtx_);
     go1StateSnapshot stateSnap;
-    stateSnap.foot_pos = foot_pos;
+
+    stateSnap.foot_pos_world_rot = foot_pos_world_rot; // overwrite with estimate or new variable?
     stateSnap.go1_lumped_inertia = go1_lumped_inertia;
-    stateSnap.root_pos = root_pos;
+    stateSnap.root_pos = USE_EST_FOR_CONTROL ? root_pos_est : root_pos;
     stateSnap.root_pos_d = root_pos_d;
-    stateSnap.root_rpy = root_rpy;
+    stateSnap.root_rpy = USE_EST_FOR_CONTROL ? root_rpy_est : root_rpy;
     stateSnap.root_rpy_d = root_rpy_d;
-    stateSnap.root_lin_vel = root_lin_vel;
+    stateSnap.root_lin_vel = USE_EST_FOR_CONTROL ? root_lin_vel_est : root_lin_vel;
     stateSnap.root_lin_vel_d = root_lin_vel_d;
-    stateSnap.root_ang_vel = root_ang_vel;
+    stateSnap.root_ang_vel = USE_EST_FOR_CONTROL ? root_ang_vel_est : root_ang_vel;
     stateSnap.root_ang_vel_d = root_ang_vel_d;
     stateSnap.walking_mode = walking_mode;
     stateSnap.swing_phase = swing_phase;
+    stateSnap.grf_forces.setZero();
+    stateSnap.contacts = contacts;
 
     return stateSnap;
 }
 
-void go1State::setGRFForces(const Eigen::Matrix<double, 3, NUM_LEG> &grf) {
+void go1State::retrieveGRF(const Eigen::Matrix<double, 3, NUM_LEG> &grf) {
     std::lock_guard<std::mutex> lock(mtx_);
     foot_forces_grf = grf;
 }
