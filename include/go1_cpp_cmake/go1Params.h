@@ -42,8 +42,8 @@ constexpr int SWING_PD_SELECT = 1; // 0: Cartesian PD, 1: Joint PD
 constexpr double SWING_TRAJ_SELECT = 0; // 0: Bezier, 1: Sinusoidal (sinusoidal broken atm)
 constexpr double SWING_KP_CART = 3000;
 constexpr double SWING_KD_CART = 40;
-constexpr double SWING_KP_JOINT = 80;
-constexpr double SWING_KD_JOINT = 3;
+constexpr double SWING_KP_JOINT = 90;
+constexpr double SWING_KD_JOINT = 4;
 constexpr double WALK_HEIGHT = 0.27;
 constexpr double STEP_HEIGHT = 0.10;
 constexpr double FOOT_DELTA_X_LIMIT = 0.20;
@@ -140,20 +140,20 @@ constexpr double GO1_LUMPED_INERTIA_ZZ = 0.286839;
 // MPC weight sets //
 /////////////////////
 
-// // Experimental
-// constexpr double q_weight_1 = 500;
-// constexpr double q_weight_2 = 1000;
-// constexpr double q_weight_3 = 500;
-// constexpr double q_weight_4 = 1000;
-// constexpr double q_weight_5 = 1000;
-// constexpr double q_weight_6 = 500;
-// constexpr double q_weight_7 = 0.1;
-// constexpr double q_weight_8 = 0.1;
-// constexpr double q_weight_9 = 1;
-// constexpr double q_weight_10 = 10;
-// constexpr double q_weight_11 = 10;
-// constexpr double q_weight_12 = 10;
-// constexpr double r_weight_val = 1e-6;
+// Experimental
+constexpr double q_weight_1 = 500;
+constexpr double q_weight_2 = 1000;
+constexpr double q_weight_3 = 500;
+constexpr double q_weight_4 = 1000;
+constexpr double q_weight_5 = 1000;
+constexpr double q_weight_6 = 500;
+constexpr double q_weight_7 = 0.1;
+constexpr double q_weight_8 = 0.1;
+constexpr double q_weight_9 = 1;
+constexpr double q_weight_10 = 10;
+constexpr double q_weight_11 = 10;
+constexpr double q_weight_12 = 10;
+constexpr double r_weight_val = 1e-6;
 
 // // MIT
 // constexpr double q_weight_1 = 1;
@@ -170,20 +170,20 @@ constexpr double GO1_LUMPED_INERTIA_ZZ = 0.286839;
 // constexpr double q_weight_12 = 1;
 // constexpr double r_weight_val = 1e-6;
 
-// current default
-constexpr double q_weight_1 = 500;
-constexpr double q_weight_2 = 500;
-constexpr double q_weight_3 = 500;
-constexpr double q_weight_4 = 1000;
-constexpr double q_weight_5 = 1000;
-constexpr double q_weight_6 = 1000;
-constexpr double q_weight_7 = 0.1;
-constexpr double q_weight_8 = 0.1;
-constexpr double q_weight_9 = 1;
-constexpr double q_weight_10 = 10;
-constexpr double q_weight_11 = 10;
-constexpr double q_weight_12 = 10;
-constexpr double r_weight_val = 1e-6;
+// // current default
+// constexpr double q_weight_1 = 500;
+// constexpr double q_weight_2 = 500;
+// constexpr double q_weight_3 = 500;
+// constexpr double q_weight_4 = 1000;
+// constexpr double q_weight_5 = 1000;
+// constexpr double q_weight_6 = 1000;
+// constexpr double q_weight_7 = 0.1;
+// constexpr double q_weight_8 = 0.1;
+// constexpr double q_weight_9 = 1;
+// constexpr double q_weight_10 = 10;
+// constexpr double q_weight_11 = 10;
+// constexpr double q_weight_12 = 10;
+// constexpr double r_weight_val = 1e-6;
 
 // // MATLAB
 // constexpr double q_weight_1 = 100;
