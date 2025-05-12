@@ -248,8 +248,8 @@
   
     <sensor>
       <!--IMU sensors-->
-      <accelerometer name="lin_acc_sensor" site="imu"/>
-      <gyro name="ang_vel_sensor" site="imu"/>
+      <accelerometer name="lin_acc_sensor" site="imu" noise='0.01'/>
+      <gyro name="ang_vel_sensor" site="imu" noise='0.01'/>
 
       <!--Foot contact sensors-->
       <touch name="touch_FR" site="FR"/>

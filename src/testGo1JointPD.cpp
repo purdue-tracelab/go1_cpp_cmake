@@ -1,21 +1,16 @@
 #include "unitree_legged_sdk/unitree_legged_sdk.h"
+#include <math.h>
 #include <iostream>
-#include <fstream>
-#include <sstream>
-#include <vector>
-#include <filesystem>
+#include <stdio.h>
+#include <stdint.h>
 #include <ncurses.h>
-#include <thread>
-#include <mutex>
-#include <atomic>
-#include <cstring>
 
-#include "go1_cpp_cmake/go1FSM.h"
-#include "go1_cpp_cmake/go1StateEstimator.h"
+#include "go1_cpp_cmake/go1DataInterface.h"
 
 // Global variables for hardware interfacing
 UNITREE_LEGGED_SDK::LowState lowState = {0};
 UNITREE_LEGGED_SDK::UDP udp(UNITREE_LEGGED_SDK::LOWLEVEL, 8090, "192.168.123.10", 8007);
+go1State tester_state;
 bool running = false;
 
 ///////////////////////////////
@@ -153,138 +148,12 @@ void writeCalcTimeCSVHeader(std::ostream &os) {
     os << "state_update_time,estimation_time,MPC_calc_time\n";
 }
 
-////////////////////
-// Main functions //
-////////////////////
-
-void keyControl(go1FSM &fsm) {
-/*
-    Keyboard terminal commands for sending desired velocities to
-    the physical Go1 robot. Can't continuously rotate, and the
-    swing leg control is iffy atm.
-*/
-    static bool hold_forward = false;
-    static bool hold_backward = false;
-    static bool hold_left = false;
-    static bool hold_right = false;
-    static bool hold_yawL = false;
-    static bool hold_yawR = false;
-
-    int ch;
-    while ((ch = getch()) != ERR) {
-        switch(ch) {
-            ///////////////////////
-            // Movement commands //
-            ///////////////////////
-
-            case 'w': 
-                if (fsm.getState().walking_mode)
-                    hold_forward = true; 
-                    break;
-
-            case 's': 
-                if (fsm.getState().walking_mode)
-                    hold_backward = true; 
-                    break;
-
-            case 'a': 
-                if (fsm.getState().walking_mode)
-                    hold_left = true; 
-                    break;
-
-            case 'd': 
-                if (fsm.getState().walking_mode)
-                    hold_right = true; 
-                    break;
-
-            case 'q': 
-                if (fsm.getState().walking_mode)
-                    hold_yawL = true; 
-                    break;
-
-            case 'e': 
-                if (fsm.getState().walking_mode)
-                    hold_yawR = true; 
-                    break;
-
-            case 'x': // stop linear movement
-                hold_forward = hold_backward = false;
-                hold_left = hold_right = false;
-                break;
-
-            case 'z': // stop yaw movement
-                hold_yawL = hold_yawR = false;
-                break;
-
-            ///////////////////////////////////
-            // Finite state machine commands //
-            ///////////////////////////////////
-
-            case 'p':
-                fsm.requestWalk(true);
-                hold_forward = hold_backward = false;
-                hold_left = hold_right = false;
-                hold_yawL = hold_yawR = false;
-                break;
-
-            case 'o':
-                fsm.requestWalk(false);
-                hold_forward = hold_backward = false;
-                hold_left = hold_right = false;
-                hold_yawL = hold_yawR = false;
-                break;
-            
-            case 'i':
-                fsm.requestShutdown();
-                hold_forward = hold_backward = false;
-                hold_left = hold_right = false;
-                hold_yawL = hold_yawR = false;
-                break;
-
-            case 'u':
-                fsm.requestStartup();
-                hold_forward = hold_backward = false;
-                hold_left = hold_right = false;
-                hold_yawL = hold_yawR = false;
-                break;
-
-            case ' ':
-                running = false;
-                mvprintw(0, 0, "Killing controller...");
-                refresh();
-                endwin();
-                std::cout << "Controller killed, exiting..." << std::endl;
-                exit(0);
-                break;
-
-            default:
-                break;
-        }
-    }
-
-    Eigen::Vector3d v_cmd = Eigen::Vector3d::Zero();
-    double yaw_cmd = 0;
-
-    if (hold_forward) v_cmd.x() += 0.2;
-    if (hold_backward) v_cmd.x() -= 0.2;
-    if (hold_left) v_cmd.y() += 0.2;
-    if (hold_right) v_cmd.y() -= 0.2;
-    if (hold_yawL) yaw_cmd += 1.0;
-    if (hold_yawR) yaw_cmd -= 1.0;
-
-    double yaw = fsm.getState().root_rpy_est(2);
-    Eigen::Matrix3d rootRotZ = rotZ(yaw);
-    Eigen::Vector3d v_world = rootRotZ * v_cmd;
-
-    fsm.setDesiredVel(v_world, yaw_cmd);
-    fsm.setDesiredPos();
-
-    // Debug output
-    mvprintw(0, 0,
-        "v: [%.2f, %.2f], yaw_rate: %.2f, FSM state: %s",
-        v_cmd.x(), v_cmd.y(), yaw_cmd, fsm.go1FiniteState2Str()
-        );
-    refresh();
+double jointLinearInterpolation(double initPos, double targetPos, double rate)
+{
+  double p;
+  rate = std::min(std::max(rate, 0.0), 1.0);
+  p = initPos * (1 - rate) + targetPos * rate;
+  return p;
 }
 
 int main() {
@@ -295,38 +164,21 @@ int main() {
     std::ostringstream hardware_data_row;
 
     auto data_src = std::make_unique<hardwareDataReader>(lowState, udp);
-    auto estimator = makeEstimator();
     auto command_sender = std::make_unique<hardwareCommandSender>(lowState, udp);
 
-    // Instantiate FSM at 500 Hz state loop, 50 Hz MPC
-    go1FSM fsm(DT_CTRL, DT_MPC_CTRL, std::move(data_src), std::move(estimator), std::move(command_sender));
-    fsm.collectInitialState();
-    fsm.step();
-    storeData(fsm.getState(), hardware_data_row);
-    data_log.logLine(hardware_data_row.str());
-
-    // Main loop
-    const std::chrono::milliseconds loop_time(static_cast<long>(1000 * DT_CTRL)); // 500 Hz loop time
+    const std::chrono::milliseconds loop_time(static_cast<long>(DT_CTRL));
     running = true;
-
-    // Initialize ncurses
-    initscr(); // Start ncurses mode
-    timeout(0); // Non-blocking input, no delay
-    nodelay(stdscr, TRUE);
-    noecho();            // Don't display pressed keys
-    cbreak();            // Disable line buffering (don't need to press Enter)
 
     while (running) {
         auto loop_start = std::chrono::high_resolution_clock::now();
-        keyControl(fsm);
-        fsm.step();
+        data_src->pullSensorData(tester_state);
+        tester_state.computeStartupPDMujoco();
+        command_sender->sendCommand(tester_state);
 
-        {
-            hardware_data_row.str("");
-            hardware_data_row.clear();
-            storeData(fsm.getState(), hardware_data_row);
-            data_log.logLine(hardware_data_row.str());
-        }
+        hardware_data_row.str("");
+        hardware_data_row.clear();
+        storeData(tester_state, hardware_data_row);
+        data_log.logLine(hardware_data_row.str());
 
         auto loop_end = std::chrono::high_resolution_clock::now();
         auto loop_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(loop_end - loop_start);
@@ -335,6 +187,5 @@ int main() {
             std::this_thread::sleep_for(remaining_time);
         }
     }
-
-    return 0;
 }
+

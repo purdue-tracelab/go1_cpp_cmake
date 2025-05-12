@@ -132,6 +132,13 @@ target_link_libraries(run_go1FSMHardware
 )
 target_link_options(run_go1FSMHardware PRIVATE -no-pie)
 
+# Small standing tester for Go1 hardware control (unsure if will properly work)
+add_executable(test_go1JointPD src/testGo1JointPD.cpp)
+target_link_libraries(test_go1JointPD
+    go1_main_lib
+)
+target_link_options(test_go1JointPD PRIVATE -no-pie)
+
 # Install libraries and executables
 install(TARGETS
     go1_main_lib

@@ -346,6 +346,7 @@ int main() {
     auto last_render_time = std::chrono::steady_clock::now();
 
     while (!glfwWindowShouldClose(window)) {
+        auto loop_start = std::chrono::high_resolution_clock::now();
         mj_step(mujoco_model, mujoco_data);
         fsm.step();
 
@@ -360,10 +361,15 @@ int main() {
         if (now - last_render_time >= render_interval) {
             renderScene();
             last_render_time = now;
-            std::cout << "FSM state: " << static_cast<int>(fsm.getFiniteState()) << std::endl;
+            std::cout << "FSM state: " << fsm.go1FiniteState2Str() << std::endl;
         }
 
-        std::this_thread::sleep_for(loop_time);
+        auto loop_end = std::chrono::high_resolution_clock::now();
+        auto loop_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(loop_end - loop_start);
+        auto remaining_time = loop_time - loop_elapsed;
+        if (remaining_time > std::chrono::milliseconds(0)) {
+            std::this_thread::sleep_for(remaining_time);
+        }
     }
 
     // Cleanup

@@ -421,6 +421,7 @@ int main() {
 
     // Main simulation loop
     while (running && !glfwWindowShouldClose(window)) {
+        auto loop_start = std::chrono::high_resolution_clock::now();
         // std::cout << "Simulation time: " << mujoco_data->time << std::endl;
 
         // // Desired states (walk in x-direction)
@@ -502,7 +503,12 @@ int main() {
 
         mj_step(mujoco_model, mujoco_data);
 
-        std::this_thread::sleep_for(loop_time);
+        auto loop_end = std::chrono::high_resolution_clock::now();
+        auto loop_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(loop_end - loop_start);
+        auto remaining_time = loop_time - loop_elapsed;
+        if (remaining_time > std::chrono::milliseconds(0)) {
+            std::this_thread::sleep_for(remaining_time);
+        }
     }
 
     mj_deleteData(mujoco_data);

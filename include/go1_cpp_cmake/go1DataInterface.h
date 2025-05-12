@@ -180,6 +180,7 @@ struct hardwareCommandSender : lowLevelCommandSender {
         
         void sendCommand(const go1State &state) override {
             for (int i = 0; i < 3*NUM_LEG; i++) {
+                // cmd.motorCmd[i].mode = 0x0A; // not sure if required
                 cmd.motorCmd[i].q = UNITREE_LEGGED_SDK::PosStopF;
                 cmd.motorCmd[i].dq = UNITREE_LEGGED_SDK::VelStopF;
                 cmd.motorCmd[i].Kp = 0;
