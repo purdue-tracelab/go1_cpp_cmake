@@ -1,6 +1,7 @@
 #ifndef GO1_DATA_INTERFACE_H
 #define GO1_DATA_INTERFACE_H
 
+#include <chrono>
 #include "go1State.h"
 
 struct lowLevelDataReader {
@@ -104,12 +105,24 @@ struct hardwareDataReader : lowLevelDataReader {
     public:
         hardwareDataReader(UNITREE_LEGGED_SDK::LowState &lowState, 
                                     UNITREE_LEGGED_SDK::UDP &udp) : extUDP(udp),
-                                                                    extLowState(lowState) {}
+                                                                    extLowState(lowState),
+                                                                    readerRunning(true) 
+        {
+            readerThread = std::thread(&hardwareDataReader::readerLoop, this);
+        }
+
+        ~hardwareDataReader() {
+            readerRunning = false;
+            if (readerThread.joinable()) readerThread.join();
+        }
 
         void pullSensorData(go1State &state) override {
             // pull sensor data from UNITREE_LEGGED_SDK::LowState
-            extUDP.Recv();
-            extUDP.GetRecv(extLowState);
+            UNITREE_LEGGED_SDK::LowState raw;
+            {
+                std::lock_guard<std::mutex> lk(readerMtx);
+                raw = extLowState;
+            }
 
             state.root_lin_acc_meas << extLowState.imu.accelerometer[0], extLowState.imu.accelerometer[1], extLowState.imu.accelerometer[2];
             state.root_ang_vel_meas << extLowState.imu.gyroscope[0], extLowState.imu.gyroscope[1], extLowState.imu.gyroscope[2];
@@ -138,8 +151,19 @@ struct hardwareDataReader : lowLevelDataReader {
         }
 
     private:
-        UNITREE_LEGGED_SDK::UDP extUDP;
-        UNITREE_LEGGED_SDK::LowState extLowState;
+        void readerLoop() {
+            while (readerRunning) {
+                extUDP.Recv();
+                std::lock_guard<std::mutex> lk(readerMtx);
+                extUDP.GetRecv(extLowState);
+            }
+        }
+
+        UNITREE_LEGGED_SDK::LowState &extLowState;
+        UNITREE_LEGGED_SDK::UDP &extUDP;
+        std::thread readerThread;
+        std::mutex readerMtx;
+        std::atomic<bool> readerRunning;
 };
 
 struct lowLevelCommandSender {
@@ -173,34 +197,66 @@ struct hardwareCommandSender : lowLevelCommandSender {
         hardwareCommandSender(UNITREE_LEGGED_SDK::LowState &lowState, 
                                         UNITREE_LEGGED_SDK::UDP &udp) : safe(UNITREE_LEGGED_SDK::LeggedType::Go1), 
                                                                         extUDP(udp),
-                                                                        extLowState(lowState)
+                                                                        extLowState(lowState),
+                                                                        senderRunning(true),
+                                                                        period(static_cast<long>(DT_CTRL * 1000))
         {
             extUDP.InitCmdData(cmd);
+            senderThread = std::thread(&hardwareCommandSender::senderLoop, this);
+        }
+
+        ~hardwareCommandSender() {
+            senderRunning = false;
+            if (senderThread.joinable()) senderThread.join();
         }
         
         void sendCommand(const go1State &state) override {
+            UNITREE_LEGGED_SDK::LowCmd new_cmd;
             for (int i = 0; i < 3*NUM_LEG; i++) {
                 // cmd.motorCmd[i].mode = 0x0A; // not sure if required
-                cmd.motorCmd[i].q = UNITREE_LEGGED_SDK::PosStopF;
-                cmd.motorCmd[i].dq = UNITREE_LEGGED_SDK::VelStopF;
-                cmd.motorCmd[i].Kp = 0;
-                cmd.motorCmd[i].Kd = 0;
-                cmd.motorCmd[i].tau = state.joint_torques(i % 3, i / 3);
+                new_cmd.motorCmd[i].q = UNITREE_LEGGED_SDK::PosStopF;
+                new_cmd.motorCmd[i].dq = UNITREE_LEGGED_SDK::VelStopF;
+                new_cmd.motorCmd[i].Kp = 0;
+                new_cmd.motorCmd[i].Kd = 0;
+                new_cmd.motorCmd[i].tau = state.joint_torques(i % 3, i / 3);
             }
-            
-            int res = safe.PowerProtect(cmd, extLowState, 1);
-            if (res < 0)
-                exit(-1);
-            
-            extUDP.SetSend(cmd);
-            extUDP.Send();
+
+            {
+                std::lock_guard<std::mutex> lk(senderMtx);
+                cmd = new_cmd;
+            }
         }
 
     private:
+        void senderLoop() {
+            auto next = std::chrono::steady_clock::now();
+            while (senderRunning) {
+                next += period;
+
+                UNITREE_LEGGED_SDK::LowCmd new_cmd;
+                {
+                    std::lock_guard<std::mutex> lk(senderMtx);
+                    new_cmd = cmd;
+                }
+
+                int res = safe.PowerProtect(new_cmd, extLowState, 1);
+                if (res < 0) exit(-1);
+
+                extUDP.SetSend(new_cmd);
+                extUDP.Send();
+
+                std::this_thread::sleep_until(next);
+            }
+        }
+
+        UNITREE_LEGGED_SDK::LowState &extLowState;
+        UNITREE_LEGGED_SDK::UDP &extUDP;
+        UNITREE_LEGGED_SDK::LowCmd cmd{0};
         UNITREE_LEGGED_SDK::Safety safe;
-        UNITREE_LEGGED_SDK::UDP extUDP;
-        UNITREE_LEGGED_SDK::LowState extLowState;
-        UNITREE_LEGGED_SDK::LowCmd cmd = {0};
+        std::chrono::milliseconds period;
+        std::thread senderThread;
+        std::mutex senderMtx;
+        std::atomic<bool> senderRunning;
 };
 
 #endif // GO1_DATA_INTERFACE_H
