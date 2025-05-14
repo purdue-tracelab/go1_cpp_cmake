@@ -689,7 +689,7 @@ bool go1State::isShutdownComplete() const {
     return squat_prog <= 0.0;
 }
 
-void go1State::computeStartupPDMujoco() {
+void go1State::computeStartupPD() {
 /*
     Activate simple joint PD for startup mode in MuJoCo.
 */
@@ -700,7 +700,7 @@ void go1State::computeStartupPDMujoco() {
     if (!isStartupComplete()) squat_prog += 0.002;
 }
 
-void go1State::computeShutdownPDMujoco() {
+void go1State::computeShutdownPD() {
 /*
     Activate simple joint PD for shutdown mode in MuJoCo.
 */

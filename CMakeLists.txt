@@ -132,12 +132,19 @@ target_link_libraries(run_go1FSMHardware
 )
 target_link_options(run_go1FSMHardware PRIVATE -no-pie)
 
-# Small standing tester for Go1 hardware control (unsure if will properly work)
-add_executable(test_go1JointPD src/testGo1JointPD.cpp)
-target_link_libraries(test_go1JointPD
+# Small reading tester for Go1 hardware control (will help decide the structure of go1DataInterface for hardware)
+add_executable(test_go1ReadHardware src/testGo1ReadHardware.cpp)
+target_link_libraries(test_go1ReadHardware
     go1_main_lib
 )
-target_link_options(test_go1JointPD PRIVATE -no-pie)
+target_link_options(test_go1ReadHardware PRIVATE -no-pie)
+
+# Small command tester for Go1 hardware control (unsure if will properly work)
+add_executable(test_go1JointPDHardware src/testGo1JointPDHardware.cpp)
+target_link_libraries(test_go1JointPDHardware
+    go1_main_lib
+)
+target_link_options(test_go1JointPDHardware PRIVATE -no-pie)
 
 # Install libraries and executables
 install(TARGETS
@@ -168,6 +175,7 @@ install(
 install(PROGRAMS
   py_src/plotGo1MujocoData.py
   py_src/plotGo1CalcTime.py
+  py_src/plotGo1HardwareData.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

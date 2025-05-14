@@ -69,8 +69,8 @@ class go1State {
         // startup/shutdown functions
         bool isStartupComplete() const;
         bool isShutdownComplete() const;
-        void computeStartupPDMujoco();
-        void computeShutdownPDMujoco();
+        void computeStartupPD();
+        void computeShutdownPD();
         void jointPD(int joint_idx, double jointPos, double jointVel, bool startup = true);
 
         // snapshot getter/setter functions for go1MPC

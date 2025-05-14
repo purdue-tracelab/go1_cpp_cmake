@@ -94,7 +94,7 @@ void go1FSM::step() {
 
     switch (current_) {
         case go1FiniteState::Startup:
-            state_.computeStartupPDMujoco();
+            state_.computeStartupPD();
             
             if (state_.isStartupComplete()) {
                 std::lock_guard<std::mutex> lock(mtx_);
@@ -118,7 +118,7 @@ void go1FSM::step() {
             break;
 
         case go1FiniteState::Shutdown:
-            state_.computeShutdownPDMujoco();
+            state_.computeShutdownPD();
             break;
     }
 

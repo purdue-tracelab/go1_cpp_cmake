@@ -100,7 +100,8 @@ void storeData(const go1State &state, std::ostream &os) {
     // Sensor measurements
     write_vector(state.root_lin_acc_meas, os); os << ",";
     write_vector(state.root_ang_vel_meas, os); os << ",";
-    write_vector(state.est_contacts, os); os << "\n";
+    write_vector(state.est_contacts, os); os << ",";
+    write_vector(state.joint_pos, os); os << "\n";
 }
 
 void storeCalcTimeData(double update_time, double est_time, double MPC_calc_time, std::ostream &os) {
@@ -140,7 +141,8 @@ void writeCSVHeader(std::ostream &os) {
             "root_rpy_est_x,root_rpy_est_y,root_rpy_est_z,"
             "root_lin_acc_meas_x,root_lin_acc_meas_y,root_lin_acc_meas_z,"
             "root_ang_vel_meas_x,root_ang_vel_meas_y,root_ang_vel_meas_z,"
-            "FR_contact_meas,FL_contact_meas,RR_contact_meas,RL_contact_meas\n";
+            "FR_contact_meas,FL_contact_meas,RR_contact_meas,RL_contact_meas,"
+            "FR_0,FR_1,FR_2,FL_0,FL_1,FL_2,RR_0,RR_1,RR_2,RL_0,RL_1,RL_2\n";
 
 }
 
@@ -166,14 +168,12 @@ int main() {
     auto data_src = std::make_unique<hardwareDataReader>(lowState, udp);
     auto command_sender = std::make_unique<hardwareCommandSender>(lowState, udp);
 
-    const std::chrono::milliseconds loop_time(static_cast<long>(DT_CTRL));
+    const std::chrono::milliseconds loop_time(static_cast<long>(1000 * DT_CTRL));
     running = true;
 
     while (running) {
         auto loop_start = std::chrono::high_resolution_clock::now();
         data_src->pullSensorData(tester_state);
-        tester_state.computeStartupPDMujoco();
-        command_sender->sendCommand(tester_state);
 
         hardware_data_row.str("");
         hardware_data_row.clear();
@@ -182,10 +182,10 @@ int main() {
 
         auto loop_end = std::chrono::high_resolution_clock::now();
         auto loop_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(loop_end - loop_start);
+        // std::cout << "loop_elapsed: " << loop_elapsed.count() << std::endl;
         auto remaining_time = loop_time - loop_elapsed;
         if (remaining_time > std::chrono::milliseconds(0)) {
             std::this_thread::sleep_for(remaining_time);
         }
     }
 }
-
