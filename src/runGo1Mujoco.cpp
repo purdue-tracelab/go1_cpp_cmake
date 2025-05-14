@@ -482,7 +482,7 @@ int main() {
                                 mujoco_go1_state.joint_torques.col(2), // RR
                                 mujoco_go1_state.joint_torques.col(3); // RL
 
-        command_sender->sendCommand(mujoco_go1_state);
+        command_sender->setCommand(mujoco_go1_state);
 
         // Render at ~60 Hz
         if (mujoco_data->time - lastRenderSimTime >= renderInterval) {

@@ -124,27 +124,34 @@ target_link_libraries(run_go1FSMMujoco
     ${CURSES_LIBRARIES}
 )
 
-# Full Go1 FSM hardware executable (use Curses instead of MuJoCo window for interaction)
-add_executable(run_go1FSMHardware src/runGo1FSMHardware.cpp)
-target_link_libraries(run_go1FSMHardware
-    go1_main_lib
-    ${CURSES_LIBRARIES}
-)
-target_link_options(run_go1FSMHardware PRIVATE -no-pie)
+# # Full Go1 FSM hardware executable (use Curses instead of MuJoCo window for interaction)
+# add_executable(run_go1FSMHardware src/runGo1FSMHardware.cpp)
+# target_link_libraries(run_go1FSMHardware
+#     go1_main_lib
+#     ${CURSES_LIBRARIES}
+# )
+# target_link_options(run_go1FSMHardware PRIVATE -no-pie)
 
-# Small reading tester for Go1 hardware control (will help decide the structure of go1DataInterface for hardware)
-add_executable(test_go1ReadHardware src/testGo1ReadHardware.cpp)
-target_link_libraries(test_go1ReadHardware
-    go1_main_lib
-)
-target_link_options(test_go1ReadHardware PRIVATE -no-pie)
+# # Small reading tester for Go1 hardware control (will help decide the structure of go1DataInterface for hardware)
+# add_executable(test_go1ReadHardware src/testGo1ReadHardware.cpp)
+# target_link_libraries(test_go1ReadHardware
+#     go1_main_lib
+# )
+# target_link_options(test_go1ReadHardware PRIVATE -no-pie)
 
-# Small command tester for Go1 hardware control (unsure if will properly work)
-add_executable(test_go1JointPDHardware src/testGo1JointPDHardware.cpp)
-target_link_libraries(test_go1JointPDHardware
+# Small reading tester for Go1 hardware control using Unitree's LoopFunc structure
+add_executable(test_go1ReadHardwareLoopFunc src/testGo1ReadHardwareLoopFunc.cpp)
+target_link_libraries(test_go1ReadHardwareLoopFunc
     go1_main_lib
 )
-target_link_options(test_go1JointPDHardware PRIVATE -no-pie)
+target_link_options(test_go1ReadHardwareLoopFunc PRIVATE -no-pie)
+
+# # Small command tester for Go1 hardware control (unsure if will properly work)
+# add_executable(test_go1JointPDHardware src/testGo1JointPDHardware.cpp)
+# target_link_libraries(test_go1JointPDHardware
+#     go1_main_lib
+# )
+# target_link_options(test_go1JointPDHardware PRIVATE -no-pie)
 
 # Install libraries and executables
 install(TARGETS
@@ -153,7 +160,10 @@ install(TARGETS
     run_go1Tests
     run_go1MujocoSim
     run_go1FSMMujoco
-    run_go1FSMHardware
+    # run_go1FSMHardware
+    # test_go1ReadHardware
+    # test_go1JointPDHardware
+    test_go1ReadHardwareLoopFunc
     DESTINATION lib/${PROJECT_NAME}
 )
 

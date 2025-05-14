@@ -110,8 +110,9 @@ void go1State::updateLocomotionPlan() {
 
     // Update contacts based on sensor measurements
     contacts_old = contacts;
+    auto thresh = USE_EST_FOR_CONTROL ? UNITREE_SDK_CONTACT_THRESH : MUJOCO_CONTACT_THRESH; // don't use estimator flag, use something else
     for (int i = 0; i < NUM_LEG; i++) {
-        if (est_contacts(i) > 3.0 && contacts_old[i] == true) {
+        if (est_contacts(i) > thresh && contacts_old[i] == true) {
             contacts[i] = true;
         } else {
             contacts[i] = false;

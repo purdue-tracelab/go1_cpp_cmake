@@ -3,7 +3,6 @@
 #include <iostream>
 #include <stdio.h>
 #include <stdint.h>
-#include <ncurses.h>
 
 #include "go1_cpp_cmake/go1DataInterface.h"
 
@@ -150,14 +149,6 @@ void writeCalcTimeCSVHeader(std::ostream &os) {
     os << "state_update_time,estimation_time,MPC_calc_time\n";
 }
 
-double jointLinearInterpolation(double initPos, double targetPos, double rate)
-{
-  double p;
-  rate = std::min(std::max(rate, 0.0), 1.0);
-  p = initPos * (1 - rate) + targetPos * rate;
-  return p;
-}
-
 int main() {
     std::ostringstream hardware_datastream;
     writeCSVHeader(hardware_datastream);
@@ -166,7 +157,6 @@ int main() {
     std::ostringstream hardware_data_row;
 
     auto data_src = std::make_unique<hardwareDataReader>(lowState, udp);
-    auto command_sender = std::make_unique<hardwareCommandSender>(lowState, udp);
 
     const std::chrono::milliseconds loop_time(static_cast<long>(1000 * DT_CTRL));
     running = true;

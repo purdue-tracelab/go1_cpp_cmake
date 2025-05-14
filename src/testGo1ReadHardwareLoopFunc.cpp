@@ -1,16 +1,29 @@
+/**********************************************************************
+ Copyright (c) 2020-2023, Unitree Robotics.Co.Ltd. All rights reserved.
+***********************************************************************/
+
 #include "unitree_legged_sdk/unitree_legged_sdk.h"
 #include <math.h>
 #include <iostream>
 #include <stdio.h>
 #include <stdint.h>
-#include <ncurses.h>
 
 #include "go1_cpp_cmake/go1DataInterface.h"
 
+using namespace std;
+using namespace UNITREE_LEGGED_SDK;
+
 // Global variables for hardware interfacing
-UNITREE_LEGGED_SDK::LowState lowState = {0};
-UNITREE_LEGGED_SDK::UDP udp(UNITREE_LEGGED_SDK::LOWLEVEL, 8090, "192.168.123.10", 8007);
+LowState lowState = {0};
+UDP udp(LOWLEVEL, 8090, "192.168.123.10", 8007);
 go1State tester_state;
+auto data_src = std::make_unique<hardwareDataReader>(lowState, udp);
+
+// Data logging functions
+std::ostringstream hardware_datastream;
+AsyncLogger data_log("../data/go1_hardware_data.csv", hardware_datastream.str());
+std::ostringstream hardware_data_row;
+
 bool running = false;
 
 ///////////////////////////////
@@ -150,46 +163,57 @@ void writeCalcTimeCSVHeader(std::ostream &os) {
     os << "state_update_time,estimation_time,MPC_calc_time\n";
 }
 
-double jointLinearInterpolation(double initPos, double targetPos, double rate)
-{
-  double p;
-  rate = std::min(std::max(rate, 0.0), 1.0);
-  p = initPos * (1 - rate) + targetPos * rate;
-  return p;
+///////////////////////////
+// Main control function //
+///////////////////////////
+
+void extractLowLevel() {
+  udp.GetRecv(lowState);
+  printf("FR_0: %f, FR_1: %f, FR_2: %f\n", lowState.motorState[FR_0].q, lowState.motorState[FR_1].q, lowState.motorState[FR_2].q);
+  printf("FL_0: %f, FL_1: %f, FL_2: %f\n", lowState.motorState[FL_0].q, lowState.motorState[FL_1].q, lowState.motorState[FL_2].q);
+  printf("RR_0: %f, RR_1: %f, RR_2: %f\n", lowState.motorState[RR_0].q, lowState.motorState[RR_1].q, lowState.motorState[RR_2].q);
+  printf("RL_0: %f, RL_1: %f, RL_2: %f\n", lowState.motorState[RL_0].q, lowState.motorState[RL_1].q, lowState.motorState[RL_2].q);
+  printf("ACC_X: %f, ACC_Y: %f, ACC_Z: %f\n", lowState.imu.accelerometer[0], lowState.imu.accelerometer[1], lowState.imu.accelerometer[2]);
+  printf("GYR_X: %f, GRY_Y: %f, GYR_Z: %f\n", lowState.imu.gyroscope[0], lowState.imu.gyroscope[1], lowState.imu.gyroscope[2]);
+  printf("FR_atm: %u, FL_atm: %u, RR_atm: %u, RL_atm: %u\n", lowState.footForce[0], lowState.footForce[1], lowState.footForce[2], lowState.footForce[3]);
+  
+  data_src->pullSensorData(tester_state);
+
+  std::cout << "###############################################" << std::endl
+            << "Output break afer one timestamp for all motors." << std::endl
+            << "###############################################" << std::endl;
+
 }
 
-int main() {
-    std::ostringstream hardware_datastream;
-    writeCSVHeader(hardware_datastream);
-
-    AsyncLogger data_log("../data/go1_hardware_data.csv", hardware_datastream.str());
-    std::ostringstream hardware_data_row;
-
-    auto data_src = std::make_unique<hardwareDataReader>(lowState, udp);
-    auto command_sender = std::make_unique<hardwareCommandSender>(lowState, udp);
-
-    const std::chrono::milliseconds loop_time(static_cast<long>(1000 * DT_CTRL));
-    running = true;
-
-    while (running) {
-        auto loop_start = std::chrono::high_resolution_clock::now();
-        std::cout << "startup_prog: " << tester_state.squat_prog << ", calf joint pos: " << tester_state.joint_pos(2) << std::endl;
-        data_src->pullSensorData(tester_state);
-        tester_state.computeStartupPD();
-        command_sender->setCommand(tester_state);
-
-        hardware_data_row.str("");
-        hardware_data_row.clear();
-        storeData(tester_state, hardware_data_row);
-        data_log.logLine(hardware_data_row.str());
-
-        auto loop_end = std::chrono::high_resolution_clock::now();
-        auto loop_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(loop_end - loop_start);
-        // std::cout << "loop_elapsed: " << loop_elapsed.count() << std::endl;
-        auto remaining_time = loop_time - loop_elapsed;
-        if (remaining_time > std::chrono::milliseconds(0)) {
-            std::this_thread::sleep_for(remaining_time);
-        }
-    }
+void recordLowLevel() {
+    hardware_data_row.str("");
+    hardware_data_row.clear();
+    storeData(tester_state, hardware_data_row);
+    data_log.logLine(hardware_data_row.str());
 }
 
+int main(void) {
+  writeCSVHeader(hardware_datastream);
+  data_log.logLine(hardware_datastream.str());
+
+  std::cout << "Communication level is set to LOW-level." << std::endl
+            << "WARNING: Make sure the robot is hung up." << std::endl
+            << "NOTE: The robot also needs to be set to LOW-level mode, otherwise it will make strange noises and this example will not run successfully! " << std::endl
+            << "Press Enter to continue..." << std::endl;
+  std::cin.ignore();
+
+  LoopFunc loop_extract("extraction_loop", DT_CTRL, boost::bind(&extractLowLevel));
+  LoopFunc loop_udpRecv("udp_recv", DT_CTRL, 3, boost::bind(&UDP::Recv, &udp));
+  LoopFunc loop_record("recording_loop:", DT_CTRL, boost::bind(&recordLowLevel));
+
+  loop_udpRecv.start();
+  loop_extract.start();
+  loop_record.start();
+
+  while (1)
+  {
+    sleep(10);
+  };
+
+  return 0;
+}

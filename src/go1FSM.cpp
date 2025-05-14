@@ -139,7 +139,7 @@ void go1FSM::step() {
         cv_.notify_one();
     }
 
-    command_sender_->sendCommand(state_);
+    command_sender_->setCommand(state_);
 
 }
 
