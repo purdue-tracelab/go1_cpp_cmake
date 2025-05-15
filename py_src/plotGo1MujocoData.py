@@ -98,6 +98,7 @@ def plot_state_data(csv_file, absolute=False):
 
     swing_phase = df['swing_phase'].values # don't show lines for legs not currently in swing
     est_contacts = df[['FR_contact_meas', 'FL_contact_meas', 'RR_contact_meas', 'RL_contact_meas']].values
+    joint_pos = df[['FR_0', 'FR_1', 'FR_2', 'FL_0', 'FL_1', 'FL_2', 'RR_0', 'RR_1', 'RR_2', 'RL_0', 'RL_1', 'RL_2']].values
 
     # Plot data
 
@@ -332,11 +333,62 @@ def plot_state_data(csv_file, absolute=False):
     plt.tight_layout()
     plt.savefig("data/foot_forces.png")
 
+    #####################
+    ## Joint positions ##
+    #####################
+
+    joint_pos_plot = plt.figure(4, figsize=(16, 9))
+
+    plt.subplot(3, 1, 1)
+    shade_by_phase(plt.subplot(3, 1, 1), time, swing_phase)
+    plt.plot(time, joint_pos[:, 0], label="FR hip", color='r')
+    plt.plot(time, joint_pos[:, 3], label="FL hip", color='b')
+    plt.plot(time, joint_pos[:, 6], label="RR hip", color='g')
+    plt.plot(time, joint_pos[:, 9], label="RL hip", color='orange')
+    plt.axhline(y=0.863, xmax=time[-1], xmin=time[0], color='k', linestyle='--')
+    plt.axhline(y=-0.863, xmax=time[-1], xmin=time[0], color='k', linestyle='--')
+    plt.title("Hip joint pos")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.subplot(3, 1, 2)
+    shade_by_phase(plt.subplot(3, 1, 2), time, swing_phase)
+    plt.plot(time, joint_pos[:, 1], label="FR thigh", color='r')
+    plt.plot(time, joint_pos[:, 4], label="FL thigh", color='b')
+    plt.plot(time, joint_pos[:, 7], label="RR thigh", color='g')
+    plt.plot(time, joint_pos[:, 10], label="RL thigh", color='orange')
+    plt.axhline(y=4.501, xmax=time[-1], xmin=time[0], color='k', linestyle='--')
+    plt.axhline(y=-0.686, xmax=time[-1], xmin=time[0], color='k', linestyle='--')
+    plt.title("Thigh joint pos")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.subplot(3, 1, 3)
+    shade_by_phase(plt.subplot(3, 1, 3), time, swing_phase)
+    plt.plot(time, joint_pos[:, 2], label="FR calf", color='r')
+    plt.plot(time, joint_pos[:, 5], label="FL calf", color='b')
+    plt.plot(time, joint_pos[:, 8], label="RR calf", color='g')
+    plt.plot(time, joint_pos[:, 11], label="RL calf", color='orange')
+    plt.axhline(y=-0.888, xmax=time[-1], xmin=time[0], color='k', linestyle='--')
+    plt.axhline(y=-2.818, xmax=time[-1], xmin=time[0], color='k', linestyle='--')
+    plt.title("Calf joint pos")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig("data/joint_pos.png")
+
     ###################
     ## Joint torques ##
     ###################
 
-    joint_torque_plot = plt.figure(4, figsize=(16, 9))
+    joint_torque_plot = plt.figure(5, figsize=(16, 9))
 
     plt.subplot(3, 1, 1)
     shade_by_phase(plt.subplot(3, 1, 1), time, swing_phase)
@@ -387,7 +439,7 @@ def plot_state_data(csv_file, absolute=False):
     ## Foot positions ##
     ####################
 
-    foot_pos_plot = plt.figure(5, figsize=(16, 9))
+    foot_pos_plot = plt.figure(6, figsize=(16, 9))
 
     plt.subplot(4, 3, 1)
     shade_by_phase(plt.subplot(4, 3, 1), time, swing_phase)
@@ -564,7 +616,7 @@ def plot_state_data(csv_file, absolute=False):
     ## Foot contacts ##
     ###################
 
-    foot_contact_plot = plt.figure(6, figsize=(16, 9))
+    foot_contact_plot = plt.figure(7, figsize=(16, 9))
 
     shade_by_phase(plt, time, swing_phase)
     plt.plot(time, est_contacts[:, 0], label="FR", color="r")
@@ -579,8 +631,9 @@ def plot_state_data(csv_file, absolute=False):
     plt.tight_layout()
     plt.savefig("data/foot_contacts.png")
 
-    # plt.close(root_pose_plot)
-    # plt.close(root_vel_plot)
+    plt.close(root_pose_plot)
+    plt.close(root_vel_plot)
+    # plt.close(joint_pos_plot)
     plt.close(foot_pos_plot)
     plt.close(foot_force_plot)
     plt.close(joint_torque_plot)

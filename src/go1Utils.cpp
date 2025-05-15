@@ -161,7 +161,7 @@ double hipJointIK(double pFutY, double pFutZ, double hipLength) {
     and the length of the hip link (notice that the hip link does not
     start at the origin of the quadruped).
 */
-    double L = sqrt(std::pow(pFutY, 2) + std::pow(pFutZ, 2) - std::pow(hipLength + DELTA_Y_HIP, 2));
+    double L = sqrt(std::pow(pFutY, 2) + std::pow(pFutZ, 2) - std::pow(hipLength, 2));
     double hipTheta = std::atan2(pFutZ*hipLength + pFutY*L, pFutY*hipLength - pFutZ*L);
 
     return hipTheta;
@@ -205,20 +205,19 @@ Eigen::Vector3d computeFutIK(int leg_idx, Eigen::Vector3d pFut) {
 
     REMEMBER LEG ORDER: FR, FL, RR, RL
 */
-    double l1 = DELTA_Y_HIP_JOINT;
-    double l2 = THIGH_LENGTH;
-    double l3 = CALF_LENGTH;
+    double l1 = HIP_LINK_LENGTH;
+    double l2 = THIGH_LINK_LENGTH;
+    double l3 = CALF_LINK_LENGTH;
 
-    double sideSign = 1.0;
-    if (leg_idx == 0 || leg_idx == 2)
-        sideSign = -1.0;
+    double sideSign = (leg_idx == 0 || leg_idx == 2) ? -1.0 : 1.0;
 
-    double base2Hip = DELTA_Y_HIP_JOINT * sideSign;
-    double thighLength = -THIGH_LENGTH;
-    double calfLength = -CALF_LENGTH;
+    double base2Hip = l1 * sideSign;
+    double thighLength = -l2;
+    double calfLength = -l3;
 
+    double a = l1;
     double futDist = pFut.norm();
-    double futDistEff = sqrt(std::pow(futDist, 2) - std::pow(DELTA_Y_HIP_JOINT, 2));
+    double futDistEff = sqrt(std::pow(futDist, 2) - std::pow(a, 2));
 
     Eigen::Vector3d futJointAngles;
     futJointAngles(0) = hipJointIK(pFut.y(), pFut.z(), base2Hip);

@@ -161,7 +161,6 @@ install(TARGETS
     run_go1MujocoSim
     run_go1FSMMujoco
     # run_go1FSMHardware
-    # test_go1ReadHardware
     # test_go1JointPDHardware
     test_go1ReadHardwareLoopFunc
     DESTINATION lib/${PROJECT_NAME}

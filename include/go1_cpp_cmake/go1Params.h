@@ -6,11 +6,11 @@
 /////////////////////////
 
 constexpr int NUM_LEG = 4;
-constexpr double DELTA_X_HIP = 0.1881;
-constexpr double DELTA_Y_HIP = 0.04675;
-constexpr double DELTA_Y_HIP_JOINT = 0.08;
-constexpr double THIGH_LENGTH = 0.213;
-constexpr double CALF_LENGTH = 0.213;
+constexpr double BASE_2_HIP_JOINT_X = 0.1881;
+constexpr double BASE_2_HIP_JOINT_Y = 0.08;
+constexpr double HIP_LINK_LENGTH = 0.04675;
+constexpr double THIGH_LINK_LENGTH = 0.213;
+constexpr double CALF_LINK_LENGTH = 0.213;
 constexpr double TORQUE_MAX_HIP = 23.7;
 constexpr double TORQUE_MAX_THIGH = 23.7;
 constexpr double TORQUE_MAX_CALF = 35.55;
@@ -42,7 +42,7 @@ constexpr int SWING_PD_SELECT = 1; // 0: Cartesian PD, 1: Joint PD
 constexpr double SWING_TRAJ_SELECT = 0; // 0: Bezier, 1: Sinusoidal (sinusoidal broken atm)
 constexpr double SWING_KP_CART = 3000;
 constexpr double SWING_KD_CART = 40;
-constexpr double SWING_KP_JOINT = 90;
+constexpr double SWING_KP_JOINT = 70;
 constexpr double SWING_KD_JOINT = 4;
 constexpr double WALK_HEIGHT = 0.27;
 constexpr double STEP_HEIGHT = 0.10;

@@ -338,7 +338,7 @@ int main() {
 
     // Load MuJoCo model
     char error[1000] = "";
-    std::filesystem::path relative_model_path("../models/go1.xml");
+    std::filesystem::path relative_model_path("../models/go1_MATLAB.xml");
     std::string model_path = std::filesystem::absolute(relative_model_path);
 
     mjVFS vfs;

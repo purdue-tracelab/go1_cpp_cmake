@@ -173,7 +173,10 @@ struct hardwareCommandSender : lowLevelCommandSender {
                                         UNITREE_LEGGED_SDK::LowCmd &lowCmd) : safe(UNITREE_LEGGED_SDK::LeggedType::Go1), 
                                                                                 extUDP(udp),
                                                                                 extLowState(lowState),
-                                                                                extLowCmd(lowCmd) {}
+                                                                                extLowCmd(lowCmd) 
+        {
+            extUDP.InitCmdData(extLowCmd);
+        }
         
         void setCommand(const go1State &state) override {
             for (int i = 0; i < 3*NUM_LEG; i++) {
@@ -184,6 +187,8 @@ struct hardwareCommandSender : lowLevelCommandSender {
                 extLowCmd.motorCmd[i].Kd = 0;
                 extLowCmd.motorCmd[i].tau = state.joint_torques(i % 3, i / 3);
             }
+
+            extUDP.SetSend(extLowCmd);
         }
 
     private:
