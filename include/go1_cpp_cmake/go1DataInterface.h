@@ -180,12 +180,32 @@ struct hardwareCommandSender : lowLevelCommandSender {
         
         void setCommand(const go1State &state) override {
             for (int i = 0; i < 3*NUM_LEG; i++) {
-                // extLowCmd.motorCmd[i].mode = 0x0A; // not sure if required
-                extLowCmd.motorCmd[i].q = UNITREE_LEGGED_SDK::PosStopF;
-                extLowCmd.motorCmd[i].dq = UNITREE_LEGGED_SDK::VelStopF;
-                extLowCmd.motorCmd[i].Kp = 0;
-                extLowCmd.motorCmd[i].Kd = 0;
-                extLowCmd.motorCmd[i].tau = state.joint_torques(i % 3, i / 3);
+                int leg_idx = i / 3;
+                extLowCmd.motorCmd[i].mode = 0x0A; // not sure if required
+
+                if (state.squat_flag) {
+                    extLowCmd.motorCmd[i].q = state.joint_pos_d(i, 0);
+                    extLowCmd.motorCmd[i].dq = state.joint_vel_d(i, 0);
+                    extLowCmd.motorCmd[i].Kp = SQUAT_JOINT_KP;
+                    extLowCmd.motorCmd[i].Kd = SQUAT_JOINT_KD;
+                    extLowCmd.motorCmd[i].tau = 0.0f;
+
+                } else {
+                    if (state.contacts[leg_idx] == true) {
+                        extLowCmd.motorCmd[i].q = UNITREE_LEGGED_SDK::PosStopF;
+                        extLowCmd.motorCmd[i].dq = UNITREE_LEGGED_SDK::VelStopF;
+                        extLowCmd.motorCmd[i].Kp = 0.0;
+                        extLowCmd.motorCmd[i].Kd = 0.0;
+                        extLowCmd.motorCmd[i].tau = state.joint_torques(i % 3, i / 3);
+
+                    } else {
+                        extLowCmd.motorCmd[i].q = state.joint_pos_d(i, 0);
+                        extLowCmd.motorCmd[i].dq = state.joint_vel_d(i, 0);
+                        extLowCmd.motorCmd[i].Kp = SWING_KP_JOINT;
+                        extLowCmd.motorCmd[i].Kd = SWING_KD_JOINT;
+                        extLowCmd.motorCmd[i].tau = 0.0f;
+                    }
+                }
             }
 
             extUDP.SetSend(extLowCmd);

@@ -7,8 +7,8 @@
 
 constexpr int NUM_LEG = 4;
 constexpr double BASE_2_HIP_JOINT_X = 0.1881;
-constexpr double BASE_2_HIP_JOINT_Y = 0.08;
-constexpr double HIP_LINK_LENGTH = 0.04675;
+constexpr double BASE_2_HIP_JOINT_Y = 0.04675;
+constexpr double HIP_LINK_LENGTH = 0.08;
 constexpr double THIGH_LINK_LENGTH = 0.213;
 constexpr double CALF_LINK_LENGTH = 0.213;
 constexpr double TORQUE_MAX_HIP = 23.7;
@@ -21,8 +21,8 @@ constexpr double TORQUE_MAX_CALF = 35.55;
 
 constexpr double THIGH_RAD_STAND = 0.9;
 constexpr double CALF_RAD_STAND = -1.8;
-constexpr double JOINT_KP = 60;
-constexpr double JOINT_KD = 3;
+constexpr double SQUAT_JOINT_KP = 60;
+constexpr double SQUAT_JOINT_KD = 3;
 
 ////////////////////////////////
 // General control parameters //

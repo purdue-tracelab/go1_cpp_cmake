@@ -182,7 +182,7 @@ void runStartupPDHardware() {
   
   data_src->pullSensorData(tester_state);
   tester_state.computeStartupPD();
-
+  command_sender->setCommand(tester_state);
 
   std::cout << "###############################################" << std::endl
             << "Output break afer one timestamp for all motors." << std::endl

@@ -227,6 +227,15 @@ Eigen::Vector3d computeFutIK(int leg_idx, Eigen::Vector3d pFut) {
     return futJointAngles;
 }
 
+Eigen::Vector3d computeNewtonIK(Eigen::Matrix3d legJacobian, Eigen::Vector3d dx) {
+/*
+    Computes the delta joint angles for each leg based on the Cartesian 3D space
+    error between the current foot position and desired foot positions, and the
+    corresponding leg Jacobian.
+*/
+    return legJacobian.colPivHouseholderQr().solve(dx);
+}
+
 /////////////////////////////////////
 // Asynchronous data storage class //
 /////////////////////////////////////

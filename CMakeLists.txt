@@ -146,6 +146,13 @@ target_link_libraries(test_go1ReadHardwareLoopFunc
 )
 target_link_options(test_go1ReadHardwareLoopFunc PRIVATE -no-pie)
 
+# Small standup joint PD for Go1 hardware control using Unitree's LoopFunc structure
+add_executable(test_go1JointPDHardwareLoopFunc src/testGo1JointPDHardwareLoopFunc.cpp)
+target_link_libraries(test_go1JointPDHardwareLoopFunc
+    go1_main_lib
+)
+target_link_options(test_go1JointPDHardwareLoopFunc PRIVATE -no-pie)
+
 # # Small command tester for Go1 hardware control (unsure if will properly work)
 # add_executable(test_go1JointPDHardware src/testGo1JointPDHardware.cpp)
 # target_link_libraries(test_go1JointPDHardware
@@ -161,8 +168,8 @@ install(TARGETS
     run_go1MujocoSim
     run_go1FSMMujoco
     # run_go1FSMHardware
-    # test_go1JointPDHardware
     test_go1ReadHardwareLoopFunc
+    test_go1JointPDHardwareLoopFunc
     DESTINATION lib/${PROJECT_NAME}
 )
 

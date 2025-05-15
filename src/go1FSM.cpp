@@ -94,6 +94,7 @@ void go1FSM::step() {
 
     switch (current_) {
         case go1FiniteState::Startup:
+            state_.squat_flag = true;
             state_.computeStartupPD();
             
             if (state_.isStartupComplete()) {
@@ -101,6 +102,7 @@ void go1FSM::step() {
                 current_ = go1FiniteState::Locomotion;
                 state_.root_pos_d << 0, 0, WALK_HEIGHT; // careful for treadmill & hardware here
                 just_transitioned_to_locomotion_ = true;
+                state_.squat_flag = false;
             }
             break;
 
@@ -118,6 +120,7 @@ void go1FSM::step() {
             break;
 
         case go1FiniteState::Shutdown:
+            state_.squat_flag = true;
             state_.computeShutdownPD();
             break;
     }

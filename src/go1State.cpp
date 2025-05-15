@@ -84,13 +84,13 @@ void go1State::resetState() {
     // Movement mode trackers
     walking_mode = false;
     squat_prog = 0.0;
+    squat_flag = true;
     swing_phase = 0; // ranges from 0 to SWING_PHASE_MAX
     foot_deltaX = 0;
     foot_deltaY = 0;
 
     std::fill(std::begin(contacts), std::end(contacts), true);
     std::fill(std::begin(contacts_old), std::end(contacts_old), true);
-    // std::fill(std::begin(est_contacts), std::end(est_contacts), true);
     est_contacts.setZero();
     init = true;
 }
@@ -108,7 +108,7 @@ void go1State::updateLocomotionPlan() {
 
     foot_pos_world_rot = go1FwdKin(joint_pos, root_rpy_ctrl); // implemented go1FwdKin using Muqun and Leo's work
     foot_pos_abs = foot_pos_world_rot.colwise() + root_pos_ctrl;
-    foot_pos_old = foot_pos; // mistake, but without it, walking sucks
+    // foot_pos_old = foot_pos; // incorrect double calculation
     foot_pos = rootRotMat.transpose() * foot_pos_world_rot;
     contactJacobian = go1ContactJacobian(joint_pos, root_rpy_ctrl);
 
@@ -615,39 +615,49 @@ void go1State::swingPD(int leg_idx, Eigen::Vector3d footPosRef, Eigen::Vector3d 
                 rootRotMatT = rootRotMat.transpose();
             }
 
-            // Convert foot position reference into joint position reference
-            Eigen::Vector3d jointPosRef = computeFutIK(leg_idx, footPosRef);
+            ////////////////////////////////////////////////////////////////////////////////////////////////////
+            // Double Muqun IK (for reference and current foot positions; not correct method, but works well) //
+            ////////////////////////////////////////////////////////////////////////////////////////////////////
+
+            // Eigen::Vector3d jointPosRef = computeFutIK(leg_idx, footPosRef);
+            // Eigen::Vector3d jointPosN = computeFutIK(leg_idx, foot_posN);
+
+            // Eigen::Vector3d jointVelRef = rootRotMatT * contactJacobian.block<3, 3>(leg_idx*3, 6 + leg_idx*3) * footVelRef;
+            // Eigen::Vector3d jointVelN = rootRotMatT * contactJacobian.block<3, 3>(leg_idx*3, 6 + leg_idx*3) * foot_velN;
+
+            ////////////////////////////////////////////////////////////////////////////////////////////////////////
+            // Reading current joint pos & Muqun IK for reference joint pos (doesn't work at all due to IK error) //
+            ////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+            // Eigen::Vector3d jointPosRef = computeFutIK(leg_idx, footPosRef);
+            // Eigen::Vector3d jointPosN = joint_pos.block<3, 1>(0 + 3*leg_idx, 0);
+
+            // Eigen::Vector3d jointVelRef = rootRotMatT * contactJacobian.block<3, 3>(leg_idx*3, 6 + leg_idx*3) * footVelRef;
+            // Eigen::Vector3d jointVelN = joint_vel.block<3, 1>(0 + 3*leg_idx, 0);
+
+            /////////////////////////////////////////////////////////////////////
+            // Reading current joint pos & one-shot IK for reference joint pos //
+            /////////////////////////////////////////////////////////////////////
+
+            Eigen::Vector3d dx = footPosRef - foot_pos.col(leg_idx);
+            Eigen::Matrix3d legJacobian = rootRotMatT * contactJacobian.block<3, 3>(leg_idx*3, 6 + leg_idx*3);
+            Eigen::Vector3d dq = computeNewtonIK(legJacobian, dx);
+
+            Eigen::Vector3d jointPosRef = joint_pos.block<3, 1>(0 + 3*leg_idx, 0) + dq;
             joint_pos_d.block<3, 1>(0 + 3*leg_idx, 0) = jointPosRef;
-
             Eigen::Vector3d jointPosN = joint_pos.block<3, 1>(0 + 3*leg_idx, 0);
-            Eigen::Vector3d jointPosN2 = computeFutIK(leg_idx, foot_posN);
 
-            std::cout << "joint pos: " << jointPosN.transpose() << std::endl;
-            std::cout << "joint pos 2: " << jointPosN2.transpose() << std::endl;
-            std::cout << "joint pos est err: " << (((jointPosN - jointPosN2).norm() >= 1e-2) ? "bad" : "good") << std::endl;
-            std::cout << "joint pos ref: " << jointPosRef.transpose() << std::endl;
-
-            // Convert foot velocity reference into joint velocity reference
-            Eigen::Matrix3d contactJacobian_N = contactJacobian.block<3, 3>(leg_idx*3, 6 + leg_idx*3);
-            Eigen::Matrix3d contactJacobian_rotN = rootRotMatT * contactJacobian_N;
-
-            Eigen::Vector3d jointVelRef = contactJacobian_rotN.completeOrthogonalDecomposition().pseudoInverse() * footVelRef;
+            Eigen::Vector3d jointVelRef = legJacobian * footVelRef; // causes backwards drift?
+            // Eigen::Vector3d jointVelRef = dq/DT_CTRL; // better but more jitter?
             joint_vel_d.block<3, 1>(0 + 3*leg_idx, 0) = jointVelRef;
-
             Eigen::Vector3d jointVelN = joint_vel.block<3, 1>(0 + 3*leg_idx, 0);
-            Eigen::Vector3d jointVelN2 = contactJacobian_rotN.completeOrthogonalDecomposition().pseudoInverse() * foot_velN;
-            
-            // std::cout << "joint vel: " << jointVelN.transpose() << std::endl;
-            // std::cout << "joint vel 2: " << jointVelN2.transpose() << std::endl;
-            std::cout << "joint vel est err: " << (((jointVelN - jointVelN2).norm() >= 1e-2) ? "bad" : "good") << std::endl;
-            std::cout << "joint vel ref: " << jointVelRef.transpose() << std::endl;
 
-            // Calculate swing leg PD
+            //////////////////////////////////////////////////////////////////////
+
             Eigen::Matrix3d kp = SWING_KP_JOINT * Eigen::Matrix3d::Identity();
             Eigen::Matrix3d kd = SWING_KD_JOINT * Eigen::Matrix3d::Identity();
 
-            // joint_torques_swing.col(leg_idx) = kp * (jointPosRef - jointPosN) + kd * (jointVelRef - jointVelN); // reading method
-            joint_torques_swing.col(leg_idx) = kp * (jointPosRef - jointPosN2) + kd * (jointVelRef - jointVelN2); // IK method
+            joint_torques_swing.col(leg_idx) = kp * (jointPosRef - jointPosN) + kd * (jointVelRef - jointVelN);
 
             Eigen::Vector3d gravity_torque_comp(-0.66, -0.37, 0.16);
             if (leg_idx == 1 || leg_idx == 3) {
@@ -674,35 +684,47 @@ void go1State::jointPD(int joint_idx, double jointPos, double jointVel, bool sta
         case 0:
             if (startup) {
                 jointInterp = (1.0 - squat_prog) * joint_pos_init(joint_idx);
-                joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(JOINT_KP * (jointInterp - jointPos) + JOINT_KD * (0 - jointVel), -TORQUE_MAX_HIP, TORQUE_MAX_HIP);
+                joint_pos_d(joint_idx, 0) = jointInterp;
+                joint_vel_d(joint_idx, 0) = 0.0;
+                joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(SQUAT_JOINT_KP * (jointInterp - jointPos) + SQUAT_JOINT_KD * (0 - jointVel), -TORQUE_MAX_HIP, TORQUE_MAX_HIP);
                 return;
 
             } else {
-                joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(JOINT_KP * (0.0 - jointPos) + JOINT_KD * (0.0 - jointVel), -TORQUE_MAX_HIP, TORQUE_MAX_HIP);
+                joint_pos_d(joint_idx, 0) = 0.0;
+                joint_vel_d(joint_idx, 0) = 0.0;
+                joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(SQUAT_JOINT_KP * (0.0 - jointPos) + SQUAT_JOINT_KD * (0.0 - jointVel), -TORQUE_MAX_HIP, TORQUE_MAX_HIP);
                 return;
             }
 
         case 1:
             if (startup) {
                 jointInterp = (1.0 - squat_prog) * joint_pos_init(joint_idx) + squat_prog * THIGH_RAD_STAND;
-                joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(JOINT_KP * (jointInterp - jointPos) + JOINT_KD * (0 - jointVel), -TORQUE_MAX_THIGH, TORQUE_MAX_THIGH);
+                joint_pos_d(joint_idx, 0) = jointInterp;
+                joint_vel_d(joint_idx, 0) = 0.0;
+                joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(SQUAT_JOINT_KP * (jointInterp - jointPos) + SQUAT_JOINT_KD * (0 - jointVel), -TORQUE_MAX_THIGH, TORQUE_MAX_THIGH);
                 return;
 
             } else {
                 jointInterp = (1.0 - squat_prog) * joint_pos_init(joint_idx) + squat_prog * THIGH_RAD_STAND;
-                joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(JOINT_KP * (jointInterp - jointPos) + JOINT_KD * (0.0 - jointVel), -TORQUE_MAX_THIGH, TORQUE_MAX_THIGH);
+                joint_pos_d(joint_idx, 0) = jointInterp;
+                joint_vel_d(joint_idx, 0) = 0.0;
+                joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(SQUAT_JOINT_KP * (jointInterp - jointPos) + SQUAT_JOINT_KD * (0.0 - jointVel), -TORQUE_MAX_THIGH, TORQUE_MAX_THIGH);
                 return;
             }
             
         case 2:
             if (startup) {
                 jointInterp = (1.0 - squat_prog) * joint_pos_init(joint_idx) + squat_prog * CALF_RAD_STAND;
-                joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(JOINT_KP * (jointInterp - jointPos) + JOINT_KD * (0 - jointVel), -TORQUE_MAX_CALF, TORQUE_MAX_CALF);
+                joint_pos_d(joint_idx, 0) = jointInterp;
+                joint_vel_d(joint_idx, 0) = 0.0;
+                joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(SQUAT_JOINT_KP * (jointInterp - jointPos) + SQUAT_JOINT_KD * (0 - jointVel), -TORQUE_MAX_CALF, TORQUE_MAX_CALF);
                 return;
 
             } else {
                 jointInterp = (1.0 - squat_prog) * joint_pos_init(joint_idx) + squat_prog * CALF_RAD_STAND;
-                joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(JOINT_KP * (jointInterp - jointPos) + JOINT_KD * (0.0 - jointVel), -TORQUE_MAX_CALF, TORQUE_MAX_CALF);
+                joint_pos_d(joint_idx, 0) = jointInterp;
+                joint_vel_d(joint_idx, 0) = 0.0;
+                joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(SQUAT_JOINT_KP * (jointInterp - jointPos) + SQUAT_JOINT_KD * (0.0 - jointVel), -TORQUE_MAX_CALF, TORQUE_MAX_CALF);
                 return;
             }
             

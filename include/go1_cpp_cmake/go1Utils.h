@@ -32,6 +32,7 @@ double hipJointIK(double pFutY, double pFutZ, double hipLength);
 double calfJointIK(double thighLength, double calfLength, double futDistEff);
 double thighJointIK(double hipTheta, double calfTheta, Eigen::Vector3d pFut, double thighLength, double calfLength);
 Eigen::Vector3d computeFutIK(int leg_idx, Eigen::Vector3d pFut);
+Eigen::Vector3d computeNewtonIK(Eigen::Matrix3d legJacobian, Eigen::Vector3d dx);
 
 // Asynchronous data storage class
 class AsyncLogger {

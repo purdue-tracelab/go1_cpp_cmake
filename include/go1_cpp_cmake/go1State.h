@@ -110,6 +110,7 @@ class go1State {
 
         // movement mode trackers
         bool walking_mode;
+        bool squat_flag;
         double squat_prog;
         std::array<bool, NUM_LEG> contacts;
         std::array<bool, NUM_LEG> contacts_old;
