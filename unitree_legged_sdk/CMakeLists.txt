@@ -66,9 +66,10 @@ add_executable(example_position_relay example/example_position_relay.cpp)
 target_link_libraries(example_position_relay ${EXTRA_LIBS})
 target_link_options(example_position_relay PRIVATE -no-pie)
 
-add_executable(example_torque_relay example/example_torque_relay.cpp)
-target_link_libraries(example_torque_relay ${EXTRA_LIBS})
-target_link_options(example_torque_relay PRIVATE -no-pie)
+# # Unsafe to use if you haven't just ran runGo1FSMMujoco.cpp
+# add_executable(example_torque_relay example/example_torque_relay.cpp)
+# target_link_libraries(example_torque_relay ${EXTRA_LIBS})
+# target_link_options(example_torque_relay PRIVATE -no-pie)
 
 # install
 install(TARGETS
@@ -79,7 +80,7 @@ install(TARGETS
   example_joystick 
   example_stand 
   example_position_relay
-  example_torque_relay
+  # example_torque_relay
   DESTINATION bin/unitree)
   
 install(DIRECTORY lib/cpp/${ARCH}/

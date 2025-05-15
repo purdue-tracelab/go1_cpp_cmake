@@ -18,6 +18,8 @@ LowState lowState = {0};
 UDP udp(LOWLEVEL, 8090, "192.168.123.10", 8007);
 LowCmd lowCmd = {0};
 go1State tester_state;
+std::mutex mtx;
+bool init = true;
 auto data_src = std::make_unique<hardwareDataReader>(lowState, udp);
 auto command_sender = std::make_unique<hardwareCommandSender>(lowState, udp, lowCmd);
 
@@ -170,24 +172,14 @@ void writeCalcTimeCSVHeader(std::ostream &os) {
 ///////////////////////////
 
 void runStartupPDHardware() {
-  udp.GetRecv(lowState);
-
-  printf("FR_0: %f, FR_1: %f, FR_2: %f\n", lowState.motorState[FR_0].q, lowState.motorState[FR_1].q, lowState.motorState[FR_2].q);
-  printf("FL_0: %f, FL_1: %f, FL_2: %f\n", lowState.motorState[FL_0].q, lowState.motorState[FL_1].q, lowState.motorState[FL_2].q);
-  printf("RR_0: %f, RR_1: %f, RR_2: %f\n", lowState.motorState[RR_0].q, lowState.motorState[RR_1].q, lowState.motorState[RR_2].q);
-  printf("RL_0: %f, RL_1: %f, RL_2: %f\n", lowState.motorState[RL_0].q, lowState.motorState[RL_1].q, lowState.motorState[RL_2].q);
-  printf("ACC_X: %f, ACC_Y: %f, ACC_Z: %f\n", lowState.imu.accelerometer[0], lowState.imu.accelerometer[1], lowState.imu.accelerometer[2]);
-  printf("GYR_X: %f, GRY_Y: %f, GYR_Z: %f\n", lowState.imu.gyroscope[0], lowState.imu.gyroscope[1], lowState.imu.gyroscope[2]);
-  printf("FR_atm: %u, FL_atm: %u, RR_atm: %u, RL_atm: %u\n", lowState.footForce[0], lowState.footForce[1], lowState.footForce[2], lowState.footForce[3]);
-  
   data_src->pullSensorData(tester_state);
-  tester_state.computeStartupPD();
-  command_sender->setCommand(tester_state);
+  if (!init) {
+    tester_state.computeStartupPD();
+    command_sender->setCommand(tester_state);
 
-  std::cout << "###############################################" << std::endl
-            << "Output break afer one timestamp for all motors." << std::endl
-            << "###############################################" << std::endl;
-
+  } else {
+    init = false;
+  }
 }
 
 void recordLowLevel() {
@@ -207,9 +199,11 @@ int main(void) {
             << "Press Enter to continue..." << std::endl;
   std::cin.ignore();
 
+//   std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
   LoopFunc loop_stand("extraction_loop", DT_CTRL, boost::bind(&runStartupPDHardware));
   LoopFunc loop_udpRecv("udp_recv", DT_CTRL, 3, boost::bind(&UDP::Recv, &udp));
-  LoopFunc loop_udpSend("udp_send", DT_CTRL, 3, boost::bind(&UDP::Send, &udp));
+  LoopFunc loop_udpSend("udp_send", DT_CTRL, 4, boost::bind(&UDP::Send, &udp));
   LoopFunc loop_record("recording_loop:", DT_CTRL, boost::bind(&recordLowLevel));
 
   loop_udpRecv.start();
