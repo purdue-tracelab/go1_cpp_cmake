@@ -26,9 +26,6 @@ std::ostringstream hardware_datastream;
 AsyncLogger data_log("../data/go1_hardware_data.csv", hardware_datastream.str());
 std::ostringstream hardware_data_row;
 
-// External controller variables
-bool jointPDInit = true;
-
 ///////////////////////////////
 // Data collection functions //
 ///////////////////////////////
@@ -173,13 +170,8 @@ void writeCalcTimeCSVHeader(std::ostream &os) {
 void runStartupPDHardware() {
     data_src->pullSensorData(tester_state);
     std::cout << "squat prog: " << tester_state.squat_prog << std::endl;
-    if (!jointPDInit) { // try taking away
-        tester_state.computeStartupPD();
-        command_sender->setCommand(tester_state);
-
-    } else {
-        jointPDInit = false;
-    }
+    tester_state.computeStartupPD();
+    command_sender->setCommand(tester_state);
 }
 
 void receiveAndSend() {

@@ -623,6 +623,7 @@ def plot_state_data(csv_file, absolute=False):
     plt.plot(time, est_contacts[:, 1], label="FL", color="b")
     plt.plot(time, est_contacts[:, 2], label="RR", color="g")
     plt.plot(time, est_contacts[:, 3], label="RL", color="orange")
+    plt.axhline(y=200.0, xmax=time[-1], xmin=time[0], color='k', linestyle='--')
     plt.xlabel("Time (s)")
     plt.ylabel("Measured normal force (N)")
     plt.xlim(0, time[-1])

@@ -230,6 +230,11 @@ struct hardwareCommandSender : lowLevelCommandSender {
                 //             << ", Kp_" << i << " des: " << extLowCmd.motorCmd[i].Kp
                 //             << ", Kd_" << i << " des: " << extLowCmd.motorCmd[i].Kd
                 //             << ", tau_" << i << ": " << extLowCmd.motorCmd[i].tau << std::endl;
+
+                // Adding this causes Locomotion MPC stand to abort controller, but Startup and Shutdown works
+                safe.PositionLimit(extLowCmd);
+                int res1 = safe.PowerProtect(extLowCmd, extLowState, 1);
+                if (res1 < 0) exit(-1);
             }
 
             extUDP.SetSend(extLowCmd);
