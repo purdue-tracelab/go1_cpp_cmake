@@ -21,6 +21,12 @@ go1FSM::go1FSM(double state_hz,
     snapshot_ready_ = false;
     snapshot_grf_populated_ = false;
     mpc_thread_ = std::thread(&go1FSM::mpcLoop, this);
+
+    if (dynamic_cast<mujocoDataReader*>(data_interface_.get())) {
+        state_.thresh = MUJOCO_CONTACT_THRESH;
+    } else {
+        state_.thresh = UNITREE_SDK_CONTACT_THRESH;
+    }
 }
 
 // Destructor

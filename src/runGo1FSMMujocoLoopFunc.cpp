@@ -468,13 +468,15 @@ int main(void) {
     writeCSVHeader(mujoco_datastream);
     data_log.logLine(mujoco_datastream.str());
 
-    // Instantiate FSM at DT_CTRL for overall loop rate, DT_MPC_CTRL for MPC loop rate
+    // Initialize data interface + estimator
     auto data_src = make_unique<mujocoDataReader>(mujoco_model, mujoco_data, "trunk", 
                                                 "lin_acc_sensor", "ang_vel_sensor", 
                                                 "touch_FR", "touch_FL", 
                                                 "touch_RR", "touch_RL");
     auto command_sender = make_unique<mujocoCommandSender>(mujoco_model, mujoco_data);
     auto estimator = makeEstimator();
+    
+    // Instantiate FSM at DT_CTRL for overall loop rate, DT_MPC_CTRL for MPC loop rate
     go1FSM fsm(DT_CTRL, DT_MPC_CTRL, std::move(data_src), std::move(estimator), std::move(command_sender));
     fsm.collectInitialState();
     fsm.step();

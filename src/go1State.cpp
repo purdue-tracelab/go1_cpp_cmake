@@ -85,6 +85,7 @@ void go1State::resetState() {
     walking_mode = false;
     squat_prog = 0.0;
     squat_flag = true;
+    thresh = MUJOCO_CONTACT_THRESH; // by default, use MuJoCo threshold; change with FSM initialization
     swing_phase = 0; // ranges from 0 to SWING_PHASE_MAX
     foot_deltaX = 0;
     foot_deltaY = 0;
@@ -114,7 +115,7 @@ void go1State::updateLocomotionPlan() {
 
     // Update contacts based on sensor measurements
     contacts_old = contacts;
-    auto thresh = MUJOCO_CONTACT_THRESH; // don't use estimator flag, use something else
+    // auto thresh = MUJOCO_CONTACT_THRESH; // don't use estimator flag, use something else
     for (int i = 0; i < NUM_LEG; i++) {
         if (est_contacts(i) > thresh && contacts_old[i] == true) {
             contacts[i] = true;

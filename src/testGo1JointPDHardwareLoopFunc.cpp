@@ -173,7 +173,7 @@ void writeCalcTimeCSVHeader(std::ostream &os) {
 void runStartupPDHardware() {
     data_src->pullSensorData(tester_state);
     std::cout << "squat prog: " << tester_state.squat_prog << std::endl;
-    if (!jointPDInit) {
+    if (!jointPDInit) { // try taking away
         tester_state.computeStartupPD();
         command_sender->setCommand(tester_state);
 

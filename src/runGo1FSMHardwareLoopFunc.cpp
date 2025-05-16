@@ -22,23 +22,15 @@ using namespace UNITREE_LEGGED_SDK;
 LowState lowState = {0};
 UDP udp(LOWLEVEL, 8090, "192.168.123.10", 8007);
 LowCmd lowCmd = {0};
-go1State tester_state;
-auto data_src = std::make_unique<hardwareDataReader>(lowState, udp);
-auto command_sender = std::make_unique<hardwareCommandSender>(lowState, udp, lowCmd);
-auto estimator = makeEstimator();
-
-// Data logging functions
-std::ostringstream hardware_datastream;
-AsyncLogger data_log("../data/go1_hardware_data.csv", hardware_datastream.str());
-std::ostringstream hardware_data_row;
-
-// External controller variables
-bool running = false;
-bool keyboardInit = false;
 
 ///////////////////////////////
 // Data collection functions //
 ///////////////////////////////
+
+// Data logging objects
+ostringstream hardware_datastream;
+AsyncLogger data_log("../data/go1_hardware_data.csv", hardware_datastream.str());
+ostringstream hardware_data_row;
 
 // Function to write Eigen::Vector in CSV format
 template <typename VectorType>
@@ -176,6 +168,10 @@ void writeCalcTimeCSVHeader(std::ostream &os) {
 ////////////////////////////
 // Main control functions //
 ////////////////////////////
+
+// External controller variables
+bool running = false;
+bool keyboardInit = false;
 
 void keyboardControl(go1FSM &fsm) {
 /*
@@ -322,44 +318,51 @@ void receiveAndSend() {
     udp.Send();
 }
 
-void recordLowLevel() {
+void recordLowLevel(const go1State &state) {
     hardware_data_row.str("");
     hardware_data_row.clear();
-    storeData(tester_state, hardware_data_row);
+    storeData(state, hardware_data_row);
     data_log.logLine(hardware_data_row.str());
 }
 
 int main(void) {
+    // Prep data collection
     writeCSVHeader(hardware_datastream);
     data_log.logLine(hardware_datastream.str());
 
-    go1FSM fsm(DT_CTRL, DT_MPC_CTRL, std::move(data_src), std::move(estimator), std::move(command_sender));
+    // Initialize data interface + estimator
+    auto data_src = make_unique<hardwareDataReader>(lowState, udp);
+    auto command_sender = make_unique<hardwareCommandSender>(lowState, udp, lowCmd);
+    auto estimator = makeEstimator();
+
+    // Instantiate FSM at DT_CTRL for overall loop rate, DT_MPC_CTRL for MPC loop rate
+    go1FSM fsm(DT_CTRL, DT_MPC_CTRL, move(data_src), move(estimator), move(command_sender));
+
+    std::cout << "Hardware control is initialized..." << std::endl;
+    running = true;
+
+    // Main loop: construct LoopFunc objects and run until killed by keyboard input [spacebar]
+    LoopFunc loop_keyInput("key_input_loop", DT_CTRL, 4, boost::bind(&keyboardControl, boost::ref(fsm)));
+    LoopFunc loop_record("recording_loop", DT_CTRL, 5, boost::bind(&recordLowLevel, boost::ref(fsm.getState())));
+    LoopFunc loop_ctrl("fsm_ctrl_loop", DT_CTRL, 6, boost::bind(&go1FSM::step, &fsm));
+    
+    // construct and start UDP send and receive loop first to collect first valid packages
+    LoopFunc loop_recvSend("udp_recvSend", DT_CTRL, 3, boost::bind(&receiveAndSend));
+    loop_recvSend.start();
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(10)); // helps with initial lag
+
     fsm.collectInitialState();
     fsm.step();
     storeData(fsm.getState(), hardware_data_row);
     data_log.logLine(hardware_data_row.str());
-
-    std::cout << "Communication level is set to LOW-level." << std::endl
-            << "WARNING: Make sure the robot is hung up." << std::endl
-            << "NOTE: The robot also needs to be set to LOW-level mode, otherwise it will make strange noises and this example will not run successfully! " << std::endl
-            << "Press Enter to continue..." << std::endl;
-    std::cin.ignore();
-
-    LoopFunc loop_ctrl("fsm_ctrl_loop", DT_CTRL, 5, boost::bind(&go1FSM::step, &fsm));
-    LoopFunc loop_keyInput("key_input_loop", DT_CTRL * 5.0, 4, boost::bind(&keyboardControl, boost::ref(fsm)));
-    LoopFunc loop_recvSend("udp_recvSend", DT_CTRL, 3, boost::bind(&receiveAndSend));
-    LoopFunc loop_record("recording_loop", DT_CTRL, boost::bind(&recordLowLevel));
-
-    loop_recvSend.start();
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(10)); // helps with initial lag of loading data into go1State properly
     
     loop_ctrl.start();
     loop_keyInput.start();
     loop_record.start();
 
-    while (1) {
-        sleep(10);
+    while (running) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     };
 
     return 0;
