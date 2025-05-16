@@ -207,6 +207,12 @@ struct hardwareCommandSender : lowLevelCommandSender {
                         extLowCmd.motorCmd[i].tau = 0.0f;
                     }
                 }
+
+                // std::cout << "q des: " << extLowCmd.motorCmd[i].q 
+                //             << ", dq des: " << extLowCmd.motorCmd[i].dq 
+                //             << ", Kp des: " << extLowCmd.motorCmd[i].Kp
+                //             << ", Kd des: " << extLowCmd.motorCmd[i].Kd
+                //             << ", tau: " << extLowCmd.motorCmd[i].tau << std::endl;
             }
 
             extUDP.SetSend(extLowCmd);

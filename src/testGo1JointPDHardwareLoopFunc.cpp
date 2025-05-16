@@ -172,14 +172,20 @@ void writeCalcTimeCSVHeader(std::ostream &os) {
 ///////////////////////////
 
 void runStartupPDHardware() {
-  data_src->pullSensorData(tester_state);
-  if (!init) {
-    tester_state.computeStartupPD();
-    command_sender->setCommand(tester_state);
+    data_src->pullSensorData(tester_state);
+    std::cout << "squat prog: " << tester_state.squat_prog << std::endl;
+    if (!init) {
+        tester_state.computeStartupPD();
+        command_sender->setCommand(tester_state);
 
-  } else {
-    init = false;
-  }
+    } else {
+        init = false;
+    }
+}
+
+void receiveAndSend() {
+    udp.Recv();
+    udp.Send();
 }
 
 void recordLowLevel() {
@@ -190,31 +196,37 @@ void recordLowLevel() {
 }
 
 int main(void) {
-  writeCSVHeader(hardware_datastream);
-  data_log.logLine(hardware_datastream.str());
+    writeCSVHeader(hardware_datastream);
+    data_log.logLine(hardware_datastream.str());
 
-  std::cout << "Communication level is set to LOW-level." << std::endl
+    std::cout << "Communication level is set to LOW-level." << std::endl
             << "WARNING: Make sure the robot is hung up." << std::endl
             << "NOTE: The robot also needs to be set to LOW-level mode, otherwise it will make strange noises and this example will not run successfully! " << std::endl
             << "Press Enter to continue..." << std::endl;
-  std::cin.ignore();
+    std::cin.ignore();
 
-//   std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    // std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
-  LoopFunc loop_stand("extraction_loop", DT_CTRL, boost::bind(&runStartupPDHardware));
-  LoopFunc loop_udpRecv("udp_recv", DT_CTRL, 3, boost::bind(&UDP::Recv, &udp));
-  LoopFunc loop_udpSend("udp_send", DT_CTRL, 4, boost::bind(&UDP::Send, &udp));
-  LoopFunc loop_record("recording_loop:", DT_CTRL, boost::bind(&recordLowLevel));
+    LoopFunc loop_stand("extraction_loop", DT_CTRL, boost::bind(&runStartupPDHardware));
+    // LoopFunc loop_udpRecv("udp_recv", DT_CTRL, 3, boost::bind(&UDP::Recv, &udp));
+    // LoopFunc loop_udpSend("udp_send", DT_CTRL, 4, boost::bind(&UDP::Send, &udp));
+    LoopFunc loop_recvSend("udp_recvSend", DT_CTRL, 3, boost::bind(&receiveAndSend));
+    LoopFunc loop_record("recording_loop:", DT_CTRL, boost::bind(&recordLowLevel));
 
-  loop_udpRecv.start();
-  loop_udpSend.start();
-  loop_stand.start();
-  loop_record.start();
+    // loop_udpRecv.start();
+    // loop_udpSend.start();
 
-  while (1)
-  {
+    loop_recvSend.start();
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    
+    loop_stand.start();
+    loop_record.start();
+
+    while (1)
+    {
     sleep(10);
-  };
+    };
 
-  return 0;
+    return 0;
 }
