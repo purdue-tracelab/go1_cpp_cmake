@@ -114,7 +114,7 @@ target_link_libraries(run_go1MujocoSim
     ${CURSES_LIBRARIES}
 )
 
-# Full Go1 FSM MuJoCo simulation executable w/ interactive mode switching (add velocity control)
+# Full Go1 FSM MuJoCo simulation w/ GLFW window keyboard inputs
 add_executable(run_go1FSMMujoco src/runGo1FSMMujoco.cpp)
 target_link_libraries(run_go1FSMMujoco
     go1_main_lib
@@ -124,41 +124,38 @@ target_link_libraries(run_go1FSMMujoco
     ${CURSES_LIBRARIES}
 )
 
-# # Full Go1 FSM hardware executable (use Curses instead of MuJoCo window for interaction)
-# add_executable(run_go1FSMHardware src/runGo1FSMHardware.cpp)
-# target_link_libraries(run_go1FSMHardware
-#     go1_main_lib
-#     ${CURSES_LIBRARIES}
-# )
-# target_link_options(run_go1FSMHardware PRIVATE -no-pie)
+# Full Go1 FSM MuJoCo simulation using Unitree's LoopFunc structure & terminal keyboard inputs
+add_executable(run_go1FSMMujocoLoopFunc src/runGo1FSMMujocoLoopFunc.cpp)
+target_link_libraries(run_go1FSMMujocoLoopFunc
+    go1_main_lib
+    glfw
+    ${GLEW_LIBRARIES}
+    ${OPENGL_LIBRARIES}
+    ${CURSES_LIBRARIES}
+)
+target_link_options(run_go1FSMMujocoLoopFunc PRIVATE -no-pie)
 
-# # Small reading tester for Go1 hardware control (will help decide the structure of go1DataInterface for hardware)
-# add_executable(test_go1ReadHardware src/testGo1ReadHardware.cpp)
-# target_link_libraries(test_go1ReadHardware
-#     go1_main_lib
-# )
-# target_link_options(test_go1ReadHardware PRIVATE -no-pie)
-
-# Small reading tester for Go1 hardware control using Unitree's LoopFunc structure
+# Small reading tester for Go1 hardware using Unitree's LoopFunc structure
 add_executable(test_go1ReadHardwareLoopFunc src/testGo1ReadHardwareLoopFunc.cpp)
 target_link_libraries(test_go1ReadHardwareLoopFunc
     go1_main_lib
 )
 target_link_options(test_go1ReadHardwareLoopFunc PRIVATE -no-pie)
 
-# Small standup joint PD for Go1 hardware control using Unitree's LoopFunc structure
+# Small standup joint PD tester for Go1 hardware using Unitree's LoopFunc structure
 add_executable(test_go1JointPDHardwareLoopFunc src/testGo1JointPDHardwareLoopFunc.cpp)
 target_link_libraries(test_go1JointPDHardwareLoopFunc
     go1_main_lib
 )
 target_link_options(test_go1JointPDHardwareLoopFunc PRIVATE -no-pie)
 
-# # Small command tester for Go1 hardware control (unsure if will properly work)
-# add_executable(test_go1JointPDHardware src/testGo1JointPDHardware.cpp)
-# target_link_libraries(test_go1JointPDHardware
-#     go1_main_lib
-# )
-# target_link_options(test_go1JointPDHardware PRIVATE -no-pie)
+# Full Go1 FSM hardware control using Unitree's LoopFunc structure & terminal keyboard inputs
+add_executable(run_go1FSMHardwareLoopFunc src/runGo1FSMHardwareLoopFunc.cpp)
+target_link_libraries(run_go1FSMHardwareLoopFunc
+    go1_main_lib
+    ${CURSES_LIBRARIES}
+)
+target_link_options(run_go1FSMHardwareLoopFunc PRIVATE -no-pie)
 
 # Install libraries and executables
 install(TARGETS
@@ -167,7 +164,8 @@ install(TARGETS
     run_go1Tests
     run_go1MujocoSim
     run_go1FSMMujoco
-    # run_go1FSMHardware
+    run_go1FSMMujocoLoopFunc
+    run_go1FSMHardwareLoopFunc
     test_go1ReadHardwareLoopFunc
     test_go1JointPDHardwareLoopFunc
     DESTINATION lib/${PROJECT_NAME}

@@ -13,13 +13,11 @@
 using namespace std;
 using namespace UNITREE_LEGGED_SDK;
 
-// Global variables for hardware interfacing
+// Global objects for hardware interfacing
 LowState lowState = {0};
 UDP udp(LOWLEVEL, 8090, "192.168.123.10", 8007);
 LowCmd lowCmd = {0};
 go1State tester_state;
-std::mutex mtx;
-bool init = true;
 auto data_src = std::make_unique<hardwareDataReader>(lowState, udp);
 auto command_sender = std::make_unique<hardwareCommandSender>(lowState, udp, lowCmd);
 
@@ -28,7 +26,8 @@ std::ostringstream hardware_datastream;
 AsyncLogger data_log("../data/go1_hardware_data.csv", hardware_datastream.str());
 std::ostringstream hardware_data_row;
 
-bool running = false;
+// External controller variables
+bool jointPDInit = true;
 
 ///////////////////////////////
 // Data collection functions //
@@ -167,19 +166,19 @@ void writeCalcTimeCSVHeader(std::ostream &os) {
     os << "state_update_time,estimation_time,MPC_calc_time\n";
 }
 
-///////////////////////////
-// Main control function //
-///////////////////////////
+////////////////////////////
+// Main control functions //
+////////////////////////////
 
 void runStartupPDHardware() {
     data_src->pullSensorData(tester_state);
     std::cout << "squat prog: " << tester_state.squat_prog << std::endl;
-    if (!init) {
+    if (!jointPDInit) {
         tester_state.computeStartupPD();
         command_sender->setCommand(tester_state);
 
     } else {
-        init = false;
+        jointPDInit = false;
     }
 }
 
@@ -205,20 +204,13 @@ int main(void) {
             << "Press Enter to continue..." << std::endl;
     std::cin.ignore();
 
-    // std::this_thread::sleep_for(std::chrono::milliseconds(10));
-
     LoopFunc loop_stand("extraction_loop", DT_CTRL, boost::bind(&runStartupPDHardware));
-    // LoopFunc loop_udpRecv("udp_recv", DT_CTRL, 3, boost::bind(&UDP::Recv, &udp));
-    // LoopFunc loop_udpSend("udp_send", DT_CTRL, 4, boost::bind(&UDP::Send, &udp));
     LoopFunc loop_recvSend("udp_recvSend", DT_CTRL, 3, boost::bind(&receiveAndSend));
     LoopFunc loop_record("recording_loop:", DT_CTRL, boost::bind(&recordLowLevel));
 
-    // loop_udpRecv.start();
-    // loop_udpSend.start();
-
     loop_recvSend.start();
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    std::this_thread::sleep_for(std::chrono::milliseconds(10)); // helps with initial lag of loading data into go1State properly
     
     loop_stand.start();
     loop_record.start();

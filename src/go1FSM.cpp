@@ -13,7 +13,7 @@ go1FSM::go1FSM(double state_hz,
         estimator_(std::move(estimator)),
         state_(),
         mpc_(),
-        current_(go1FiniteState::Startup),
+        current_(go1FiniteState::Passive),
         mpc_counter_(0),
         mpc_interval_(static_cast<int>(std::round(state_hz / mpc_hz)))
 {
@@ -30,6 +30,7 @@ go1FSM::~go1FSM() {
         mpc_thread_running_ = false;
         snapshot_ready_ = true;
         cv_.notify_one();
+        command_sender_->setMotorsToDamping(true);
     }
 
     if (mpc_thread_.joinable()) mpc_thread_.join();
@@ -61,6 +62,7 @@ go1FSM::go1FiniteState go1FSM::getFiniteState() const {
 const char* go1FSM::go1FiniteState2Str() {
     go1FiniteState finiteState = getFiniteState();
     switch(finiteState) {
+        case go1FiniteState::Passive: return "Passive";
         case go1FiniteState::Startup: return "Startup";
         case go1FiniteState::Locomotion: return "Locomotion";
         case go1FiniteState::Shutdown: return "Shutdown";
@@ -93,7 +95,17 @@ void go1FSM::step() {
     }
 
     switch (current_) {
+        case go1FiniteState::Passive:
+            command_sender_->setMotorsToDamping(true);
+            state_.joint_pos_d = state_.joint_pos;
+            state_.joint_vel_d = state_.joint_vel;
+            state_.joint_torques_swing.setZero();
+            state_.joint_torques.setZero();
+            state_.joint_torques_stacked.setZero();
+            break;
+
         case go1FiniteState::Startup:
+            command_sender_->setMotorsToDamping(false);
             state_.squat_flag = true;
             state_.computeStartupPD();
             

@@ -173,6 +173,7 @@ void keyControl(go1FSM &fsm) {
     int ch;
     while ((ch = getch()) != ERR) {
         switch(ch) {
+            
             ///////////////////////
             // Movement commands //
             ///////////////////////

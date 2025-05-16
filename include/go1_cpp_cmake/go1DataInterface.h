@@ -143,12 +143,20 @@ struct hardwareDataReader : lowLevelDataReader {
 
 struct lowLevelCommandSender {
     virtual ~lowLevelCommandSender() = default;
+    virtual void setMotorsToDamping(const bool input) = 0;
     virtual void setCommand(const go1State &state) = 0;
 };
 
 struct mujocoCommandSender : lowLevelCommandSender {
     public:
-        mujocoCommandSender(mjModel* model, mjData* data) : mujoco_model(model), mujoco_data(data) {}
+        mujocoCommandSender(mjModel* model, mjData* data) : mujoco_model(model), mujoco_data(data) 
+        {
+            damping_mode = false;
+        }
+
+        void setMotorsToDamping(const bool input) override {
+            damping_mode = input;
+        }
 
         void setCommand(const go1State &state) override {
             if (!mujoco_data) {
@@ -158,13 +166,15 @@ struct mujocoCommandSender : lowLevelCommandSender {
 
             // send control commands to MuJoCo
             for (int i = 0; i < 3*NUM_LEG; i++) {
-                mujoco_data->ctrl[i] = state.joint_torques(i%3, i/3);
+                if (damping_mode) mujoco_data->ctrl[i] = 0.0;
+                else mujoco_data->ctrl[i] = state.joint_torques(i%3, i/3);
             }
         }
 
     private:
         mjModel* mujoco_model;
         mjData* mujoco_data;
+        bool damping_mode;
 };
 
 struct hardwareCommandSender : lowLevelCommandSender {
@@ -177,12 +187,19 @@ struct hardwareCommandSender : lowLevelCommandSender {
                                                                                 extLowCmd(lowCmd) 
         {
             extUDP.InitCmdData(extLowCmd);
+            damping_mode = false;
+        }
+
+        void setMotorsToDamping(const bool input) override {
+            damping_mode = input;
         }
         
         void setCommand(const go1State &state) override {
             for (int i = 0; i < 3*NUM_LEG; i++) {
                 int leg_idx = i / 3;
-                extLowCmd.motorCmd[i].mode = 0x0A; // not sure if required
+
+                if (damping_mode) extLowCmd.motorCmd[i].mode = 0x00;
+                else extLowCmd.motorCmd[i].mode = 0x0A;
 
                 if (state.squat_flag) { // startup or shutdown mode
                     extLowCmd.motorCmd[i].q = state.joint_pos_d(i, 0);
@@ -208,11 +225,11 @@ struct hardwareCommandSender : lowLevelCommandSender {
                     }
                 }
 
-                // std::cout << "q des: " << extLowCmd.motorCmd[i].q 
-                //             << ", dq des: " << extLowCmd.motorCmd[i].dq 
-                //             << ", Kp des: " << extLowCmd.motorCmd[i].Kp
-                //             << ", Kd des: " << extLowCmd.motorCmd[i].Kd
-                //             << ", tau: " << extLowCmd.motorCmd[i].tau << std::endl;
+                // std::cout << "q_" << i << " des: " << extLowCmd.motorCmd[i].q 
+                //             << ", dq_" << i << " des: " << extLowCmd.motorCmd[i].dq 
+                //             << ", Kp_" << i << " des: " << extLowCmd.motorCmd[i].Kp
+                //             << ", Kd_" << i << " des: " << extLowCmd.motorCmd[i].Kd
+                //             << ", tau_" << i << ": " << extLowCmd.motorCmd[i].tau << std::endl;
             }
 
             extUDP.SetSend(extLowCmd);
@@ -223,6 +240,7 @@ struct hardwareCommandSender : lowLevelCommandSender {
         UNITREE_LEGGED_SDK::UDP &extUDP;
         UNITREE_LEGGED_SDK::LowCmd &extLowCmd;
         UNITREE_LEGGED_SDK::Safety safe;
+        bool damping_mode;
 };
 
 #endif // GO1_DATA_INTERFACE_H

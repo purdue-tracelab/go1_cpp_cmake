@@ -14,7 +14,7 @@
 
 class go1FSM {
     public:
-        enum class go1FiniteState { Startup, Locomotion, Shutdown };
+        enum class go1FiniteState { Passive, Startup, Locomotion, Shutdown };
 
         go1FSM(double state_hz, 
                 double mpc_hz, 
