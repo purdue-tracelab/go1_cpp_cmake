@@ -25,7 +25,6 @@ using namespace UNITREE_LEGGED_SDK;
 /////////////////////////////
 
 // Global variables for MuJoCo simulation
-go1State tester_state;
 static mjModel* mujoco_model = nullptr;
 static mjData* mujoco_data = nullptr;
 static mjvCamera cam;
@@ -147,9 +146,9 @@ void adjustCamera() {
 ///////////////////////////////
 
 // Data logging objects
-std::ostringstream hardware_datastream;
-AsyncLogger data_log("../data/go1_hardware_data.csv", hardware_datastream.str());
-std::ostringstream hardware_data_row;
+std::ostringstream mujoco_datastream;
+AsyncLogger data_log("../data/go1_mujoco_data.csv", mujoco_datastream.str());
+std::ostringstream mujoco_data_row;
 
 // Function to write Eigen::Vector in CSV format
 template <typename VectorType>
@@ -432,11 +431,11 @@ void keyboardControl(go1FSM &fsm) {
     refresh();
 }
 
-void recordLowLevel() {
-    hardware_data_row.str("");
-    hardware_data_row.clear();
-    storeData(tester_state, hardware_data_row);
-    data_log.logLine(hardware_data_row.str());
+void recordLowLevel(const go1State &state) {
+    mujoco_data_row.str("");
+    mujoco_data_row.clear();
+    storeData(state, mujoco_data_row);
+    data_log.logLine(mujoco_data_row.str());
 }
 
 int main(void) {
@@ -466,8 +465,8 @@ int main(void) {
     adjustCamera();
 
     // Prep data collection
-    writeCSVHeader(hardware_datastream);
-    data_log.logLine(hardware_datastream.str());
+    writeCSVHeader(mujoco_datastream);
+    data_log.logLine(mujoco_datastream.str());
 
     // Instantiate FSM at DT_CTRL for overall loop rate, DT_MPC_CTRL for MPC loop rate
     auto data_src = make_unique<mujocoDataReader>(mujoco_model, mujoco_data, "trunk", 
@@ -479,15 +478,15 @@ int main(void) {
     go1FSM fsm(DT_CTRL, DT_MPC_CTRL, std::move(data_src), std::move(estimator), std::move(command_sender));
     fsm.collectInitialState();
     fsm.step();
-    storeData(fsm.getState(), hardware_data_row);
-    data_log.logLine(hardware_data_row.str());
+    storeData(fsm.getState(), mujoco_data_row);
+    data_log.logLine(mujoco_data_row.str());
 
     std::cout << "MuJoCo simulation has initialized..." << std::endl;
     running = true;
 
     // Main loop: construct LoopFunc objects and run until GLFW window is closed or controller is killed
-    LoopFunc loop_keyInput("key_input_loop", DT_CTRL * 5.0, 4, boost::bind(&keyboardControl, boost::ref(fsm)));
-    LoopFunc loop_record("recording_loop", DT_CTRL, boost::bind(&recordLowLevel));
+    LoopFunc loop_keyInput("key_input_loop", DT_CTRL, 4, boost::bind(&keyboardControl, boost::ref(fsm)));
+    LoopFunc loop_record("recording_loop", DT_CTRL, boost::bind(&recordLowLevel, boost::ref(fsm.getState())));
     LoopFunc loop_simulate("simulation_loop", 
                             mujoco_model->opt.timestep, 
                             7, 
