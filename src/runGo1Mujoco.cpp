@@ -511,6 +511,7 @@ int main() {
         }
     }
 
+    // Cleanup
     mj_deleteData(mujoco_data);
     mj_deleteModel(mujoco_model);
     mjr_freeContext(&con);

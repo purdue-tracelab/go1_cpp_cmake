@@ -280,7 +280,6 @@ void keyboardControl(go1FSM &fsm) {
                 refresh();
                 endwin();
                 std::cout << "Controller killed, exiting..." << std::endl;
-                exit(0);
                 break;
 
             default:
@@ -364,6 +363,12 @@ int main(void) {
     while (running) {
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     };
+
+    // Cleanup
+    loop_record.shutdown();
+    loop_recvSend.shutdown();
+    loop_ctrl.shutdown();
+    loop_keyInput.shutdown();
 
     return 0;
 }

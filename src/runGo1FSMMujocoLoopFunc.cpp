@@ -398,7 +398,6 @@ void keyboardControl(go1FSM &fsm) {
                 refresh();
                 endwin();
                 std::cout << "Controller killed, exiting..." << std::endl;
-                exit(0);
                 break;
 
             default:
@@ -513,6 +512,10 @@ int main(void) {
     };
 
     // Cleanup
+    loop_record.shutdown();
+    loop_simulate.shutdown();
+    loop_keyInput.shutdown();
+
     glfwDestroyWindow(window);
     glfwTerminate();
     mj_deleteData(mujoco_data);

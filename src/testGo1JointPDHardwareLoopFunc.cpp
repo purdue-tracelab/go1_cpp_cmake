@@ -207,10 +207,14 @@ int main(void) {
     loop_stand.start();
     loop_record.start();
 
-    while (1)
-    {
-    sleep(10);
+    while (1) {
+        sleep(10);
     };
+
+    // Cleanup
+    loop_record.shutdown();
+    loop_stand.shutdown();
+    loop_recvSend.shutdown();
 
     return 0;
 }

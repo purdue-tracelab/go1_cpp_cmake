@@ -381,5 +381,6 @@ int main() {
     mj_deleteModel(mujoco_model);
     mjv_freeScene(&scn);
     mjr_freeContext(&con);
+    
     return 0;
 }
