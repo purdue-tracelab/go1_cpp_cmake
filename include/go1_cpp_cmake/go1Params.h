@@ -31,7 +31,7 @@ constexpr double SQUAT_JOINT_KD = 3;
 constexpr int STATE_EST_SELECT = 2; // O: naive KF, 1: kinematic KF, 2: two-stage KF, 3: extended KF
 constexpr bool USE_EST_FOR_CONTROL = true; // false: no, use ground truth info, true: yes, use estimated info
 constexpr double MUJOCO_CONTACT_THRESH = 3.0;
-constexpr int UNITREE_SDK_CONTACT_THRESH = 200;
+constexpr int UNITREE_SDK_CONTACT_THRESH = 100;
 
 /////////////////////////////
 // Swing leg PD parameters //

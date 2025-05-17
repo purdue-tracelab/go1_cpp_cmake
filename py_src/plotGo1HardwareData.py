@@ -38,28 +38,27 @@ def shade_by_phase(ax, time, phase, threshold=99,
 
 def plot_state_data(csv_file, absolute=False):
     # Load data
-    df = pd.read_csv(csv_file)
+    df = pd.read_csv(csv_file, on_bad_lines='skip', engine='python', encoding='utf-8', encoding_errors='ignore')
     data_length = len(df)
     time = np.arange(0, data_length * 0.002, 0.002)
 
-    root_pos = df[['root_pos_x', 'root_pos_y', 'root_pos_z']].values
     root_pos_d = df[['root_pos_d_x', 'root_pos_d_y', 'root_pos_d_z']].values
     root_pos_est = df[['root_pos_est_x', 'root_pos_est_y', 'root_pos_est_z']].values
 
-    root_rpy = df[['root_rpy_x', 'root_rpy_y', 'root_rpy_z']].values
     root_rpy_d = df[['root_rpy_d_x', 'root_rpy_d_y', 'root_rpy_d_z']].values
     root_rpy_est = df[['root_rpy_est_x', 'root_rpy_est_y', 'root_rpy_est_z']].values
 
-    root_lin_vel = df[['root_lin_vel_x', 'root_lin_vel_y', 'root_lin_vel_z']].values
     root_lin_vel_d = df[['root_lin_vel_d_x', 'root_lin_vel_d_y', 'root_lin_vel_d_z']].values
     root_lin_vel_est = df[['root_lin_vel_est_x', 'root_lin_vel_est_y', 'root_lin_vel_est_z']].values
 
-    root_lin_acc_est = df[['root_lin_acc_est_x', 'root_lin_acc_est_y', 'root_lin_acc_est_z']].values
-    root_lin_acc_meas = df[['root_lin_acc_meas_x', 'root_lin_acc_meas_y', 'root_lin_acc_meas_z']].values
-
-    root_ang_vel = df[['root_ang_vel_x', 'root_ang_vel_y', 'root_ang_vel_z']].values
     root_ang_vel_d = df[['root_ang_vel_d_x', 'root_ang_vel_d_y', 'root_ang_vel_d_z']].values
+    root_ang_vel_est = df[['root_ang_vel_est_x', 'root_ang_vel_est_y', 'root_ang_vel_est_z']].values
     root_ang_vel_meas = df[['root_ang_vel_meas_x', 'root_ang_vel_meas_y', 'root_ang_vel_meas_z']].values
+
+    joint_pos = df[['FR_0', 'FR_1', 'FR_2', 'FL_0', 'FL_1', 'FL_2', 'RR_0', 'RR_1', 'RR_2', 'RL_0', 'RL_1', 'RL_2']].values
+    joint_pos_d = df[['FR_0_des', 'FR_1_des', 'FR_2_des', 'FL_0_des', 'FL_1_des', 'FL_2_des', 'RR_0_des', 'RR_1_des', 'RR_2_des', 'RL_0_des', 'RL_1_des', 'RL_2_des']].values
+    joint_vel = df[['FR_0_dot', 'FR_1_dot', 'FR_2_dot', 'FL_0_dot', 'FL_1_dot', 'FL_2_dot', 'RR_0_dot', 'RR_1_dot', 'RR_2_dot', 'RL_0_dot', 'RL_1_dot', 'RL_2_dot']].values
+    joint_vel_d = df[['FR_0_dot_des', 'FR_1_dot_des', 'FR_2_dot_des', 'FL_0_dot_des', 'FL_1_dot_des', 'FL_2_dot_des', 'RR_0_dot_des', 'RR_1_dot_des', 'RR_2_dot_des', 'RL_0_dot_des', 'RL_1_dot_des', 'RL_2_dot_des']].values
 
     foot_pos_FR = df[['foot_pos_FR_x', 'foot_pos_FR_y', 'foot_pos_FR_z']].values
     foot_pos_FL = df[['foot_pos_FL_x', 'foot_pos_FL_y', 'foot_pos_FL_z']].values
@@ -98,7 +97,6 @@ def plot_state_data(csv_file, absolute=False):
 
     swing_phase = df['swing_phase'].values # don't show lines for legs not currently in swing
     est_contacts = df[['FR_contact_meas', 'FL_contact_meas', 'RR_contact_meas', 'RL_contact_meas']].values
-    joint_pos = df[['FR_0', 'FR_1', 'FR_2', 'FL_0', 'FL_1', 'FL_2', 'RR_0', 'RR_1', 'RR_2', 'RL_0', 'RL_1', 'RL_2']].values
 
     # Plot data
 
@@ -110,7 +108,6 @@ def plot_state_data(csv_file, absolute=False):
 
     plt.subplot(3, 2, 1)
     shade_by_phase(plt.subplot(3, 2, 1), time, swing_phase)
-    plt.plot(time, root_pos[:, 0], label="Actual x pos", color='r')
     plt.plot(time, root_pos_d[:, 0], label="Desired x pos", color='b')
     plt.plot(time, root_pos_est[:, 0], label="Estimated x pos", color='g')
     plt.title("Root position x")
@@ -121,7 +118,6 @@ def plot_state_data(csv_file, absolute=False):
 
     plt.subplot(3, 2, 2)
     shade_by_phase(plt.subplot(3, 2, 2), time, swing_phase)
-    plt.plot(time, root_pos[:, 1], label="Actual y pos", color='r')
     plt.plot(time, root_pos_d[:, 1], label="Desired y pos", color='b')
     plt.plot(time, root_pos_est[:, 1], label="Estimated y pos", color='g')
     plt.title("Root position y")
@@ -132,7 +128,6 @@ def plot_state_data(csv_file, absolute=False):
 
     plt.subplot(3, 2, 3)
     shade_by_phase(plt.subplot(3, 2, 3), time, swing_phase)
-    plt.plot(time, root_pos[:, 2], label="Actual z pos", color='r')
     plt.plot(time, root_pos_d[:, 2], label="Desired z pos", color='b')
     plt.plot(time, root_pos_est[:, 2], label="Estimated z pos", color='g')
     plt.title("Root position z")
@@ -143,7 +138,6 @@ def plot_state_data(csv_file, absolute=False):
 
     plt.subplot(3, 2, 4)
     shade_by_phase(plt.subplot(3, 2, 4), time, swing_phase)
-    plt.plot(time, root_rpy[:, 0], label="Actual roll", color='r')
     plt.plot(time, root_rpy_d[:, 0], label="Desired roll", color='b')
     plt.plot(time, root_rpy_est[:, 0], label="Estimated roll", color='g')
     plt.title("Root roll")
@@ -154,7 +148,6 @@ def plot_state_data(csv_file, absolute=False):
 
     plt.subplot(3, 2, 5)
     shade_by_phase(plt.subplot(3, 2, 5), time, swing_phase)
-    plt.plot(time, root_rpy[:, 1], label="Actual pitch", color='r')
     plt.plot(time, root_rpy_d[:, 1], label="Desired pitch", color='b')
     plt.plot(time, root_rpy_est[:, 1], label="Estimated pitch", color='g')
     plt.title("Root pitch")
@@ -165,7 +158,6 @@ def plot_state_data(csv_file, absolute=False):
 
     plt.subplot(3, 2, 6)
     shade_by_phase(plt.subplot(3, 2, 6), time, swing_phase)
-    plt.plot(time, root_rpy[:, 2], label="Actual yaw", color='r')
     plt.plot(time, root_rpy_d[:, 2], label="Desired yaw", color='b')
     plt.plot(time, root_rpy_est[:, 2], label="Estimated yaw", color='g')
     plt.title("Root yaw")
@@ -185,7 +177,6 @@ def plot_state_data(csv_file, absolute=False):
 
     plt.subplot(3, 2, 1)
     shade_by_phase(plt.subplot(3, 2, 1), time, swing_phase)
-    plt.plot(time, root_lin_vel[:, 0], label="Actual x vel", color='r')
     plt.plot(time, root_lin_vel_d[:, 0], label="Desired x vel", color='b')
     plt.plot(time, root_lin_vel_est[:, 0], label="Estimated x vel", color='g')
     plt.title("Root linear velocity x")
@@ -196,7 +187,6 @@ def plot_state_data(csv_file, absolute=False):
 
     plt.subplot(3, 2, 2)
     shade_by_phase(plt.subplot(3, 2, 2), time, swing_phase)
-    plt.plot(time, root_lin_vel[:, 1], label="Actual y vel", color='r')
     plt.plot(time, root_lin_vel_d[:, 1], label="Desired y vel", color='b')
     plt.plot(time, root_lin_vel_est[:, 1], label="Estimated y vel", color='g')
     plt.title("Root linear velocity y")
@@ -207,7 +197,6 @@ def plot_state_data(csv_file, absolute=False):
 
     plt.subplot(3, 2, 3)
     shade_by_phase(plt.subplot(3, 2, 3), time, swing_phase)
-    plt.plot(time, root_lin_vel[:, 2], label="Actual z vel", color='r')
     plt.plot(time, root_lin_vel_d[:, 2], label="Desired z vel", color='b')
     plt.plot(time, root_lin_vel_est[:, 2], label="Estimated z vel", color='g')
     plt.title("Root linear velocity z")
@@ -218,7 +207,6 @@ def plot_state_data(csv_file, absolute=False):
 
     plt.subplot(3, 2, 4)
     shade_by_phase(plt.subplot(3, 2, 4), time, swing_phase)
-    plt.plot(time, root_ang_vel[:, 0], label="Actual roll rate", color='r')
     plt.plot(time, root_ang_vel_d[:, 0], label="Desired roll rate", color='b')
     plt.plot(time, root_ang_vel_meas[:, 0], label="Estimated roll rate", color='g')
     plt.title("Root angular velocity x")
@@ -229,7 +217,6 @@ def plot_state_data(csv_file, absolute=False):
 
     plt.subplot(3, 2, 5)
     shade_by_phase(plt.subplot(3, 2, 5), time, swing_phase)
-    plt.plot(time, root_ang_vel[:, 1], label="Actual pitch rate", color='r')
     plt.plot(time, root_ang_vel_d[:, 1], label="Desired pitch rate", color='b')
     plt.plot(time, root_ang_vel_meas[:, 1], label="Estimated pitch rate", color='g')
     plt.title("Root angular velocity y")
@@ -240,7 +227,6 @@ def plot_state_data(csv_file, absolute=False):
 
     plt.subplot(3, 2, 6)
     shade_by_phase(plt.subplot(3, 2, 6), time, swing_phase)
-    plt.plot(time, root_ang_vel[:, 2], label="Actual yaw rate", color='r')
     plt.plot(time, root_ang_vel_d[:, 2], label="Desired yaw rate", color='b')
     plt.plot(time, root_ang_vel_meas[:, 2], label="Estimated yaw rate", color='g')
     plt.title("Root angular velocity z")
@@ -384,11 +370,314 @@ def plot_state_data(csv_file, absolute=False):
     plt.tight_layout()
     plt.savefig("data/joint_pos.png")
 
+    ########################
+    ## Joint pos tracking ##
+    ########################
+
+    joint_pos_tracking_plot = plt.figure(5, figsize=(16, 9))
+
+    plt.subplot(4, 3, 1)
+    shade_by_phase(plt.subplot(4, 3, 1), time, swing_phase)
+    plt.plot(time, joint_pos[:, 0], label='FR_0', color='r')
+    plt.plot(time, joint_pos_d[:, 0], label='Desired FR_0', color='b')
+    plt.title("FR_0 pos tracking")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.subplot(4, 3, 2)
+    shade_by_phase(plt.subplot(4, 3, 2), time, swing_phase)
+    plt.plot(time, joint_pos[:, 1], label='FR_1', color='r')
+    plt.plot(time, joint_pos_d[:, 1], label='Desired FR_1', color='b')
+    plt.title("FR_1 pos tracking")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.subplot(4, 3, 3)
+    shade_by_phase(plt.subplot(4, 3, 3), time, swing_phase)
+    plt.plot(time, joint_pos[:, 2], label='FR_2', color='r')
+    plt.plot(time, joint_pos_d[:, 2], label='Desired FR_2', color='b')
+    plt.title("FR_2 pos tracking")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.subplot(4, 3, 4)
+    shade_by_phase(plt.subplot(4, 3, 4), time, swing_phase)
+    plt.plot(time, joint_pos[:, 3], label='FL_0', color='r')
+    plt.plot(time, joint_pos_d[:, 3], label='Desired FL_0', color='b')
+    plt.title("FL_0 pos tracking")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.subplot(4, 3, 5)
+    shade_by_phase(plt.subplot(4, 3, 5), time, swing_phase)
+    plt.plot(time, joint_pos[:, 4], label='FL_1', color='r')
+    plt.plot(time, joint_pos_d[:, 4], label='Desired FL_1', color='b')
+    plt.title("FL_1 pos tracking")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.subplot(4, 3, 6)
+    shade_by_phase(plt.subplot(4, 3, 6), time, swing_phase)
+    plt.plot(time, joint_pos[:, 5], label='FL_2', color='r')
+    plt.plot(time, joint_pos_d[:, 5], label='Desired FL_2', color='b')
+    plt.title("FL_2 pos tracking")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.subplot(4, 3, 7)
+    shade_by_phase(plt.subplot(4, 3, 7), time, swing_phase)
+    plt.plot(time, joint_pos[:, 6], label='RR_0', color='r')
+    plt.plot(time, joint_pos_d[:, 6], label='Desired RR_0', color='b')
+    plt.title("RR_0 pos tracking")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.subplot(4, 3, 8)
+    shade_by_phase(plt.subplot(4, 3, 8), time, swing_phase)
+    plt.plot(time, joint_pos[:, 7], label='RR_1', color='r')
+    plt.plot(time, joint_pos_d[:, 7], label='Desired RR_1', color='b')
+    plt.title("RR_1 pos tracking")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.subplot(4, 3, 9)
+    shade_by_phase(plt.subplot(4, 3, 9), time, swing_phase)
+    plt.plot(time, joint_pos[:, 8], label='RR_2', color='r')
+    plt.plot(time, joint_pos_d[:, 8], label='Desired RR_2', color='b')
+    plt.title("RR_2 pos tracking")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.subplot(4, 3, 10)
+    shade_by_phase(plt.subplot(4, 3, 10), time, swing_phase)
+    plt.plot(time, joint_pos[:, 9], label='RL_0', color='r')
+    plt.plot(time, joint_pos_d[:, 9], label='Desired RL_0', color='b')
+    plt.title("RL_0 pos tracking")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.subplot(4, 3, 11)
+    shade_by_phase(plt.subplot(4, 3, 11), time, swing_phase)
+    plt.plot(time, joint_pos[:, 10], label='RL_1', color='r')
+    plt.plot(time, joint_pos_d[:, 10], label='Desired RL_1', color='b')
+    plt.title("RL_1 pos tracking")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.subplot(4, 3, 12)
+    shade_by_phase(plt.subplot(4, 3, 12), time, swing_phase)
+    plt.plot(time, joint_pos[:, 11], label='RL_2', color='r')
+    plt.plot(time, joint_pos_d[:, 11], label='Desired RL_2', color='b')
+    plt.title("RL_2 pos tracking")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig("data/joint_pos_tracking.png")
+
+    ######################
+    ## Joint velocities ##
+    ######################
+
+    joint_vel_plot = plt.figure(6, figsize=(16, 9))
+
+    plt.subplot(3, 1, 1)
+    shade_by_phase(plt.subplot(3, 1, 1), time, swing_phase)
+    plt.plot(time, joint_vel[:, 0], label="FR hip", color='r')
+    plt.plot(time, joint_vel[:, 3], label="FL hip", color='b')
+    plt.plot(time, joint_vel[:, 6], label="RR hip", color='g')
+    plt.plot(time, joint_vel[:, 9], label="RL hip", color='orange')
+    plt.title("Hip joint vel")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians/sec")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.subplot(3, 1, 2)
+    shade_by_phase(plt.subplot(3, 1, 2), time, swing_phase)
+    plt.plot(time, joint_vel[:, 1], label="FR thigh", color='r')
+    plt.plot(time, joint_vel[:, 4], label="FL thigh", color='b')
+    plt.plot(time, joint_vel[:, 7], label="RR thigh", color='g')
+    plt.plot(time, joint_vel[:, 10], label="RL thigh", color='orange')
+    plt.title("Thigh joint vel")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians/sec")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.subplot(3, 1, 3)
+    shade_by_phase(plt.subplot(3, 1, 3), time, swing_phase)
+    plt.plot(time, joint_vel[:, 2], label="FR calf", color='r')
+    plt.plot(time, joint_vel[:, 5], label="FL calf", color='b')
+    plt.plot(time, joint_vel[:, 8], label="RR calf", color='g')
+    plt.plot(time, joint_vel[:, 11], label="RL calf", color='orange')
+    plt.title("Calf joint vel")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians/sec")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig("data/joint_vel.png")
+
+    ########################
+    ## Joint vel tracking ##
+    ########################
+
+    joint_vel_tracking_plot = plt.figure(7, figsize=(16, 9))
+
+    plt.subplot(4, 3, 1)
+    shade_by_phase(plt.subplot(4, 3, 1), time, swing_phase)
+    plt.plot(time, joint_vel[:, 0], label='FR_0', color='r')
+    plt.plot(time, joint_vel_d[:, 0], label='Desired FR_0', color='b')
+    plt.title("FR_0 vel tracking")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians/sec")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.subplot(4, 3, 2)
+    shade_by_phase(plt.subplot(4, 3, 2), time, swing_phase)
+    plt.plot(time, joint_vel[:, 1], label='FR_1', color='r')
+    plt.plot(time, joint_vel_d[:, 1], label='Desired FR_1', color='b')
+    plt.title("FR_1 vel tracking")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians/sec")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.subplot(4, 3, 3)
+    shade_by_phase(plt.subplot(4, 3, 3), time, swing_phase)
+    plt.plot(time, joint_vel[:, 2], label='FR_2', color='r')
+    plt.plot(time, joint_vel_d[:, 2], label='Desired FR_2', color='b')
+    plt.title("FR_2 vel tracking")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians/sec")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.subplot(4, 3, 4)
+    shade_by_phase(plt.subplot(4, 3, 4), time, swing_phase)
+    plt.plot(time, joint_vel[:, 3], label='FL_0', color='r')
+    plt.plot(time, joint_vel_d[:, 3], label='Desired FL_0', color='b')
+    plt.title("FL_0 vel tracking")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians/sec")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.subplot(4, 3, 5)
+    shade_by_phase(plt.subplot(4, 3, 5), time, swing_phase)
+    plt.plot(time, joint_vel[:, 4], label='FL_1', color='r')
+    plt.plot(time, joint_vel_d[:, 4], label='Desired FL_1', color='b')
+    plt.title("FL_1 vel tracking")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians/sec")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.subplot(4, 3, 6)
+    shade_by_phase(plt.subplot(4, 3, 6), time, swing_phase)
+    plt.plot(time, joint_vel[:, 5], label='FL_2', color='r')
+    plt.plot(time, joint_vel_d[:, 5], label='Desired FL_2', color='b')
+    plt.title("FL_2 vel tracking")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians/sec")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.subplot(4, 3, 7)
+    shade_by_phase(plt.subplot(4, 3, 7), time, swing_phase)
+    plt.plot(time, joint_vel[:, 6], label='RR_0', color='r')
+    plt.plot(time, joint_vel_d[:, 6], label='Desired RR_0', color='b')
+    plt.title("RR_0 vel tracking")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians/sec")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.subplot(4, 3, 8)
+    shade_by_phase(plt.subplot(4, 3, 8), time, swing_phase)
+    plt.plot(time, joint_vel[:, 7], label='RR_1', color='r')
+    plt.plot(time, joint_vel_d[:, 7], label='Desired RR_1', color='b')
+    plt.title("RR_1 vel tracking")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians/sec")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.subplot(4, 3, 9)
+    shade_by_phase(plt.subplot(4, 3, 9), time, swing_phase)
+    plt.plot(time, joint_vel[:, 8], label='RR_2', color='r')
+    plt.plot(time, joint_vel_d[:, 8], label='Desired RR_2', color='b')
+    plt.title("RR_2 vel tracking")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians/sec")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.subplot(4, 3, 10)
+    shade_by_phase(plt.subplot(4, 3, 10), time, swing_phase)
+    plt.plot(time, joint_vel[:, 9], label='RL_0', color='r')
+    plt.plot(time, joint_vel_d[:, 9], label='Desired RL_0', color='b')
+    plt.title("RL_0 vel tracking")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians/sec")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.subplot(4, 3, 11)
+    shade_by_phase(plt.subplot(4, 3, 11), time, swing_phase)
+    plt.plot(time, joint_vel[:, 10], label='RL_1', color='r')
+    plt.plot(time, joint_vel_d[:, 10], label='Desired RL_1', color='b')
+    plt.title("RL_1 vel tracking")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians/sec")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.subplot(4, 3, 12)
+    shade_by_phase(plt.subplot(4, 3, 12), time, swing_phase)
+    plt.plot(time, joint_vel[:, 11], label='RL_2', color='r')
+    plt.plot(time, joint_vel_d[:, 11], label='Desired RL_2', color='b')
+    plt.title("RL_2 vel tracking")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Radians/sec")
+    plt.xlim(0, time[-1])
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig("data/joint_vel_tracking.png")
+
     ###################
     ## Joint torques ##
     ###################
 
-    joint_torque_plot = plt.figure(5, figsize=(16, 9))
+    joint_torque_plot = plt.figure(8, figsize=(16, 9))
 
     plt.subplot(3, 1, 1)
     shade_by_phase(plt.subplot(3, 1, 1), time, swing_phase)
@@ -439,7 +728,7 @@ def plot_state_data(csv_file, absolute=False):
     ## Foot positions ##
     ####################
 
-    foot_pos_plot = plt.figure(6, figsize=(16, 9))
+    foot_pos_plot = plt.figure(9, figsize=(16, 9))
 
     plt.subplot(4, 3, 1)
     shade_by_phase(plt.subplot(4, 3, 1), time, swing_phase)
@@ -616,14 +905,14 @@ def plot_state_data(csv_file, absolute=False):
     ## Foot contacts ##
     ###################
 
-    foot_contact_plot = plt.figure(7, figsize=(16, 9))
+    foot_contact_plot = plt.figure(10, figsize=(16, 9))
 
     shade_by_phase(plt, time, swing_phase)
     plt.plot(time, est_contacts[:, 0], label="FR", color="r")
     plt.plot(time, est_contacts[:, 1], label="FL", color="b")
     plt.plot(time, est_contacts[:, 2], label="RR", color="g")
     plt.plot(time, est_contacts[:, 3], label="RL", color="orange")
-    plt.axhline(y=200.0, xmax=time[-1], xmin=time[0], color='k', linestyle='--')
+    plt.axhline(y=130.0, xmax=time[-1], xmin=time[0], color='k', linestyle='--') # make sure to match with UNITREE_SDK_CONTACT_THRESH in go1Params.h
     plt.xlabel("Time (s)")
     plt.ylabel("Measured normal force (N)")
     plt.xlim(0, time[-1])
@@ -635,9 +924,12 @@ def plot_state_data(csv_file, absolute=False):
     plt.close(root_pose_plot)
     plt.close(root_vel_plot)
     plt.close(foot_pos_plot)
-    plt.close(foot_force_plot)
-    # plt.close(joint_pos_plot)
-    plt.close(joint_torque_plot)
+    # plt.close(foot_force_plot)
+    plt.close(joint_pos_plot)
+    plt.close(joint_pos_tracking_plot)
+    plt.close(joint_vel_plot)
+    plt.close(joint_vel_tracking_plot)
+    # plt.close(joint_torque_plot)
     # plt.close(foot_contact_plot)
     plt.show()
 

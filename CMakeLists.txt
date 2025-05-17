@@ -146,6 +146,7 @@ target_link_options(test_go1ReadHardwareLoopFunc PRIVATE -no-pie)
 add_executable(test_go1JointPDHardwareLoopFunc src/testGo1JointPDHardwareLoopFunc.cpp)
 target_link_libraries(test_go1JointPDHardwareLoopFunc
     go1_main_lib
+    ${CURSES_LIBRARIES}
 )
 target_link_options(test_go1JointPDHardwareLoopFunc PRIVATE -no-pie)
 

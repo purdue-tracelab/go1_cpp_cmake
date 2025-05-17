@@ -346,7 +346,7 @@ int main(void)
   Custom custom(LOWLEVEL);
   // InitEnvironment();
   LoopFunc loop_control("control_loop", custom.dt, 4, boost::bind(&Custom::RobotControl, &custom));
-  LoopFunc loop_keyInput("key_input_loop", custom.dt * 5.0, 5, boost::bind(&Custom::keyControl, &custom));
+  LoopFunc loop_keyInput("key_input_loop", custom.dt, 5, boost::bind(&Custom::keyControl, &custom));
   LoopFunc loop_udpSend("udp_send", custom.dt, 3, boost::bind(&Custom::UDPSend, &custom));
   LoopFunc loop_udpRecv("udp_recv", custom.dt, 3, boost::bind(&Custom::UDPRecv, &custom));
 

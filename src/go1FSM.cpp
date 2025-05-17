@@ -15,7 +15,7 @@ go1FSM::go1FSM(double state_hz,
         mpc_(),
         current_(go1FiniteState::Passive),
         mpc_counter_(0),
-        mpc_interval_(static_cast<int>(std::round(state_hz / mpc_hz)))
+        mpc_interval_(static_cast<int>(mpc_hz / state_hz) - 1)
 {
     mpc_thread_running_ = true;
     snapshot_ready_ = false;

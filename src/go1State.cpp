@@ -113,16 +113,15 @@ void go1State::updateLocomotionPlan() {
     foot_pos = rootRotMat.transpose() * foot_pos_world_rot;
     contactJacobian = go1ContactJacobian(joint_pos, root_rpy_ctrl);
 
-    // Update contacts based on sensor measurements
+    // Add early contacts based on sensor measurements
     contacts_old = contacts;
-    // auto thresh = MUJOCO_CONTACT_THRESH; // don't use estimator flag, use something else
-    for (int i = 0; i < NUM_LEG; i++) {
-        if (est_contacts(i) > thresh && contacts_old[i] == true) {
-            contacts[i] = true;
-        } else {
-            contacts[i] = false;
-        }
-    }
+    // for (int i = 0; i < NUM_LEG; i++) {
+    //     if (est_contacts(i) > thresh && contacts_old[i] == true) {
+    //         contacts[i] = true;
+    //     } else {
+    //         contacts[i] = false;
+    //     }
+    // }
 
     // Update walking plan if walking_mode is requested
     if (walking_mode) {
@@ -436,17 +435,9 @@ void go1State::amirHLIP() {
     based on a QP formulation of HT-LIP dynamics. Need to ask I-Chia if
     correct or incorrect, may take a while to debug if incorrect.
 */
-    Eigen::Matrix3d rootRotMatZ; // assumes small roll + pitch only (should I keep this assumption?)
-    Eigen::Vector3d lin_vel_rel;
-
-    if (USE_EST_FOR_CONTROL) {
-        rootRotMatZ = rotZ(root_rpy_est(2));
-        lin_vel_rel = rootRotMatZ.transpose() * root_lin_vel_est;
-
-    } else {
-        rootRotMatZ = rotZ(root_rpy(2));
-        lin_vel_rel = rootRotMatZ.transpose() * root_lin_vel;
-    }
+    // rootRotMatZ and lin_vel_rel assumes small roll + pitch only (should I keep this assumption?)
+    Eigen::Matrix3d rootRotMatZ = rotZ(USE_EST_FOR_CONTROL ? root_rpy_est(2) : root_rpy(2));
+    Eigen::Vector3d lin_vel_rel = rootRotMatZ.transpose() * (USE_EST_FOR_CONTROL ? root_lin_vel_est : root_lin_vel);
 
     double swingProg = 0.0;
     stanceFeetSumXY.setZero(); // sum of stance feet xy positions
@@ -477,7 +468,7 @@ void go1State::amirHLIP() {
 
     rel_error_pos = root_lin_vel_d.segment<2>(0) * DT_CTRL * (1.0 - swingProg)/2.0 - StanceFeetSumXY; // double check the (1 - swingProg) expression
     rel_error_vel = lin_vel_rel.segment<2>(0) - root_lin_vel_d.segment<2>(0);
-    u_ref = root_lin_vel_d.segment<2>(0) * DT_CTRL * (SWING_PHASE_MAX/2);
+    u_ref = root_lin_vel_d.segment<2>(0) * DT_CTRL * (SWING_PHASE_MAX + 1) / 2;
 
     // Finds the effective LIP frequency and adjusts it based on the vertical acceleration
     double a_ver_plus_g = root_lin_acc_meas(2) - 9.81; // isn't used anywhere else, what's the point of this? only comparison?

@@ -44,20 +44,31 @@ void write_vector(const Eigen::MatrixBase<VectorType> &vec, std::ostream &os) {
 // Functions to store data in CSV file
 void storeData(const go1State &state, std::ostream &os) {
     // Position
-    write_vector(state.root_pos, os); os << ",";
+    write_vector(state.root_pos_est, os); os << ",";
     write_vector(state.root_pos_d, os); os << ",";
 
     // Linear velocity
-    write_vector(state.root_lin_vel, os); os << ",";
+    write_vector(state.root_lin_vel_est, os); os << ",";
     write_vector(state.root_lin_vel_d, os); os << ",";
 
+    // Linear acceleration
+    write_vector(state.root_lin_acc_est, os); os << ",";
+    write_vector(state.root_lin_acc_meas, os); os << ",";
+
     // RPY orientation
-    write_vector(state.root_rpy, os); os << ",";
+    write_vector(state.root_rpy_est, os); os << ",";
     write_vector(state.root_rpy_d, os); os << ",";
 
     // Angular velocity
-    write_vector(state.root_ang_vel, os); os << ",";
-    write_vector(state.root_ang_vel_d, os); os << ",";
+    write_vector(state.root_ang_vel_est, os); os << ",";
+    write_vector(state.root_ang_vel_meas, os); os << ",";
+    write_vector(state.root_ang_vel_d, os); os << ",";    
+
+    // Joint states
+    write_vector(state.joint_pos, os); os << ",";
+    write_vector(state.joint_pos_d, os); os << ",";
+    write_vector(state.joint_vel, os); os << ",";
+    write_vector(state.joint_vel_d, os); os << ",";
  
     // Foot positions and velocities
     write_vector(state.foot_pos_world_rot, os); os << ",";
@@ -66,7 +77,7 @@ void storeData(const go1State &state, std::ostream &os) {
     write_vector(state.foot_pos_d, os); os << ",";
     write_vector(state.foot_vel_d, os); os << ",";
 
-    // Foot forces and joint torques
+    // Foot forces
     {
         Eigen::Map<const Eigen::VectorXd> flat_grf(
             state.foot_forces_grf.data(),
@@ -87,6 +98,7 @@ void storeData(const go1State &state, std::ostream &os) {
 
     os << ',';
     
+    // Joint torques
     {
         Eigen::Map<const Eigen::VectorXd> flat_torque(
             state.joint_torques.data(),
@@ -97,40 +109,25 @@ void storeData(const go1State &state, std::ostream &os) {
 
     os << ',';
 
-    // Foot contact states
+    // Foot contacts
     os << state.swing_phase << "," 
         << (state.contacts[0] ? 1 : 0) << "," 
         << (state.contacts[1] ? 1 : 0) << "," 
         << (state.contacts[2] ? 1 : 0) << "," 
         << (state.contacts[3] ? 1 : 0) << ",";
-
-    // Estimated states
-    write_vector(state.root_pos_est, os); os << ",";
-    write_vector(state.root_lin_vel_est, os); os << ",";
-    write_vector(state.root_lin_acc_est, os); os << ",";
-    write_vector(state.root_rpy_est, os); os << ",";
+    write_vector(state.est_contacts, os); os << "\n";
     
-    // Sensor measurements
-    write_vector(state.root_lin_acc_meas, os); os << ",";
-    write_vector(state.root_ang_vel_meas, os); os << ",";
-    write_vector(state.est_contacts, os); os << ",";
-    write_vector(state.joint_pos, os); os << "\n";
-}
-
-void storeCalcTimeData(double update_time, double est_time, double MPC_calc_time, std::ostream &os) {
-    // Store calculation times
-    {
-        os << update_time << "," 
-        << est_time << "," 
-        << MPC_calc_time << "\n";
-    }
 }
 
 void writeCSVHeader(std::ostream &os) {    
-    os << "root_pos_x,root_pos_y,root_pos_z,root_pos_d_x,root_pos_d_y,root_pos_d_z,"
-            "root_lin_vel_x,root_lin_vel_y,root_lin_vel_z,root_lin_vel_d_x,root_lin_vel_d_y,root_lin_vel_d_z,"
-            "root_rpy_x,root_rpy_y,root_rpy_z,root_rpy_d_x,root_rpy_d_y,root_rpy_d_z,"
-            "root_ang_vel_x,root_ang_vel_y,root_ang_vel_z,root_ang_vel_d_x,root_ang_vel_d_y,root_ang_vel_d_z,"
+    os << "root_pos_est_x,root_pos_est_y,root_pos_est_z,root_pos_d_x,root_pos_d_y,root_pos_d_z,"
+            "root_lin_vel_est_x,root_lin_vel_est_y,root_lin_vel_est_z,root_lin_vel_d_x,root_lin_vel_d_y,root_lin_vel_d_z,"
+            "root_lin_acc_est_x,root_lin_acc_est_y,root_lin_acc_est_z,root_lin_acc_meas_x,root_lin_acc_meas_y,root_lin_acc_meas_z,"
+            "root_rpy_est_x,root_rpy_est_y,root_rpy_est_z,root_rpy_d_x,root_rpy_d_y,root_rpy_d_z,"
+            "root_ang_vel_est_x,root_ang_vel_est_y,root_ang_vel_est_z,root_ang_vel_meas_x,root_ang_vel_meas_y,root_ang_vel_meas_z,root_ang_vel_d_x,root_ang_vel_d_y,root_ang_vel_d_z,"            "FR_0,FR_1,FR_2,FL_0,FL_1,FL_2,RR_0,RR_1,RR_2,RL_0,RL_1,RL_2,"
+            "FR_0_des,FR_1_des,FR_2_des,FL_0_des,FL_1_des,FL_2_des,RR_0_des,RR_1_des,RR_2_des,RL_0_des,RL_1_des,RL_2_des,"
+            "FR_0_dot,FR_1_dot,FR_2_dot,FL_0_dot,FL_1_dot,FL_2_dot,RR_0_dot,RR_1_dot,RR_2_dot,RL_0_dot,RL_1_dot,RL_2_dot,"
+            "FR_0_dot_des,FR_1_dot_des,FR_2_dot_des,FL_0_dot_des,FL_1_dot_des,FL_2_dot_des,RR_0_dot_des,RR_1_dot_des,RR_2_dot_des,RL_0_dot_des,RL_1_dot_des,RL_2_dot_des,"
             "foot_pos_FR_x,foot_pos_FR_y,foot_pos_FR_z,foot_pos_FL_x,foot_pos_FL_y,foot_pos_FL_z,"
             "foot_pos_RR_x,foot_pos_RR_y,foot_pos_RR_z,foot_pos_RL_x,foot_pos_RL_y,foot_pos_RL_z,"
             "foot_pos_abs_FR_x,foot_pos_abs_FR_y,foot_pos_abs_FR_z,foot_pos_abs_FL_x,foot_pos_abs_FL_y,foot_pos_abs_FL_z,"
@@ -148,19 +145,8 @@ void writeCSVHeader(std::ostream &os) {
             "joint_torques_FR_hip,joint_torques_FR_thigh,joint_torques_FR_calf,joint_torques_FL_hip,joint_torques_FL_thigh,joint_torques_FL_calf,"
             "joint_torques_RR_hip,joint_torques_RR_thigh,joint_torques_RR_calf,joint_torques_RL_hip,joint_torques_RL_thigh,joint_torques_RL_calf,"
             "swing_phase,contact_FR,contact_FL,contact_RR,contact_RL,"
-            "root_pos_est_x,root_pos_est_y,root_pos_est_z,"
-            "root_lin_vel_est_x,root_lin_vel_est_y,root_lin_vel_est_z,"
-            "root_lin_acc_est_x,root_lin_acc_est_y,root_lin_acc_est_z,"
-            "root_rpy_est_x,root_rpy_est_y,root_rpy_est_z,"
-            "root_lin_acc_meas_x,root_lin_acc_meas_y,root_lin_acc_meas_z,"
-            "root_ang_vel_meas_x,root_ang_vel_meas_y,root_ang_vel_meas_z,"
-            "FR_contact_meas,FL_contact_meas,RR_contact_meas,RL_contact_meas,"
-            "FR_0,FR_1,FR_2,FL_0,FL_1,FL_2,RR_0,RR_1,RR_2,RL_0,RL_1,RL_2\n";
+            "FR_contact_meas,FL_contact_meas,RR_contact_meas,RL_contact_meas\n";
 
-}
-
-void writeCalcTimeCSVHeader(std::ostream &os) {
-    os << "state_update_time,estimation_time,MPC_calc_time\n";
 }
 
 ///////////////////////////
