@@ -605,16 +605,9 @@ void go1State::swingPD(int leg_idx, Eigen::Vector3d footPosRef, Eigen::Vector3d 
             foot_forces_swing.col(leg_idx) = kp * (footPosRef - foot_posN) + kd * (footVelRef - foot_velN);
         
         } else {
-            Eigen::Matrix3d rootRotMat;
-            Eigen::Matrix3d rootRotMatT;
-    
-            if (USE_EST_FOR_CONTROL) {
-                rootRotMat = rotZ(root_rpy_est(2))*rotY(root_rpy_est(1))*rotX(root_rpy_est(0));
-                rootRotMatT = rootRotMat.transpose();
-            } else {
-                rootRotMat = rotZ(root_rpy(2))*rotY(root_rpy(1))*rotX(root_rpy(0));
-                rootRotMatT = rootRotMat.transpose();
-            }
+            Eigen::Vector3d rpy_ctrl = USE_EST_FOR_CONTROL ? root_rpy_est : root_rpy;
+            Eigen::Matrix3d rootRotMat = rotZ(rpy_ctrl(2)) * rotY(rpy_ctrl(1)) * rotX(rpy_ctrl(0));
+            Eigen::Matrix3d rootRotMatT = rootRotMat.transpose();
 
             ////////////////////////////////////////////////////////////////////////////////////////////////////
             // Double Muqun IK (for reference and current foot positions; not correct method, but works well) //

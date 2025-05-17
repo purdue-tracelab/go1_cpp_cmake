@@ -233,7 +233,7 @@ struct hardwareCommandSender : lowLevelCommandSender {
 
                 // Adding this causes Locomotion MPC stand to abort controller, but Startup and Shutdown works
                 safe.PositionLimit(extLowCmd);
-                int res1 = safe.PowerProtect(extLowCmd, extLowState, 1);
+                int res1 = safe.PowerProtect(extLowCmd, extLowState, 2); // input factor of 1-10 -> 10%-100%
                 if (res1 < 0) exit(-1);
             }
 

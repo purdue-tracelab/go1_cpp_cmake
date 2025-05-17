@@ -118,7 +118,8 @@ void go1FSM::step() {
             if (state_.isStartupComplete()) {
                 std::lock_guard<std::mutex> lock(mtx_);
                 current_ = go1FiniteState::Locomotion;
-                state_.root_pos_d << 0, 0, WALK_HEIGHT; // careful for treadmill & hardware here
+                Eigen::Vector3d pos_ctrl = USE_EST_FOR_CONTROL ? state_.root_pos_est : state_.root_pos;
+                state_.root_pos_d << pos_ctrl(0), pos_ctrl(1), WALK_HEIGHT; // for sim, treadmill XML requires 1 + WALK_HEIGHT meters
                 just_transitioned_to_locomotion_ = true;
                 state_.squat_flag = false;
             }
@@ -140,6 +141,14 @@ void go1FSM::step() {
         case go1FiniteState::Shutdown:
             state_.squat_flag = true;
             state_.computeShutdownPD();
+
+            if (state_.isShutdownComplete()) {
+                std::lock_guard<std::mutex> lock(mtx_);
+                current_ = go1FiniteState::Passive;
+                Eigen::Vector3d pos_ctrl = USE_EST_FOR_CONTROL ? state_.root_pos_est : state_.root_pos;
+                state_.root_pos_d << pos_ctrl(0), pos_ctrl(1), 0.0; // for sim, treadmill XML requires 1 meters
+                state_.squat_flag = false;
+            }
             break;
     }
 
