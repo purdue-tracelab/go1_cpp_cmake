@@ -167,7 +167,7 @@ struct mujocoCommandSender : lowLevelCommandSender {
             // send control commands to MuJoCo
             for (int i = 0; i < 3*NUM_LEG; i++) {
                 if (damping_mode) mujoco_data->ctrl[i] = 0.0;
-                else mujoco_data->ctrl[i] = state.joint_torques(i%3, i/3);
+                else mujoco_data->ctrl[i] = state.joint_torques(i % 3, i / 3);
             }
         }
 
@@ -198,43 +198,46 @@ struct hardwareCommandSender : lowLevelCommandSender {
             for (int i = 0; i < 3*NUM_LEG; i++) {
                 int leg_idx = i / 3;
 
-                if (damping_mode) extLowCmd.motorCmd[i].mode = 0x00;
-                else extLowCmd.motorCmd[i].mode = 0x0A;
-
-                if (state.squat_flag) { // startup or shutdown mode
-                    extLowCmd.motorCmd[i].q = state.joint_pos_d(i, 0);
-                    extLowCmd.motorCmd[i].dq = state.joint_vel_d(i, 0);
-                    extLowCmd.motorCmd[i].Kp = SQUAT_JOINT_KP;
+                if (damping_mode) {
+                    extLowCmd.motorCmd[i].q = UNITREE_LEGGED_SDK::PosStopF;
+                    extLowCmd.motorCmd[i].dq = 0.0;
+                    extLowCmd.motorCmd[i].Kp = 0.0;
                     extLowCmd.motorCmd[i].Kd = SQUAT_JOINT_KD;
-                    extLowCmd.motorCmd[i].tau = 0.0f;
+                    extLowCmd.motorCmd[i].tau = 0.0;
 
                 } else {
-                    if (state.contacts[leg_idx] == true) { // stance leg
-                        extLowCmd.motorCmd[i].q = UNITREE_LEGGED_SDK::PosStopF;
-                        extLowCmd.motorCmd[i].dq = UNITREE_LEGGED_SDK::VelStopF;
-                        extLowCmd.motorCmd[i].Kp = 0.0;
-                        extLowCmd.motorCmd[i].Kd = 0.0;
-                        extLowCmd.motorCmd[i].tau = state.joint_torques(i % 3, i / 3);
-
-                    } else { // swing leg
+                    if (state.squat_flag) { // startup or shutdown mode
                         extLowCmd.motorCmd[i].q = state.joint_pos_d(i, 0);
                         extLowCmd.motorCmd[i].dq = state.joint_vel_d(i, 0);
-                        extLowCmd.motorCmd[i].Kp = SWING_KP_JOINT;
-                        extLowCmd.motorCmd[i].Kd = SWING_KD_JOINT;
-                        extLowCmd.motorCmd[i].tau = 0.0f;
+                        extLowCmd.motorCmd[i].Kp = SQUAT_JOINT_KP;
+                        extLowCmd.motorCmd[i].Kd = SQUAT_JOINT_KD;
+                        extLowCmd.motorCmd[i].tau = 0.0;
+
+                    } else {
+                        if (state.contacts[leg_idx] == true) { // stance leg
+                            extLowCmd.motorCmd[i].q = UNITREE_LEGGED_SDK::PosStopF;
+                            extLowCmd.motorCmd[i].dq = UNITREE_LEGGED_SDK::VelStopF;
+                            extLowCmd.motorCmd[i].Kp = 0.0;
+                            extLowCmd.motorCmd[i].Kd = 0.0;
+                            extLowCmd.motorCmd[i].tau = state.joint_torques(i % 3, i / 3);
+
+                        } else { // swing leg
+                            extLowCmd.motorCmd[i].q = state.joint_pos_d(i, 0);
+                            extLowCmd.motorCmd[i].dq = state.joint_vel_d(i, 0);
+                            extLowCmd.motorCmd[i].Kp = SWING_KP_JOINT;
+                            extLowCmd.motorCmd[i].Kd = SWING_KD_JOINT;
+                            extLowCmd.motorCmd[i].tau = 0.0;
+                        }
                     }
                 }
 
-                // std::cout << "q_" << i << " des: " << extLowCmd.motorCmd[i].q 
-                //             << ", dq_" << i << " des: " << extLowCmd.motorCmd[i].dq 
-                //             << ", Kp_" << i << " des: " << extLowCmd.motorCmd[i].Kp
-                //             << ", Kd_" << i << " des: " << extLowCmd.motorCmd[i].Kd
-                //             << ", tau_" << i << ": " << extLowCmd.motorCmd[i].tau << std::endl;
-
                 // Adding this causes Locomotion MPC stand to abort controller, but Startup and Shutdown works
+                // PowerProtect represents power limit, ranges from 10%-100% w/ input from 1-10
                 safe.PositionLimit(extLowCmd);
-                int res1 = safe.PowerProtect(extLowCmd, extLowState, 3); // input factor of 1-10 -> 10%-100%
-                if (res1 < 0) exit(-1);
+                int res1 = safe.PowerProtect(extLowCmd, extLowState, 3);
+                if (res1 < 0) {
+                    damping_mode = true;
+                }
             }
 
             extUDP.SetSend(extLowCmd);

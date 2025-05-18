@@ -516,12 +516,16 @@ int main(void) {
     loop_simulate.shutdown();
     loop_keyInput.shutdown();
 
+    endwin();
+
     glfwDestroyWindow(window);
     glfwTerminate();
     mj_deleteData(mujoco_data);
     mj_deleteModel(mujoco_model);
     mjv_freeScene(&scn);
     mjr_freeContext(&con);
+
+    std::cout << "MuJoCo simulation complete!" << std::endl;
 
     return 0;
 }

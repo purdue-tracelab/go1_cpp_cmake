@@ -8,9 +8,13 @@
 constexpr int NUM_LEG = 4;
 constexpr double BASE_2_HIP_JOINT_X = 0.1881;
 constexpr double BASE_2_HIP_JOINT_Y = 0.04675;
+
+// Link lengths
 constexpr double HIP_LINK_LENGTH = 0.08;
 constexpr double THIGH_LINK_LENGTH = 0.213;
 constexpr double CALF_LINK_LENGTH = 0.213;
+
+// Torque limits
 constexpr double TORQUE_MAX_HIP = 23.7;
 constexpr double TORQUE_MAX_THIGH = 23.7;
 constexpr double TORQUE_MAX_CALF = 35.55;
@@ -19,8 +23,11 @@ constexpr double TORQUE_MAX_CALF = 35.55;
 // Startup parameters //
 ////////////////////////
 
+// Desired joint positions in startup
 constexpr double THIGH_RAD_STAND = 0.9;
 constexpr double CALF_RAD_STAND = -1.8;
+
+// Desired startup/shutdown joint PD gains
 constexpr double SQUAT_JOINT_KP = 60;
 constexpr double SQUAT_JOINT_KD = 3;
 
@@ -28,8 +35,9 @@ constexpr double SQUAT_JOINT_KD = 3;
 // General control parameters //
 ////////////////////////////////
 
+constexpr double DT_CTRL = 0.002; // General control frequency (500 Hz)
 constexpr int STATE_EST_SELECT = 2; // O: naive KF, 1: kinematic KF, 2: two-stage KF, 3: extended KF
-constexpr bool USE_EST_FOR_CONTROL = true; // false: no, use ground truth info, true: yes, use estimated info
+constexpr bool USE_EST_FOR_CONTROL = true; // false: no, use ground truth info, true: yes, use estimated info (ALWAYS USE ESTIMATE FOR HARDWARE)
 constexpr double MUJOCO_CONTACT_THRESH = 3.0;
 constexpr int UNITREE_SDK_CONTACT_THRESH = 100;
 
@@ -40,32 +48,42 @@ constexpr int UNITREE_SDK_CONTACT_THRESH = 100;
 constexpr int PLANNER_SELECT = 2; // 0: Raibert Heuristic, 1: Raibert Heuristic with Capture Point, 2: HT-LIP
 constexpr int SWING_PD_SELECT = 1; // 0: Cartesian PD, 1: Joint PD
 constexpr double SWING_TRAJ_SELECT = 0; // 0: Bezier, 1: Sinusoidal (sinusoidal broken atm)
+constexpr int SWING_PHASE_MAX = 199; // swap between 0-99 (0.2 s gait cycle) and 0-199 (0.4 s gait cycle)
+
+// Cartesian space swing PD gains
 constexpr double SWING_KP_CART = 3000;
 constexpr double SWING_KD_CART = 40;
+
+// Joint space swing PD gains
 constexpr double SWING_KP_JOINT = 70;
 constexpr double SWING_KD_JOINT = 4;
+
+// Swing leg Bezier curve parameters
 constexpr double WALK_HEIGHT = 0.27;
 constexpr double STEP_HEIGHT = 0.10;
 constexpr double FOOT_DELTA_X_LIMIT = 0.20;
 constexpr double FOOT_DELTA_Y_LIMIT = 0.10;
-constexpr int SWING_PHASE_MAX = 199; // swap between 0-99 (0.2 s gait cycle) and 0-199 (0.4 s gait cycle)
 
 ////////////////////
 // MPC parameters //
 ////////////////////
 
-constexpr double DT_CTRL = 0.002; // General control frequency (500 Hz)
-constexpr int MPC_HORIZON = 7; // w/ EIGEN_STACK_ALLOCATION_LIMIT, max = 7; w/o, max = 9
+// MPC calculation timings
+constexpr int MPC_HORIZON = 7; // with EIGEN_STACK_ALLOCATION_LIMIT, max = 7; without, max = 9
 constexpr double DT_MPC_CTRL = 0.02; // MPC control frequency (50 Hz)
 constexpr double DT_MPC = DT_CTRL * (1 + SWING_PHASE_MAX) / MPC_HORIZON; // MPC horizon time step (ctrl dt * # gait phases / # horizons), should see whole gait
+
+// GRF bounds
 constexpr double MU = 0.6;
 constexpr double FZ_MIN = 0.0;
 constexpr double FZ_MAX = 500.0;
+
+// Helpful MPC matrix dimensions
 constexpr int FRIC_PYR = 6;
 constexpr int MPC_REF_DIM = 13 * MPC_HORIZON;
 constexpr int MPC_INPUT_DIM = 3 * NUM_LEG * MPC_HORIZON;
 
-// for blending MPC trajectory
+// MPC blending trajectory parameters
 constexpr double ALEPH = 0.8;
 constexpr double BETTA = 0.8;
 

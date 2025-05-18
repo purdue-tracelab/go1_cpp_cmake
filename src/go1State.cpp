@@ -115,13 +115,6 @@ void go1State::updateLocomotionPlan() {
 
     // Add early contacts based on sensor measurements
     contacts_old = contacts;
-    // for (int i = 0; i < NUM_LEG; i++) {
-    //     if (est_contacts(i) > thresh && contacts_old[i] == true) {
-    //         contacts[i] = true;
-    //     } else {
-    //         contacts[i] = false;
-    //     }
-    // }
 
     // Update walking plan if walking_mode is requested
     if (walking_mode) {
@@ -710,7 +703,6 @@ void go1State::jointPD(int joint_idx, double jointPos, double jointVel, bool sta
 }
 
 bool go1State::isStartupComplete() const {
-    // std::cout << "squat_prog: " << squat_prog << std::endl;
     return squat_prog >= 1.0;
 }
 

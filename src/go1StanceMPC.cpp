@@ -260,14 +260,8 @@ void go1MPC::buildAndSolveQPForSnapshot(go1StateSnapshot &snap) {
         int swingPhaseShift = DT_MPC/DT_CTRL;
         int tempCurrSwingPhase = tempSwingPhase;
 
-        // Fill in current contacts for first horizon? Unsure if this is correct
-        C_qp.coeffRef(0, 2) = snap.contacts[0] ? 0 : 1;
-        C_qp.coeffRef(0, 5) = snap.contacts[1] ? 0 : 1;
-        C_qp.coeffRef(1, 8) = snap.contacts[2] ? 0 : 1;
-        C_qp.coeffRef(1, 11) = snap.contacts[3] ? 0 : 1;
-
-        // Fill in rest of contacts according to nominal gait schedule
-        for (int i = 1; i < MPC_HORIZON; i++) {
+        // Fill in contacts according to nominal gait schedule
+        for (int i = 0; i < MPC_HORIZON; i++) {
             tempCurrSwingPhase = (tempSwingPhase + i*swingPhaseShift) % SWING_PHASE_MAX;
 
             if (tempCurrSwingPhase <= SWING_PHASE_MAX/2) {

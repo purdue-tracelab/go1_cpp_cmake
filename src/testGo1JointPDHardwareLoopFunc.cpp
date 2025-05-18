@@ -242,5 +242,8 @@ int main(void) {
     loop_keyInput.shutdown();
     loop_recvSend.shutdown();
 
+    endwin();
+    std::cout << "Hardware code cleaned up!" << std::endl;
+
     return 0;
 }
