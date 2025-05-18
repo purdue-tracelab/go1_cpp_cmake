@@ -17,11 +17,6 @@ go1FSM::go1FSM(double state_hz,
         mpc_counter_(0),
         mpc_interval_(static_cast<int>(mpc_hz / state_hz) - 1)
 {
-    mpc_thread_running_ = true;
-    snapshot_ready_ = false;
-    snapshot_grf_populated_ = false;
-    mpc_thread_ = std::thread(&go1FSM::mpcLoop, this);
-
     if (dynamic_cast<mujocoDataReader*>(data_interface_.get())) {
         state_.thresh = MUJOCO_CONTACT_THRESH;
     } else {
@@ -33,13 +28,8 @@ go1FSM::go1FSM(double state_hz,
 go1FSM::~go1FSM() {
     {
         std::lock_guard<std::mutex> lock(mtx_);
-        mpc_thread_running_ = false;
-        snapshot_ready_ = true;
-        cv_.notify_one();
         command_sender_->setMotorsToDamping(true);
     }
-
-    if (mpc_thread_.joinable()) mpc_thread_.join();
 }
 
 void go1FSM::requestStartup() {
@@ -152,40 +142,15 @@ void go1FSM::step() {
             break;
     }
 
-    {
-        std::lock_guard<std::mutex> lock(mtx_);
-        if (snapshot_grf_populated_ && current_ == go1FiniteState::Locomotion) {
-            state_.retrieveGRF(pending_snapshot_.grf_forces);
-            snapshot_grf_populated_ = false;
-            state_.convertForcesToTorques();
+    if (current_ == go1FiniteState::Locomotion) {
+        // Iterate mpc_counter and only solve if at 10th tick (50 Hz)
+        if (mpc_counter_++ >= mpc_interval_ || just_transitioned_to_locomotion_) {
+            mpc_counter_ = 0;
+            mpc_.solveMPCForState(state_);
         }
-    }
-
-    if (current_ == go1FiniteState::Locomotion && (mpc_counter_++ >= mpc_interval_ || just_transitioned_to_locomotion_)) {
-        mpc_counter_ = 0;
-        std::lock_guard<std::mutex> lock(mtx_);
-        pending_snapshot_ = state_.getSnapshot();
-        snapshot_ready_ = true;
-        cv_.notify_one();
+        
+        state_.convertForcesToTorques();
     }
 
     command_sender_->setCommand(state_);
-
-}
-
-void go1FSM::mpcLoop() {
-    std::unique_lock<std::mutex> lock(mtx_);
-    while (mpc_thread_running_) {
-        cv_.wait(lock, [this]() { return snapshot_ready_; });
-        if (!mpc_thread_running_) break;
-
-        snapshot_ready_ = false;
-        snapshot_grf_populated_ = false;
-        lock.unlock();
-
-        mpc_.solveMPCFromSnapshot(pending_snapshot_);
-
-        lock.lock();
-        snapshot_grf_populated_ = true;
-    }
 }

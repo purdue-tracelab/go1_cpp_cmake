@@ -148,6 +148,8 @@ void go1State::updateLocomotionPlan() {
             contacts[3] = true;  // RL stance
 
             foot_forces_swing.setZero();
+            joint_pos_d.setZero();
+            joint_vel_d.setZero();
             joint_torques_swing.setZero();
             joint_torques.setZero();
             foot_pos_liftoff.setZero();
@@ -165,6 +167,8 @@ void go1State::updateLocomotionPlan() {
             contacts[3] = false;  // RL swing
 
             foot_forces_swing.setZero();
+            joint_pos_d.setZero();
+            joint_vel_d.setZero();
             joint_torques_swing.setZero();
             joint_torques.setZero();
             foot_pos_liftoff.setZero();
@@ -232,16 +236,9 @@ void go1State::convertForcesToTorques() {
 
     // Convert swing leg forces to torques if using Cartesian space PD
     if (SWING_PD_SELECT == 0) {
-        Eigen::Matrix3d rootRotMat;
-        Eigen::Matrix3d rootRotMatT;
-
-        if (USE_EST_FOR_CONTROL) {
-            Eigen::Matrix3d rootRotMat = rotZ(root_rpy_est(2))*rotY(root_rpy_est(1))*rotX(root_rpy_est(0));
-            Eigen::Matrix3d rootRotMatT = rootRotMat.transpose();
-        } else {
-            Eigen::Matrix3d rootRotMat = rotZ(root_rpy(2))*rotY(root_rpy(1))*rotX(root_rpy(0));
-            Eigen::Matrix3d rootRotMatT = rootRotMat.transpose();
-        }
+        Eigen::Vector3d root_rpy_ctrl = USE_EST_FOR_CONTROL ? root_rpy_est : root_rpy;
+        Eigen::Matrix3d rootRotMat = rotZ(root_rpy_ctrl(2))*rotY(root_rpy_ctrl(1))*rotX(root_rpy_ctrl(0));
+        Eigen::Matrix3d rootRotMatT = rootRotMat.transpose();
 
         for (int i = 0; i < NUM_LEG; i++) {
             Eigen::Matrix3d contactJacobian_i = contactJacobian.block<3, 3>(i*3, 6 + i*3).transpose();
@@ -665,18 +662,18 @@ void go1State::jointPD(int joint_idx, double jointPos, double jointVel, bool sta
     double jointInterp;
     double jointTorque;
 
+    joint_vel_d(joint_idx, 0) = 0.0;
+
     switch(joint_idx % 3) {
         case 0:
             if (startup) {
                 jointInterp = (1.0 - squat_prog) * joint_pos_init(joint_idx);
                 joint_pos_d(joint_idx, 0) = jointInterp;
-                joint_vel_d(joint_idx, 0) = 0.0;
                 joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(SQUAT_JOINT_KP * (jointInterp - jointPos) + SQUAT_JOINT_KD * (0 - jointVel), -TORQUE_MAX_HIP, TORQUE_MAX_HIP);
                 return;
 
             } else {
                 joint_pos_d(joint_idx, 0) = 0.0;
-                joint_vel_d(joint_idx, 0) = 0.0;
                 joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(SQUAT_JOINT_KP * (0.0 - jointPos) + SQUAT_JOINT_KD * (0.0 - jointVel), -TORQUE_MAX_HIP, TORQUE_MAX_HIP);
                 return;
             }
@@ -685,14 +682,12 @@ void go1State::jointPD(int joint_idx, double jointPos, double jointVel, bool sta
             if (startup) {
                 jointInterp = (1.0 - squat_prog) * joint_pos_init(joint_idx) + squat_prog * THIGH_RAD_STAND;
                 joint_pos_d(joint_idx, 0) = jointInterp;
-                joint_vel_d(joint_idx, 0) = 0.0;
                 joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(SQUAT_JOINT_KP * (jointInterp - jointPos) + SQUAT_JOINT_KD * (0 - jointVel), -TORQUE_MAX_THIGH, TORQUE_MAX_THIGH);
                 return;
 
             } else {
                 jointInterp = (1.0 - squat_prog) * joint_pos_init(joint_idx) + squat_prog * THIGH_RAD_STAND;
                 joint_pos_d(joint_idx, 0) = jointInterp;
-                joint_vel_d(joint_idx, 0) = 0.0;
                 joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(SQUAT_JOINT_KP * (jointInterp - jointPos) + SQUAT_JOINT_KD * (0.0 - jointVel), -TORQUE_MAX_THIGH, TORQUE_MAX_THIGH);
                 return;
             }
@@ -701,14 +696,12 @@ void go1State::jointPD(int joint_idx, double jointPos, double jointVel, bool sta
             if (startup) {
                 jointInterp = (1.0 - squat_prog) * joint_pos_init(joint_idx) + squat_prog * CALF_RAD_STAND;
                 joint_pos_d(joint_idx, 0) = jointInterp;
-                joint_vel_d(joint_idx, 0) = 0.0;
                 joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(SQUAT_JOINT_KP * (jointInterp - jointPos) + SQUAT_JOINT_KD * (0 - jointVel), -TORQUE_MAX_CALF, TORQUE_MAX_CALF);
                 return;
 
             } else {
                 jointInterp = (1.0 - squat_prog) * joint_pos_init(joint_idx) + squat_prog * CALF_RAD_STAND;
                 joint_pos_d(joint_idx, 0) = jointInterp;
-                joint_vel_d(joint_idx, 0) = 0.0;
                 joint_torques(joint_idx % 3, joint_idx / 3) = std::clamp(SQUAT_JOINT_KP * (jointInterp - jointPos) + SQUAT_JOINT_KD * (0.0 - jointVel), -TORQUE_MAX_CALF, TORQUE_MAX_CALF);
                 return;
             }

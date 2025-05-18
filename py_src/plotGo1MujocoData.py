@@ -636,8 +636,8 @@ def plot_state_data(csv_file, absolute=False):
     plt.close(root_vel_plot)
     # plt.close(joint_pos_plot)
     plt.close(foot_pos_plot)
-    plt.close(foot_force_plot)
-    plt.close(joint_torque_plot)
+    # plt.close(foot_force_plot)
+    # plt.close(joint_torque_plot)
     plt.close(foot_contact_plot)
     plt.show()
 

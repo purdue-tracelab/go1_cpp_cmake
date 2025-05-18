@@ -52,17 +52,7 @@ class go1FSM {
         bool want_walk_{false};
         bool want_shutdown_{false};
         bool just_transitioned_to_locomotion_{false};
-
-        // Threading for MPC
-        std::thread mpc_thread_;
         mutable std::mutex mtx_;
-        std::condition_variable cv_;
-        std::atomic<bool> mpc_thread_running_{true};
-        bool snapshot_ready_{false};
-        go1StateSnapshot pending_snapshot_;
-        bool snapshot_grf_populated_{false};
-
-        void mpcLoop();
 };
 
 #endif // GO1_FSM_H
