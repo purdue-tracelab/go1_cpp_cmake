@@ -17,6 +17,7 @@ using namespace UNITREE_LEGGED_SDK;
 // Global objects for hardware interfacing
 LowState lowState = {0};
 UDP udp(LOWLEVEL, 8090, "192.168.123.10", 8007);
+// Safety safe(LeggedType::Go1); // used for manual joint PD instead of Go1's MCU joint PD
 LowCmd lowCmd = {0};
 go1State tester_state;
 auto data_src = std::make_unique<hardwareDataReader>(lowState, udp);
@@ -194,7 +195,26 @@ void runStartupPDHardware() {
     if (startup) tester_state.computeStartupPD();
     else tester_state.computeShutdownPD();
 
+    // hardwareCommandSender method
     command_sender->setCommand(tester_state);
+
+    // // manual method
+    // for (int i = 0; i < 3*NUM_LEG; i++) {
+    //     lowCmd.motorCmd[i].mode = 0x0A;
+    //     lowCmd.motorCmd[i].q = UNITREE_LEGGED_SDK::PosStopF;
+    //     lowCmd.motorCmd[i].dq = UNITREE_LEGGED_SDK::VelStopF;
+    //     lowCmd.motorCmd[i].Kp = 0.0;
+    //     lowCmd.motorCmd[i].Kd = 0.0;
+    //     lowCmd.motorCmd[i].tau = tester_state.joint_torques(i % 3, i / 3);
+    // }
+
+    // safe.PositionLimit(lowCmd);
+    // // int res1 = safe.PowerProtect(lowCmd, lowState, 4);
+    // // if (res1 < 0) {
+    // //     exit(-1);
+    // // }
+
+    // udp.SetSend(lowCmd);
 }
 
 void receiveAndSend() {
@@ -210,6 +230,9 @@ void recordLowLevel() {
 }
 
 int main(void) {
+    // // init for manual method
+    // udp.InitCmdData(lowCmd);
+
     writeCSVHeader(hardware_datastream);
     data_log.logLine(hardware_datastream.str());
 

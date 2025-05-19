@@ -15,6 +15,7 @@ using namespace UNITREE_LEGGED_SDK;
 
 // Global variables for hardware interfacing
 LowState lowState = {0};
+LowCmd lowCmd = {0};
 UDP udp(LOWLEVEL, 8090, "192.168.123.10", 8007);
 go1State tester_state;
 auto data_src = std::make_unique<hardwareDataReader>(lowState, udp);
@@ -154,21 +155,36 @@ void writeCSVHeader(std::ostream &os) {
 ///////////////////////////
 
 void extractLowLevel() {
-  udp.GetRecv(lowState);
-  printf("FR_0: %f, FR_1: %f, FR_2: %f\n", lowState.motorState[FR_0].q, lowState.motorState[FR_1].q, lowState.motorState[FR_2].q);
-  printf("FL_0: %f, FL_1: %f, FL_2: %f\n", lowState.motorState[FL_0].q, lowState.motorState[FL_1].q, lowState.motorState[FL_2].q);
-  printf("RR_0: %f, RR_1: %f, RR_2: %f\n", lowState.motorState[RR_0].q, lowState.motorState[RR_1].q, lowState.motorState[RR_2].q);
-  printf("RL_0: %f, RL_1: %f, RL_2: %f\n", lowState.motorState[RL_0].q, lowState.motorState[RL_1].q, lowState.motorState[RL_2].q);
-  printf("ACC_X: %f, ACC_Y: %f, ACC_Z: %f\n", lowState.imu.accelerometer[0], lowState.imu.accelerometer[1], lowState.imu.accelerometer[2]);
-  printf("GYR_X: %f, GRY_Y: %f, GYR_Z: %f\n", lowState.imu.gyroscope[0], lowState.imu.gyroscope[1], lowState.imu.gyroscope[2]);
-  printf("FR_atm: %u, FL_atm: %u, RR_atm: %u, RL_atm: %u\n", lowState.footForce[0], lowState.footForce[1], lowState.footForce[2], lowState.footForce[3]);
-  
-  data_src->pullSensorData(tester_state);
+    udp.GetRecv(lowState);
+    // Generic LowState information
+    printf("FR_0: %f, FR_1: %f, FR_2: %f\n", lowState.motorState[FR_0].q, lowState.motorState[FR_1].q, lowState.motorState[FR_2].q);
+    printf("FL_0: %f, FL_1: %f, FL_2: %f\n", lowState.motorState[FL_0].q, lowState.motorState[FL_1].q, lowState.motorState[FL_2].q);
+    printf("RR_0: %f, RR_1: %f, RR_2: %f\n", lowState.motorState[RR_0].q, lowState.motorState[RR_1].q, lowState.motorState[RR_2].q);
+    printf("RL_0: %f, RL_1: %f, RL_2: %f\n", lowState.motorState[RL_0].q, lowState.motorState[RL_1].q, lowState.motorState[RL_2].q);
+    printf("ACC_X: %f, ACC_Y: %f, ACC_Z: %f\n", lowState.imu.accelerometer[0], lowState.imu.accelerometer[1], lowState.imu.accelerometer[2]);
+    printf("GYR_X: %f, GRY_Y: %f, GYR_Z: %f\n", lowState.imu.gyroscope[0], lowState.imu.gyroscope[1], lowState.imu.gyroscope[2]);
+    printf("FR_atm: %u, FL_atm: %u, RR_atm: %u, RL_atm: %u\n", lowState.footForce[0], lowState.footForce[1], lowState.footForce[2], lowState.footForce[3]);
 
-  std::cout << "###############################################" << std::endl
+    // UDP information
+    printf("UDP loop ct.: %llu\n", udp.udpState.TotalCount);
+    printf("UDP send ct.: %llu\n", udp.udpState.SendCount);
+    printf("UDP send err. ct.: %llu\n", udp.udpState.SendError);
+    printf("UDP recv ct.: %llu\n", udp.udpState.RecvCount);
+    printf("UDP recv err. ct.: %llu\n", udp.udpState.RecvCRCError);
+    printf("UDP recv lost ct.: %llu\n", udp.udpState.RecvLoseError);
+    printf("UDP flag err. ct.: %llu\n", udp.udpState.FlagError);
+
+    data_src->pullSensorData(tester_state);
+
+    std::cout << "###############################################" << std::endl
             << "Output break afer one timestamp for all motors." << std::endl
             << "###############################################" << std::endl;
 
+}
+
+void receiveAndSend() {
+    udp.Recv();
+    udp.Send();
 }
 
 void recordLowLevel() {
@@ -179,27 +195,42 @@ void recordLowLevel() {
 }
 
 int main(void) {
-  writeCSVHeader(hardware_datastream);
-  data_log.logLine(hardware_datastream.str());
+    writeCSVHeader(hardware_datastream);
+    data_log.logLine(hardware_datastream.str());
 
-  std::cout << "Communication level is set to LOW-level." << std::endl
+    std::cout << "Communication level is set to LOW-level." << std::endl
             << "WARNING: Make sure the robot is hung up." << std::endl
             << "NOTE: The robot also needs to be set to LOW-level mode, otherwise it will make strange noises and this example will not run successfully! " << std::endl
             << "Press Enter to continue..." << std::endl;
-  std::cin.ignore();
+    std::cin.ignore();
 
-  LoopFunc loop_extract("extraction_loop", DT_CTRL, boost::bind(&extractLowLevel));
-  LoopFunc loop_udpRecv("udp_recv", DT_CTRL, 3, boost::bind(&UDP::Recv, &udp));
-  LoopFunc loop_record("recording_loop:", DT_CTRL, boost::bind(&recordLowLevel));
+    LoopFunc loop_extract("extraction_loop", DT_CTRL, boost::bind(&extractLowLevel));
+    LoopFunc loop_recvSend("udp_recvSend", DT_CTRL, 3, boost::bind(&receiveAndSend));
+    LoopFunc loop_record("recording_loop:", DT_CTRL, boost::bind(&recordLowLevel));
 
-  loop_udpRecv.start();
-  loop_extract.start();
-  loop_record.start();
+    udp.InitCmdData(lowCmd); // send in dummy command
+    loop_recvSend.start();
 
-  while (1)
-  {
+    // Wait to collect until the data stops getting lost
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    uint64_t lostCount = 0;
+
+    while (true) {
+        if (udp.udpState.RecvLoseError > lostCount) {
+            lostCount = udp.udpState.RecvLoseError;
+            continue;
+        } else {
+            break;
+        }
+    }    
+
+    loop_extract.start();
+    loop_record.start();
+
+    while (1)
+    {
     sleep(10);
-  };
+    };
 
-  return 0;
+    return 0;
 }

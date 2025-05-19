@@ -197,6 +197,7 @@ struct hardwareCommandSender : lowLevelCommandSender {
         void setCommand(const go1State &state) override {
             for (int i = 0; i < 3*NUM_LEG; i++) {
                 int leg_idx = i / 3;
+                extLowCmd.motorCmd[i].mode = 0x0A;
 
                 if (damping_mode) {
                     extLowCmd.motorCmd[i].q = UNITREE_LEGGED_SDK::PosStopF;
