@@ -200,34 +200,34 @@ struct hardwareCommandSender : lowLevelCommandSender {
                 extLowCmd.motorCmd[i].mode = 0x0A;
 
                 if (damping_mode) {
-                    extLowCmd.motorCmd[i].q = UNITREE_LEGGED_SDK::PosStopF;
-                    extLowCmd.motorCmd[i].dq = 0.0;
-                    extLowCmd.motorCmd[i].Kp = 0.0;
-                    extLowCmd.motorCmd[i].Kd = SQUAT_JOINT_KD;
-                    extLowCmd.motorCmd[i].tau = 0.0;
+                    extLowCmd.motorCmd[i].q = 0.0f;
+                    extLowCmd.motorCmd[i].dq = 0.0f;
+                    extLowCmd.motorCmd[i].Kp = 0.0f;
+                    extLowCmd.motorCmd[i].Kd = static_cast<float>(SQUAT_JOINT_KD);
+                    extLowCmd.motorCmd[i].tau = 0.0f;
 
                 } else {
                     if (state.squat_flag) { // startup or shutdown mode
-                        extLowCmd.motorCmd[i].q = state.joint_pos_d(i, 0);
-                        extLowCmd.motorCmd[i].dq = state.joint_vel_d(i, 0);
-                        extLowCmd.motorCmd[i].Kp = SQUAT_JOINT_KP;
-                        extLowCmd.motorCmd[i].Kd = SQUAT_JOINT_KD;
-                        extLowCmd.motorCmd[i].tau = 0.0;
+                        extLowCmd.motorCmd[i].q = static_cast<float>(state.joint_pos_d(i, 0));
+                        extLowCmd.motorCmd[i].dq = static_cast<float>(state.joint_vel_d(i, 0));
+                        extLowCmd.motorCmd[i].Kp = static_cast<float>(SQUAT_JOINT_KP);
+                        extLowCmd.motorCmd[i].Kd = static_cast<float>(SQUAT_JOINT_KD);
+                        extLowCmd.motorCmd[i].tau = 0.0f;
 
                     } else {
                         if (state.contacts[leg_idx] == true) { // stance leg
-                            extLowCmd.motorCmd[i].q = UNITREE_LEGGED_SDK::PosStopF;
-                            extLowCmd.motorCmd[i].dq = UNITREE_LEGGED_SDK::VelStopF;
-                            extLowCmd.motorCmd[i].Kp = 0.0;
-                            extLowCmd.motorCmd[i].Kd = 0.0;
-                            extLowCmd.motorCmd[i].tau = state.joint_torques(i % 3, i / 3);
+                            extLowCmd.motorCmd[i].q = static_cast<float>(extLowCmd.motorCmd[i].q);
+                            extLowCmd.motorCmd[i].dq = static_cast<float>(extLowCmd.motorCmd[i].dq);
+                            extLowCmd.motorCmd[i].Kp = 0.0f;
+                            extLowCmd.motorCmd[i].Kd = 0.0f;
+                            extLowCmd.motorCmd[i].tau = static_cast<float>(state.joint_torques(i % 3, i / 3));
 
                         } else { // swing leg
                             extLowCmd.motorCmd[i].q = state.joint_pos_d(i, 0);
                             extLowCmd.motorCmd[i].dq = state.joint_vel_d(i, 0);
                             extLowCmd.motorCmd[i].Kp = SWING_KP_JOINT;
                             extLowCmd.motorCmd[i].Kd = SWING_KD_JOINT;
-                            extLowCmd.motorCmd[i].tau = 0.0;
+                            extLowCmd.motorCmd[i].tau = 0.0f;
                         }
                     }
                 }

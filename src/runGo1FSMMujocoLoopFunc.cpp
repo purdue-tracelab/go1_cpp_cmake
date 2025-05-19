@@ -512,10 +512,6 @@ int main(void) {
     };
 
     // Cleanup
-    loop_record.shutdown();
-    loop_simulate.shutdown();
-    loop_keyInput.shutdown();
-
     endwin();
 
     glfwDestroyWindow(window);

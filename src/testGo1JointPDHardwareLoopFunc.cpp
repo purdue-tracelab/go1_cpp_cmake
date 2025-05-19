@@ -259,12 +259,6 @@ int main(void) {
         sleep(10);
     };
 
-    // Cleanup
-    loop_record.shutdown();
-    loop_stand.shutdown();
-    loop_keyInput.shutdown();
-    loop_recvSend.shutdown();
-
     endwin();
     std::cout << "Hardware code cleaned up!" << std::endl;
 
