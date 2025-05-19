@@ -109,7 +109,7 @@ struct hardwareDataReader : lowLevelDataReader {
 
         void pullSensorData(go1State &state) override {
             // pull sensor data from UNITREE_LEGGED_SDK::LowState
-            extUDP.GetRecv(extLowState);
+            // extUDP.GetRecv(extLowState); // comment out for fully ordered loop
             state.root_lin_acc_meas << extLowState.imu.accelerometer[0], extLowState.imu.accelerometer[1], extLowState.imu.accelerometer[2];
             state.root_ang_vel_meas << extLowState.imu.gyroscope[0], extLowState.imu.gyroscope[1], extLowState.imu.gyroscope[2];
             state.est_contacts << extLowState.footForce[0], extLowState.footForce[1], extLowState.footForce[2], extLowState.footForce[3];
@@ -200,34 +200,34 @@ struct hardwareCommandSender : lowLevelCommandSender {
                 extLowCmd.motorCmd[i].mode = 0x0A;
 
                 if (damping_mode) {
-                    extLowCmd.motorCmd[i].q = 0.0f;
-                    extLowCmd.motorCmd[i].dq = 0.0f;
-                    extLowCmd.motorCmd[i].Kp = 0.0f;
-                    extLowCmd.motorCmd[i].Kd = static_cast<float>(SQUAT_JOINT_KD);
-                    extLowCmd.motorCmd[i].tau = 0.0f;
+                    extLowCmd.motorCmd[i].q = 0.0;
+                    extLowCmd.motorCmd[i].dq = 0.0;
+                    extLowCmd.motorCmd[i].Kp = 0.0;
+                    extLowCmd.motorCmd[i].Kd = SQUAT_JOINT_KD;
+                    extLowCmd.motorCmd[i].tau = 0.0;
 
                 } else {
                     if (state.squat_flag) { // startup or shutdown mode
-                        extLowCmd.motorCmd[i].q = static_cast<float>(state.joint_pos_d(i, 0));
-                        extLowCmd.motorCmd[i].dq = static_cast<float>(state.joint_vel_d(i, 0));
-                        extLowCmd.motorCmd[i].Kp = static_cast<float>(SQUAT_JOINT_KP);
-                        extLowCmd.motorCmd[i].Kd = static_cast<float>(SQUAT_JOINT_KD);
-                        extLowCmd.motorCmd[i].tau = 0.0f;
+                        extLowCmd.motorCmd[i].q = state.joint_pos_d(i, 0);
+                        extLowCmd.motorCmd[i].dq = state.joint_vel_d(i, 0);
+                        extLowCmd.motorCmd[i].Kp = SQUAT_JOINT_KP;
+                        extLowCmd.motorCmd[i].Kd = SQUAT_JOINT_KD;
+                        extLowCmd.motorCmd[i].tau = 0.0;
 
                     } else {
                         if (state.contacts[leg_idx] == true) { // stance leg
-                            extLowCmd.motorCmd[i].q = static_cast<float>(extLowCmd.motorCmd[i].q);
-                            extLowCmd.motorCmd[i].dq = static_cast<float>(extLowCmd.motorCmd[i].dq);
-                            extLowCmd.motorCmd[i].Kp = 0.0f;
-                            extLowCmd.motorCmd[i].Kd = 0.0f;
-                            extLowCmd.motorCmd[i].tau = static_cast<float>(state.joint_torques(i % 3, i / 3));
+                            extLowCmd.motorCmd[i].q = extLowCmd.motorCmd[i].q;
+                            extLowCmd.motorCmd[i].dq = extLowCmd.motorCmd[i].dq;
+                            extLowCmd.motorCmd[i].Kp = 0.0;
+                            extLowCmd.motorCmd[i].Kd = 0.0;
+                            extLowCmd.motorCmd[i].tau = state.joint_torques(i % 3, i / 3);
 
                         } else { // swing leg
                             extLowCmd.motorCmd[i].q = state.joint_pos_d(i, 0);
                             extLowCmd.motorCmd[i].dq = state.joint_vel_d(i, 0);
                             extLowCmd.motorCmd[i].Kp = SWING_KP_JOINT;
                             extLowCmd.motorCmd[i].Kd = SWING_KD_JOINT;
-                            extLowCmd.motorCmd[i].tau = 0.0f;
+                            extLowCmd.motorCmd[i].tau = 0.0;
                         }
                     }
                 }
@@ -241,7 +241,7 @@ struct hardwareCommandSender : lowLevelCommandSender {
                 }
             }
 
-            extUDP.SetSend(extLowCmd);
+            // extUDP.SetSend(extLowCmd); // comment out for the fully ordered loop
         }
 
     private:

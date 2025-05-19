@@ -5,11 +5,15 @@
 #include "unitree_legged_sdk/unitree_legged_sdk.h"
 #include <math.h>
 #include <iostream>
+#include <fstream>
+#include <sstream>
+#include <filesystem>
+#include <ncurses.h>
 #include <stdio.h>
 #include <stdint.h>
-#include <ncurses.h>
 
-#include "go1_cpp_cmake/go1DataInterface.h"
+#include "go1_cpp_cmake/go1FSM.h"
+#include "go1_cpp_cmake/go1StateEstimator.h"
 
 using namespace std;
 using namespace UNITREE_LEGGED_SDK;
@@ -17,20 +21,16 @@ using namespace UNITREE_LEGGED_SDK;
 // Global objects for hardware interfacing
 LowState lowState = {0};
 UDP udp(LOWLEVEL, 8090, "192.168.123.10", 8007);
-// Safety safe(LeggedType::Go1); // used for manual joint PD instead of Go1's MCU joint PD
 LowCmd lowCmd = {0};
-go1State tester_state;
-auto data_src = std::make_unique<hardwareDataReader>(lowState, udp);
-auto command_sender = std::make_unique<hardwareCommandSender>(lowState, udp, lowCmd);
-
-// Data logging functions
-std::ostringstream hardware_datastream;
-AsyncLogger data_log("../data/go1_hardware_data.csv", hardware_datastream.str());
-std::ostringstream hardware_data_row;
 
 ///////////////////////////////
 // Data collection functions //
 ///////////////////////////////
+
+// Data logging objects
+ostringstream hardware_datastream;
+SyncLogger data_log("../data/go1_hardware_data.csv", hardware_datastream.str());
+ostringstream hardware_data_row;
 
 // Function to write Eigen::Vector in CSV format
 template <typename VectorType>
@@ -126,8 +126,7 @@ void writeCSVHeader(std::ostream &os) {
             "root_lin_vel_est_x,root_lin_vel_est_y,root_lin_vel_est_z,root_lin_vel_d_x,root_lin_vel_d_y,root_lin_vel_d_z,"
             "root_lin_acc_est_x,root_lin_acc_est_y,root_lin_acc_est_z,root_lin_acc_meas_x,root_lin_acc_meas_y,root_lin_acc_meas_z,"
             "root_rpy_est_x,root_rpy_est_y,root_rpy_est_z,root_rpy_d_x,root_rpy_d_y,root_rpy_d_z,"
-            "root_ang_vel_est_x,root_ang_vel_est_y,root_ang_vel_est_z,root_ang_vel_meas_x,root_ang_vel_meas_y,root_ang_vel_meas_z,root_ang_vel_d_x,root_ang_vel_d_y,root_ang_vel_d_z,"
-            "FR_0,FR_1,FR_2,FL_0,FL_1,FL_2,RR_0,RR_1,RR_2,RL_0,RL_1,RL_2,"
+            "root_ang_vel_est_x,root_ang_vel_est_y,root_ang_vel_est_z,root_ang_vel_meas_x,root_ang_vel_meas_y,root_ang_vel_meas_z,root_ang_vel_d_x,root_ang_vel_d_y,root_ang_vel_d_z,"            "FR_0,FR_1,FR_2,FL_0,FL_1,FL_2,RR_0,RR_1,RR_2,RL_0,RL_1,RL_2,"
             "FR_0_des,FR_1_des,FR_2_des,FL_0_des,FL_1_des,FL_2_des,RR_0_des,RR_1_des,RR_2_des,RL_0_des,RL_1_des,RL_2_des,"
             "FR_0_dot,FR_1_dot,FR_2_dot,FL_0_dot,FL_1_dot,FL_2_dot,RR_0_dot,RR_1_dot,RR_2_dot,RL_0_dot,RL_1_dot,RL_2_dot,"
             "FR_0_dot_des,FR_1_dot_des,FR_2_dot_des,FL_0_dot_des,FL_1_dot_des,FL_2_dot_des,RR_0_dot_des,RR_1_dot_des,RR_2_dot_des,RL_0_dot_des,RL_1_dot_des,RL_2_dot_des,"
@@ -156,11 +155,11 @@ void writeCSVHeader(std::ostream &os) {
 // Main control functions //
 ////////////////////////////
 
-// Keyboard control variable
+// External controller variables
+bool running = false;
 bool keyboardInit = false;
-bool startup = true;
 
-void keyboardControl() {
+void keyboardControl(go1FSM &fsm) {
 /*
     Keyboard terminal commands for sending desired velocities to
     the physical Go1 robot. Can't continuously rotate, and the
@@ -175,46 +174,128 @@ void keyboardControl() {
         keyboardInit = true;
     }
 
-    int ch = getch();
+    static bool hold_forward = false;
+    static bool hold_backward = false;
+    static bool hold_left = false;
+    static bool hold_right = false;
+    static bool hold_yawL = false;
+    static bool hold_yawR = false;
 
-    if (ch != ERR) {
-        switch (ch) {
+    int ch;
+    while ((ch = getch()) != ERR) {
+        switch(ch) {
+
+            ///////////////////////
+            // Movement commands //
+            ///////////////////////
+
+            case 'w': 
+                if (fsm.getState().walking_mode)
+                    hold_forward = true; 
+                    break;
+
+            case 's': 
+                if (fsm.getState().walking_mode)
+                    hold_backward = true; 
+                    break;
+
+            case 'a': 
+                if (fsm.getState().walking_mode)
+                    hold_left = true; 
+                    break;
+
+            case 'd': 
+                if (fsm.getState().walking_mode)
+                    hold_right = true; 
+                    break;
+
+            case 'q': 
+                if (fsm.getState().walking_mode)
+                    hold_yawL = true; 
+                    break;
+
+            case 'e': 
+                if (fsm.getState().walking_mode)
+                    hold_yawR = true; 
+                    break;
+
+            case 'x': // stop linear movement
+                hold_forward = hold_backward = false;
+                hold_left = hold_right = false;
+                break;
+
+            case 'z': // stop yaw movement
+                hold_yawL = hold_yawR = false;
+                break;
+
+            ///////////////////////////////////
+            // Finite state machine commands //
+            ///////////////////////////////////
+
             case 'p':
-                startup = !startup;
+                fsm.requestWalk(true);
+                hold_forward = hold_backward = false;
+                hold_left = hold_right = false;
+                hold_yawL = hold_yawR = false;
+                break;
+
+            case 'o':
+                fsm.requestWalk(false);
+                hold_forward = hold_backward = false;
+                hold_left = hold_right = false;
+                hold_yawL = hold_yawR = false;
+                break;
+            
+            case 'i':
+                fsm.requestShutdown();
+                hold_forward = hold_backward = false;
+                hold_left = hold_right = false;
+                hold_yawL = hold_yawR = false;
+                break;
+
+            case 'u':
+                fsm.requestStartup();
+                hold_forward = hold_backward = false;
+                hold_left = hold_right = false;
+                hold_yawL = hold_yawR = false;
+                break;
+
+            case ' ':
+                running = false;
+                mvprintw(0, 0, "Killing controller...");
+                refresh();
+                endwin();
+                std::cout << "Controller killed, exiting..." << std::endl;
+                break;
+
+            default:
                 break;
         }
     }
-    move(0, 0);
-    printw("squat: %i, squat_prog: %f\n", startup, tester_state.squat_prog);
+
+    Eigen::Vector3d v_cmd = Eigen::Vector3d::Zero();
+    double yaw_cmd = 0;
+
+    if (hold_forward) v_cmd.x() += 0.2;
+    if (hold_backward) v_cmd.x() -= 0.2;
+    if (hold_left) v_cmd.y() += 0.2;
+    if (hold_right) v_cmd.y() -= 0.2;
+    if (hold_yawL) yaw_cmd += 1.0;
+    if (hold_yawR) yaw_cmd -= 1.0;
+
+    double yaw = fsm.getState().root_rpy_est(2);
+    Eigen::Matrix3d rootRotZ = rotZ(yaw);
+    Eigen::Vector3d v_world = rootRotZ * v_cmd;
+
+    fsm.setDesiredVel(v_world, yaw_cmd);
+    fsm.setDesiredPos();
+
+    // Debug output
+    mvprintw(0, 0,
+        "v: [%.2f, %.2f], yaw_rate: %.2f, FSM state: %s",
+        v_cmd.x(), v_cmd.y(), yaw_cmd, fsm.go1FiniteState2Str()
+        );
     refresh();
-}
-
-void runStartupPDHardware() {
-    data_src->pullSensorData(tester_state);
-    
-    if (startup) tester_state.computeStartupPD();
-    else tester_state.computeShutdownPD();
-
-    // hardwareCommandSender method
-    command_sender->setCommand(tester_state);
-
-    // // manual method
-    // for (int i = 0; i < 3*NUM_LEG; i++) {
-    //     lowCmd.motorCmd[i].mode = 0x0A;
-    //     lowCmd.motorCmd[i].q = UNITREE_LEGGED_SDK::PosStopF;
-    //     lowCmd.motorCmd[i].dq = UNITREE_LEGGED_SDK::VelStopF;
-    //     lowCmd.motorCmd[i].Kp = 0.0;
-    //     lowCmd.motorCmd[i].Kd = 0.0;
-    //     lowCmd.motorCmd[i].tau = tester_state.joint_torques(i % 3, i / 3);
-    // }
-
-    // safe.PositionLimit(lowCmd);
-    // // int res1 = safe.PowerProtect(lowCmd, lowState, 4);
-    // // if (res1 < 0) {
-    // //     exit(-1);
-    // // }
-
-    // udp.SetSend(lowCmd);
 }
 
 void receiveAndSend() {
@@ -222,42 +303,58 @@ void receiveAndSend() {
     udp.Send();
 }
 
-void recordLowLevel() {
+void recordLowLevel(const go1State &state) {
     hardware_data_row.str("");
     hardware_data_row.clear();
-    storeData(tester_state, hardware_data_row);
+    storeData(state, hardware_data_row);
     data_log.logLine(hardware_data_row.str());
 }
 
 int main(void) {
-    // // init for manual method
-    // udp.InitCmdData(lowCmd);
-
+    // Prep data collection
     writeCSVHeader(hardware_datastream);
     data_log.logLine(hardware_datastream.str());
 
-    std::cout << "Communication level is set to LOW-level." << std::endl
-            << "WARNING: Make sure the robot is hung up." << std::endl
-            << "NOTE: The robot also needs to be set to LOW-level mode, otherwise it will make strange noises and this example will not run successfully! " << std::endl
-            << "Press Enter to continue..." << std::endl;
-    std::cin.ignore();
+    // Initialize data interface + estimator
+    auto data_src = make_unique<hardwareDataReader>(lowState, udp);
+    auto command_sender = make_unique<hardwareCommandSender>(lowState, udp, lowCmd);
+    auto estimator = makeEstimator();
 
-    LoopFunc loop_stand("squat_loop", DT_CTRL, boost::bind(&runStartupPDHardware));
-    LoopFunc loop_keyInput("key_input_loop", DT_CTRL, 4, boost::bind(&keyboardControl));
+    // Instantiate FSM at DT_CTRL for overall loop rate, DT_MPC_CTRL for MPC loop rate
+    go1FSM fsm(DT_CTRL, DT_MPC_CTRL, move(data_src), move(estimator), move(command_sender));
+
+    std::cout << "Hardware control is initialized..." << std::endl;
+    running = true;
+
+    // Main loop: construct LoopFunc objects and run until killed by keyboard input [spacebar]
+    LoopFunc loop_keyInput("key_input_loop", DT_CTRL, 4, boost::bind(&keyboardControl, boost::ref(fsm)));
+    LoopFunc loop_record("recording_loop", DT_CTRL, 5, boost::bind(&recordLowLevel, boost::ref(fsm.getState())));
+    LoopFunc loop_ctrl("fsm_ctrl_loop", DT_CTRL, 6, boost::bind(&go1FSM::step, &fsm));
+    
+    // construct and start UDP send and receive loop first to collect first valid packages
     LoopFunc loop_recvSend("udp_recvSend", DT_CTRL, 3, boost::bind(&receiveAndSend));
-    LoopFunc loop_record("recording_loop", DT_CTRL, boost::bind(&recordLowLevel));
-
     loop_recvSend.start();
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(10)); // helps with initial lag of loading data into go1State properly
+    std::this_thread::sleep_for(std::chrono::milliseconds(10)); // helps with initial lag
+
+    fsm.collectInitialState();
+    fsm.step();
+    storeData(fsm.getState(), hardware_data_row);
+    data_log.logLine(hardware_data_row.str());
     
+    loop_ctrl.start();
     loop_keyInput.start();
-    loop_stand.start();
     loop_record.start();
 
-    while (1) {
-        sleep(10);
+    while (running) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     };
+
+    // Cleanup
+    loop_record.shutdown();
+    loop_recvSend.shutdown();
+    loop_ctrl.shutdown();
+    loop_keyInput.shutdown();
 
     endwin();
     std::cout << "Hardware code cleaned up!" << std::endl;

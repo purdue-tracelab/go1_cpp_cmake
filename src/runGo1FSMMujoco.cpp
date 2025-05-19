@@ -7,7 +7,6 @@
 #include <filesystem>
 #include <ncurses.h>
 #include <thread>
-#include <mutex>
 #include <atomic>
 #include <cstring>
 
@@ -305,7 +304,7 @@ int main() {
     std::ostringstream mujoco_datastream;
     writeCSVHeader(mujoco_datastream);
 
-    AsyncLogger data_log("../data/go1_mujoco_data.csv", mujoco_datastream.str());
+    SyncLogger data_log("../data/go1_mujoco_data.csv", mujoco_datastream.str());
     std::ostringstream mujoco_data_row;
 
     auto data_src = std::make_unique<mujocoDataReader>(

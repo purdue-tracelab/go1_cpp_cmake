@@ -714,6 +714,10 @@ void go1State::computeStartupPD() {
 /*
     Activate simple joint PD for startup mode in MuJoCo.
 */
+    if (squat_prog == 0) {
+        joint_pos_init = joint_pos;
+    }
+
     for (int i = 0; i < 3*NUM_LEG; i++) {
         go1State::jointPD(i, joint_pos(i, 0), joint_vel(i, 0));
     }
@@ -737,7 +741,6 @@ void go1State::computeShutdownPD() {
 }
 
 go1StateSnapshot go1State::getSnapshot() const {
-    std::lock_guard<std::mutex> lock(mtx_);
     go1StateSnapshot stateSnap;
 
     stateSnap.foot_pos_world_rot = foot_pos_world_rot; // overwrite with estimate or new variable?
@@ -759,6 +762,5 @@ go1StateSnapshot go1State::getSnapshot() const {
 }
 
 void go1State::retrieveGRF(const Eigen::Matrix<double, 3, NUM_LEG> &grf) {
-    std::lock_guard<std::mutex> lock(mtx_);
     foot_forces_grf = grf;
 }

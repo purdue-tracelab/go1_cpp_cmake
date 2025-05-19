@@ -22,7 +22,7 @@ auto data_src = std::make_unique<hardwareDataReader>(lowState, udp);
 
 // Data logging functions
 std::ostringstream hardware_datastream;
-AsyncLogger data_log("../data/go1_hardware_data.csv", hardware_datastream.str());
+SyncLogger data_log("../data/go1_hardware_data.csv", hardware_datastream.str());
 std::ostringstream hardware_data_row;
 
 bool running = false;
@@ -155,6 +155,7 @@ void writeCSVHeader(std::ostream &os) {
 ///////////////////////////
 
 void extractLowLevel() {
+    udp.Recv();
     udp.GetRecv(lowState);
     // Generic LowState information
     printf("FR_0: %f, FR_1: %f, FR_2: %f\n", lowState.motorState[FR_0].q, lowState.motorState[FR_1].q, lowState.motorState[FR_2].q);
@@ -176,22 +177,16 @@ void extractLowLevel() {
 
     data_src->pullSensorData(tester_state);
 
-    std::cout << "###############################################" << std::endl
-            << "Output break afer one timestamp for all motors." << std::endl
-            << "###############################################" << std::endl;
-
-}
-
-void receiveAndSend() {
-    udp.Recv();
-    udp.Send();
-}
-
-void recordLowLevel() {
     hardware_data_row.str("");
     hardware_data_row.clear();
     storeData(tester_state, hardware_data_row);
     data_log.logLine(hardware_data_row.str());
+
+    std::cout << "###############################################" << std::endl
+            << "Output break afer one timestamp for all motors." << std::endl
+            << "###############################################" << std::endl;
+
+    udp.Send();
 }
 
 int main(void) {
@@ -205,11 +200,8 @@ int main(void) {
     std::cin.ignore();
 
     LoopFunc loop_extract("extraction_loop", DT_CTRL, boost::bind(&extractLowLevel));
-    LoopFunc loop_recvSend("udp_recvSend", DT_CTRL, 3, boost::bind(&receiveAndSend));
-    LoopFunc loop_record("recording_loop:", DT_CTRL, boost::bind(&recordLowLevel));
 
     udp.InitCmdData(lowCmd); // send in dummy command
-    loop_recvSend.start();
 
     // Wait to collect until the data stops getting lost
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -225,7 +217,6 @@ int main(void) {
     }    
 
     loop_extract.start();
-    loop_record.start();
 
     while (1)
     {

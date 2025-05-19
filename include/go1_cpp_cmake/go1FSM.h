@@ -3,7 +3,6 @@
 
 #include <thread>
 #include <atomic>
-#include <mutex>
 #include <condition_variable>
 #include <memory>
 
@@ -52,7 +51,6 @@ class go1FSM {
         bool want_walk_{false};
         bool want_shutdown_{false};
         bool just_transitioned_to_locomotion_{false};
-        mutable std::mutex mtx_;
 };
 
 #endif // GO1_FSM_H

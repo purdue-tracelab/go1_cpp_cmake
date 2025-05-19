@@ -52,6 +52,17 @@ class AsyncLogger {
         std::thread                 thread_;
 };
 
+class SyncLogger {
+    public:
+        SyncLogger(const std::string &path, const std::string &header);
+        ~SyncLogger();
+        void logLine(const std::string &line);
+        void flush();
+
+    private:
+        std::ofstream out_;
+};
+
 // numerical Jacobian functions defined in separate .tpp file
 template<class F, class... Extra>
 Eigen::MatrixXd numericalJacobian(F&& f, const Eigen::VectorXd& x, double eps = 1e-6, bool central = false, Extra&&... extra) {

@@ -18,18 +18,6 @@ if("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "aarch64.*")
   set(ARCH arm64)
 endif()
 
-# # Add unitree_legged_sdk library
-# add_library(unitree_legged_sdk STATIC IMPORTED)
-# set_target_properties(unitree_legged_sdk
-#     PROPERTIES
-#     IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/lib/cpp/amd64/libunitree_legged_sdk.a"
-# )
-# target_include_directories(unitree_legged_sdk
-#     INTERFACE
-#     "${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/include"
-# )
-
-# Add unitree_legged_sdk subdirectory
 add_subdirectory(unitree_legged_sdk)
 
 # Find linear algebra and optimization libraries
@@ -37,9 +25,10 @@ find_package(Eigen3 REQUIRED)
 find_package(osqp REQUIRED)
 find_package(OsqpEigen REQUIRED)
 
-add_definitions(-DEIGEN_STACK_ALLOCATION_LIMIT=0) # Disable stack allocation limit for Eigen if desired
+# add_definitions(-DEIGEN_STACK_ALLOCATION_LIMIT=0) # Disable stack allocation limit for Eigen if desired
 
 # Find graphics and interaction libraries
+find_package(Threads REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(glfw3 REQUIRED)
@@ -56,6 +45,19 @@ find_library(MUJOCO_LIBRARY mujoco HINTS /usr/local/mujoco/lib)
 if(NOT MUJOCO_INCLUDE_DIR OR NOT MUJOCO_LIBRARY)
     message(FATAL_ERROR "MuJoCo 3.2.7 not found. Please check your installation.")
 endif()
+
+# Import unitree_legged_sdk static archive
+add_library(unitree_legged_sdk STATIC IMPORTED)
+set_target_properties(unitree_legged_sdk PROPERTIES
+  IMPORTED_LOCATION
+  "${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/lib/cpp/${ARCH}/libunitree_legged_sdk.a"
+)
+
+# Add unitree_legged_sdk headers
+target_include_directories(unitree_legged_sdk
+  INTERFACE
+    "${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/include"
+)
 
 # Include directories
 include_directories(
@@ -86,9 +88,12 @@ add_library(go1_main_lib
   include/go1_cpp_cmake/go1DataInterface.h
 )
 target_link_libraries(go1_main_lib
+  PUBLIC
     OsqpEigen::OsqpEigen
     ${MUJOCO_LIBRARY}
-    "${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/lib/cpp/${ARCH}/libunitree_legged_sdk.a"
+    # "${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/lib/cpp/${ARCH}/libunitree_legged_sdk.a"
+    Threads::Threads
+    unitree_legged_sdk
 )
 target_include_directories(go1_main_lib PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/include
@@ -136,27 +141,35 @@ target_link_libraries(run_go1FSMMujocoLoopFunc
 target_link_options(run_go1FSMMujocoLoopFunc PRIVATE -no-pie)
 
 # Small reading tester for Go1 hardware using Unitree's LoopFunc structure
-add_executable(test_go1ReadHardwareLoopFunc src/testGo1ReadHardwareLoopFunc.cpp)
-target_link_libraries(test_go1ReadHardwareLoopFunc
+add_executable(test_go1ReadHardware src/testGo1ReadHardware.cpp)
+target_link_libraries(test_go1ReadHardware
     go1_main_lib
 )
-target_link_options(test_go1ReadHardwareLoopFunc PRIVATE -no-pie)
+target_link_options(test_go1ReadHardware PRIVATE -no-pie)
 
 # Small standup joint PD tester for Go1 hardware using Unitree's LoopFunc structure
-add_executable(test_go1JointPDHardwareLoopFunc src/testGo1JointPDHardwareLoopFunc.cpp)
-target_link_libraries(test_go1JointPDHardwareLoopFunc
+add_executable(test_go1JointPDHardware src/testGo1JointPDHardware.cpp)
+target_link_libraries(test_go1JointPDHardware
     go1_main_lib
     ${CURSES_LIBRARIES}
 )
-target_link_options(test_go1JointPDHardwareLoopFunc PRIVATE -no-pie)
+target_link_options(test_go1JointPDHardware PRIVATE -no-pie)
+
+# Small torque tester for Go1 hardware using Unitree's LoopFunc structure
+add_executable(test_go1TorqueHardware src/testGo1TorqueHardware.cpp)
+target_link_libraries(test_go1TorqueHardware
+    go1_main_lib
+    ${CURSES_LIBRARIES}
+)
+target_link_options(test_go1TorqueHardware PRIVATE -no-pie)
 
 # Full Go1 FSM hardware control using Unitree's LoopFunc structure & terminal keyboard inputs
-add_executable(run_go1FSMHardwareLoopFunc src/runGo1FSMHardwareLoopFunc.cpp)
-target_link_libraries(run_go1FSMHardwareLoopFunc
+add_executable(run_go1FSMHardware src/runGo1FSMHardware.cpp)
+target_link_libraries(run_go1FSMHardware
     go1_main_lib
     ${CURSES_LIBRARIES}
 )
-target_link_options(run_go1FSMHardwareLoopFunc PRIVATE -no-pie)
+target_link_options(run_go1FSMHardware PRIVATE -no-pie)
 
 # Install libraries and executables
 install(TARGETS
@@ -166,9 +179,9 @@ install(TARGETS
     run_go1MujocoSim
     run_go1FSMMujoco
     run_go1FSMMujocoLoopFunc
-    run_go1FSMHardwareLoopFunc
-    test_go1ReadHardwareLoopFunc
-    test_go1JointPDHardwareLoopFunc
+    run_go1FSMHardware
+    test_go1ReadHardware
+    test_go1JointPDHardware
     DESTINATION lib/${PROJECT_NAME}
 )
 

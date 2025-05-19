@@ -9,7 +9,6 @@
 #include <unsupported/Eigen/MatrixFunctions>
 #include "OsqpEigen/OsqpEigen.h"
 #include <mujoco/mujoco.h>
-#include <mutex>
 #include <atomic>
 #include <array>
 
@@ -165,9 +164,6 @@ class go1State {
         Eigen::VectorXd hlip_ub; 
         Eigen::VectorXd hlip_lb;
         Eigen::VectorXd GainsHLIP; // HLIP-based stepping controller gains
-    
-    private:
-        mutable std::mutex mtx_; // maybe experiment with adding more private variables?
 };
 
 #endif //GO1_STATE_H

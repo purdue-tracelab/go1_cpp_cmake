@@ -294,3 +294,33 @@ void AsyncLogger::loop() {
         }
     }
 }
+
+////////////////////////////////////
+// Synchronous data storage class //
+////////////////////////////////////
+
+SyncLogger::SyncLogger(const std::string &path, const std::string &header) {
+    out_.open(path, std::ios::out | std::ios::trunc);
+    if (!out_.is_open()) {
+        throw std::runtime_error("SyncLogger: failed to open file" + path);
+    }
+
+    out_ << header;
+    if (header.empty() || header.back()!='\n') out_ << '\n';
+}
+
+SyncLogger::~SyncLogger() {
+    if (out_.is_open()) {
+        out_.flush();
+        out_.close();
+    }
+}
+
+void SyncLogger::logLine(const std::string &line) {
+    out_ << line;
+    if (line.empty() || line.back() != '\n') out_ << '\n';
+}
+
+void SyncLogger::flush() {
+    out_.flush();
+}

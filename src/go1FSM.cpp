@@ -26,32 +26,25 @@ go1FSM::go1FSM(double state_hz,
 
 // Destructor
 go1FSM::~go1FSM() {
-    {
-        std::lock_guard<std::mutex> lock(mtx_);
-        command_sender_->setMotorsToDamping(true);
-    }
+    command_sender_->setMotorsToDamping(true);
 }
 
 void go1FSM::requestStartup() {
-    std::lock_guard<std::mutex> lock(mtx_);
     want_shutdown_ = false;
     want_walk_ = false;
     current_ = go1FiniteState::Startup;
 }
 
 void go1FSM::requestWalk(bool enable) {
-    std::lock_guard<std::mutex> lock(mtx_);
     want_walk_ = enable;
 }
 
 void go1FSM::requestShutdown() {
-    std::lock_guard<std::mutex> lock(mtx_);
     want_shutdown_ = true;
     want_walk_ = false;
 }
 
 go1FSM::go1FiniteState go1FSM::getFiniteState() const {
-    std::lock_guard<std::mutex> lock(mtx_);
     return current_;
 }
 
@@ -85,11 +78,10 @@ void go1FSM::step() {
     data_interface_->pullSensorData(state_);
     estimator_->estimateState(state_);
 
-    {
-        std::lock_guard<std::mutex> lock(mtx_);
-        if (want_shutdown_) current_ = go1FiniteState::Shutdown;
-    }
+    // First, check if want to shutdown
+    if (want_shutdown_) current_ = go1FiniteState::Shutdown;
 
+    // Check finite states for corresponding actions
     switch (current_) {
         case go1FiniteState::Passive:
             command_sender_->setMotorsToDamping(true);
@@ -106,7 +98,6 @@ void go1FSM::step() {
             state_.computeStartupPD();
             
             if (state_.isStartupComplete()) {
-                std::lock_guard<std::mutex> lock(mtx_);
                 current_ = go1FiniteState::Locomotion;
                 Eigen::Vector3d pos_ctrl = USE_EST_FOR_CONTROL ? state_.root_pos_est : state_.root_pos;
                 state_.root_pos_d << pos_ctrl(0), pos_ctrl(1), WALK_HEIGHT; // for sim, treadmill XML requires 1 + WALK_HEIGHT meters
@@ -133,7 +124,6 @@ void go1FSM::step() {
             state_.computeShutdownPD();
 
             if (state_.isShutdownComplete()) {
-                std::lock_guard<std::mutex> lock(mtx_);
                 current_ = go1FiniteState::Passive;
                 Eigen::Vector3d pos_ctrl = USE_EST_FOR_CONTROL ? state_.root_pos_est : state_.root_pos;
                 state_.root_pos_d << pos_ctrl(0), pos_ctrl(1), 0.0; // for sim, treadmill XML requires 1 meters

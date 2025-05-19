@@ -147,7 +147,7 @@ void adjustCamera() {
 
 // Data logging objects
 std::ostringstream mujoco_datastream;
-AsyncLogger data_log("../data/go1_mujoco_data.csv", mujoco_datastream.str());
+SyncLogger data_log("../data/go1_mujoco_data.csv", mujoco_datastream.str());
 std::ostringstream mujoco_data_row;
 
 // Function to write Eigen::Vector in CSV format
@@ -430,13 +430,6 @@ void keyboardControl(go1FSM &fsm) {
     refresh();
 }
 
-void recordLowLevel(const go1State &state) {
-    mujoco_data_row.str("");
-    mujoco_data_row.clear();
-    storeData(state, mujoco_data_row);
-    data_log.logLine(mujoco_data_row.str());
-}
-
 int main(void) {
     // Load MuJoCo model
     char error[1000] = "";
@@ -487,20 +480,22 @@ int main(void) {
 
     // Main loop: construct LoopFunc objects and run until GLFW window is closed or controller is killed
     LoopFunc loop_keyInput("key_input_loop", DT_CTRL, 4, boost::bind(&keyboardControl, boost::ref(fsm)));
-    LoopFunc loop_record("recording_loop", DT_CTRL, boost::bind(&recordLowLevel, boost::ref(fsm.getState())));
     LoopFunc loop_simulate("simulation_loop", 
                             mujoco_model->opt.timestep, 
                             7, 
                             [&](){
                                 mj_step(mujoco_model, mujoco_data);
                                 fsm.step();
+                                mujoco_data_row.str("");
+                                mujoco_data_row.clear();
+                                storeData(fsm.getState(), mujoco_data_row);
+                                data_log.logLine(mujoco_data_row.str());
                             });
     const auto render_interval = std::chrono::milliseconds(16); // ~60 FPS
     auto last_render_time = std::chrono::steady_clock::now();
     
     loop_simulate.start();
     loop_keyInput.start();
-    loop_record.start();
 
     while (running && !glfwWindowShouldClose(window)) {
         auto now = std::chrono::steady_clock::now();
@@ -512,7 +507,14 @@ int main(void) {
     };
 
     // Cleanup
+    running = false;
+    mvprintw(0, 0, "Killing controller...");
+    refresh();
     endwin();
+    std::cout << "Controller killed, exiting..." << std::endl;
+
+    loop_simulate.shutdown();
+    loop_keyInput.shutdown();
 
     glfwDestroyWindow(window);
     glfwTerminate();

@@ -381,9 +381,9 @@ int main() {
     std::ostringstream mujoco_calcstream;
     writeCalcTimeCSVHeader(mujoco_calcstream);
 
-    AsyncLogger mujocoDataLog("../data/go1_mujoco_data.csv", mujoco_datastream.str());
+    SyncLogger mujocoDataLog("../data/go1_mujoco_data.csv", mujoco_datastream.str());
     std::ostringstream mujoco_datastream_row;
-    AsyncLogger calcDataLog("../data/go1_mujoco_calc_time.csv", mujoco_calcstream.str());
+    SyncLogger calcDataLog("../data/go1_mujoco_calc_time.csv", mujoco_calcstream.str());
     std::ostringstream mujoco_calcstream_row;
 
     const std::chrono::milliseconds loop_time(static_cast<long>(1000 * mujoco_model->opt.timestep)); // 500 Hz loop time
@@ -424,25 +424,6 @@ int main() {
     // Main simulation loop
     while (running && !glfwWindowShouldClose(window)) {
         auto loop_start = std::chrono::high_resolution_clock::now();
-        // std::cout << "Simulation time: " << mujoco_data->time << std::endl;
-
-        // // Desired states (walk in x-direction)
-        // mujoco_go1_state.root_lin_vel_d << 0.3, 0, 0;
-        // mujoco_go1_state.root_pos_d << 0.3*mujoco_data->time, 0, WALK_HEIGHT; // current position + desired velocity * gait cycle time (0.2 or 0.4 seconds)
-
-        // // Desired states (walk in y-direction)
-        // mujoco_go1_state.root_lin_vel_d << 0, 0.1, 0;
-        // mujoco_go1_state.root_pos_d << 0, 0.1*mujoco_data->time, WALK_HEIGHT;
-
-        // // Desired states (walk in xy-direction)
-        // mujoco_go1_state.root_lin_vel_d << 0.2, 0.2, 0;
-        // mujoco_go1_state.root_pos_d << 0.2*mujoco_data->time, 0.2*mujoco_data->time, WALK_HEIGHT;
-
-        // // Desired states (dynamic standing)
-        // mujoco_go1_state.root_pos_d << 0, 0, 0.27 + 0.2*sin(2*mujoco_data->time);
-        // mujoco_go1_state.root_lin_vel_d << 0, 0, 0.2*cos(2*mujoco_data->time);
-        // mujoco_go1_state.root_rpy_d << 0, 0, 0.3*sin(mujoco_data->time);
-        // mujoco_go1_state.root_ang_vel_d << 0, 0, 0.3*cos(mujoco_data->time);
 
         keyControl(mujoco_data->time);
 
