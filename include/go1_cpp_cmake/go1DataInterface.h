@@ -74,11 +74,11 @@ struct mujocoDataReader : lowLevelDataReader {
             const auto& root_pos_ctrl = USE_EST_FOR_CONTROL ? state.root_pos_est : state.root_pos;
             Eigen::Matrix3d rootRotMat = rotZ(root_rpy_ctrl(2))*rotY(root_rpy_ctrl(1))*rotX(root_rpy_ctrl(0));
 
-            state.foot_pos_world_rot = go1FwdKin(state.joint_pos, root_rpy_ctrl);
+            state.foot_pos_world_rot = go1BaseFrameWorldRotFwdKin(state.joint_pos, root_rpy_ctrl);
             state.foot_pos_abs = state.foot_pos_world_rot.colwise() + root_pos_ctrl;
             state.foot_pos_old = state.foot_pos;
             state.foot_pos = rootRotMat.transpose() * state.foot_pos_world_rot;
-            state.contactJacobian = go1ContactJacobian(state.joint_pos, root_rpy_ctrl);
+            state.contactJacobian = go1WorldFrameContactJacobian(state.joint_pos, root_rpy_ctrl);
 
             // copy current values into desired and old states to avoid jumping
             if (state.init) {
@@ -121,11 +121,11 @@ struct hardwareDataReader : lowLevelDataReader {
 
             // calculate foot position & Jacobian before state estimation
             Eigen::Matrix3d rootRotMat = rotZ(state.root_rpy_est(2))*rotY(state.root_rpy_est(1))*rotX(state.root_rpy_est(0));
-            state.foot_pos_world_rot = go1FwdKin(state.joint_pos, state.root_rpy_est);
+            state.foot_pos_world_rot = go1BaseFrameWorldRotFwdKin(state.joint_pos, state.root_rpy_est);
             state.foot_pos_abs = state.foot_pos_world_rot.colwise() + state.root_pos_est;
             state.foot_pos_old = state.foot_pos;
             state.foot_pos = rootRotMat.transpose() * state.foot_pos_world_rot;
-            state.contactJacobian = go1ContactJacobian(state.joint_pos, state.root_rpy_est);
+            state.contactJacobian = go1WorldFrameContactJacobian(state.joint_pos, state.root_rpy_est);
 
             // Copy current values into desired and old states to avoid jumping
             if (state.init) {
@@ -219,7 +219,8 @@ struct hardwareCommandSender : lowLevelCommandSender {
                             extLowCmd.motorCmd[i].q = 0.0;
                             extLowCmd.motorCmd[i].dq = 0.0;
                             extLowCmd.motorCmd[i].Kp = 0.0;
-                            extLowCmd.motorCmd[i].Kd = 5.0;
+                            extLowCmd.motorCmd[i].Kd = 5.0; // maybe adjust this with conditional for MuJoCo style damping: (i % 3 == 0) ? 1.0 : 2.0;
+                            // extLowCmd.motorCmd[i].Kd = (i % 3 == 0) ? 1.5 : 2.5;
                             extLowCmd.motorCmd[i].tau = state.joint_torques(i % 3, i / 3);
 
                         } else { // swing leg

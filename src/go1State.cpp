@@ -107,11 +107,11 @@ void go1State::updateLocomotionPlan() {
     const auto& root_pos_ctrl = USE_EST_FOR_CONTROL ? root_pos_est : root_pos;
     Eigen::Matrix3d rootRotMat = rotZ(root_rpy_ctrl(2))*rotY(root_rpy_ctrl(1))*rotX(root_rpy_ctrl(0));
 
-    foot_pos_world_rot = go1FwdKin(joint_pos, root_rpy_ctrl); // implemented go1FwdKin using Muqun and Leo's work
+    foot_pos_world_rot = go1BaseFrameWorldRotFwdKin(joint_pos, root_rpy_ctrl); // implemented go1FwdKin using Muqun and Leo's work
     foot_pos_abs = foot_pos_world_rot.colwise() + root_pos_ctrl;
     // foot_pos_old = foot_pos; // incorrect double calculation
     foot_pos = rootRotMat.transpose() * foot_pos_world_rot;
-    contactJacobian = go1ContactJacobian(joint_pos, root_rpy_ctrl);
+    contactJacobian = go1WorldFrameContactJacobian(joint_pos, root_rpy_ctrl);
 
     // Add early contacts based on sensor measurements
     contacts_old = contacts;
@@ -600,14 +600,19 @@ void go1State::swingPD(int leg_idx, Eigen::Vector3d footPosRef, Eigen::Vector3d 
             // Eigen::Vector3d jointVelRef = rootRotMatT * contactJacobian.block<3, 3>(leg_idx*3, 6 + leg_idx*3) * footVelRef;
             // Eigen::Vector3d jointVelN = rootRotMatT * contactJacobian.block<3, 3>(leg_idx*3, 6 + leg_idx*3) * foot_velN;
 
-            ////////////////////////////////////////////////////////////////////////////////////////////////////////
-            // Reading current joint pos & Muqun IK for reference joint pos (doesn't work at all due to IK error) //
-            ////////////////////////////////////////////////////////////////////////////////////////////////////////
+            ////////////////////////////////////////////////////////////////////////////////////////////////////
+            // Reading current joint pos & Muqun IK for reference joint pos (IK in hip frame, not body frame) //
+            ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-            // Eigen::Vector3d jointPosRef = computeFutIK(leg_idx, footPosRef);
+            // Eigen::Vector3d jointPosRef = computeFutIK(leg_idx, (footPosRef - Eigen::Vector3d(default_foot_pos(0, leg_idx), 
+            //                                                                                     default_foot_pos(1, leg_idx),
+            //                                                                                     0)));
+            // joint_pos_d.block<3, 1>(0 + 3*leg_idx, 0) = jointPosRef;
             // Eigen::Vector3d jointPosN = joint_pos.block<3, 1>(0 + 3*leg_idx, 0);
 
-            // Eigen::Vector3d jointVelRef = rootRotMatT * contactJacobian.block<3, 3>(leg_idx*3, 6 + leg_idx*3) * footVelRef;
+            // // Eigen::Vector3d jointVelRef = rootRotMatT * contactJacobian.block<3, 3>(leg_idx*3, 6 + leg_idx*3) * footVelRef;
+            // Eigen::Vector3d jointVelRef = go1HipFrameLegJacobian(leg_idx, joint_pos) * footVelRef;
+            // joint_vel_d.block<3, 1>(0 + 3*leg_idx, 0) = jointVelRef;
             // Eigen::Vector3d jointVelN = joint_vel.block<3, 1>(0 + 3*leg_idx, 0);
 
             /////////////////////////////////////////////////////////////////////

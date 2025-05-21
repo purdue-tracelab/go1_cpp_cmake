@@ -191,27 +191,39 @@ void go1MPC::updateMPCStatesFromSnapshot(const go1StateSnapshot &snap) {
     Eigen::Vector3d lin_vel_ref = snap.root_lin_vel;
     Eigen::Vector3d ang_vel_ref = snap.root_ang_vel;
 
-    // Exponential interpolation (scuffed)
-    for (int i = 0; i < MPC_HORIZON; i++) {
-        pos_ref = (1 - ALEPH) * pos_ref + ALEPH * (snap.root_pos_d + lin_vel_ref * i * DT_MPC);
-        rpy_ref = (1 - ALEPH) * rpy_ref + ALEPH * (snap.root_rpy_d + lin_vel_ref * i * DT_MPC);
-        lin_vel_ref = (1 - BETTA) * lin_vel_ref + BETTA * snap.root_lin_vel_d;
-        ang_vel_ref = (1 - BETTA) * ang_vel_ref + BETTA * snap.root_ang_vel_d;
+    // // Exponential interpolation (incorrectly implemented I think, but prevents body roll+pitch w/ velocity commands)
+    // for (int i = 0; i < MPC_HORIZON; i++) {
+    //     pos_ref = (1 - ALEPH) * pos_ref + ALEPH * (snap.root_pos_d + snap.root_lin_vel_d * i * DT_MPC);
+    //     rpy_ref = (1 - ALEPH) * rpy_ref + ALEPH * (snap.root_rpy_d + snap.root_lin_vel_d * i * DT_MPC);
+    //     lin_vel_ref = (1 - BETTA) * lin_vel_ref + BETTA * snap.root_lin_vel_d;
+    //     ang_vel_ref = (1 - BETTA) * ang_vel_ref + BETTA * snap.root_ang_vel_d;
 
-        if ((pos_ref - snap.root_pos_d).norm() <= 1e-2) {
-            lin_vel_ref.setZero();
-            pos_ref = snap.root_pos_d;
-        }
+    //     if ((pos_ref - snap.root_pos_d).norm() <= 1e-2) {
+    //         lin_vel_ref.setZero();
+    //         pos_ref = snap.root_pos_d;
+    //     }
 
-        if ((rpy_ref - snap.root_rpy_d).norm() <= 1e-2) {
-            ang_vel_ref.setZero();
-            rpy_ref = snap.root_rpy_d;
-        }
+    //     if ((rpy_ref - snap.root_rpy_d).norm() <= 1e-2) {
+    //         ang_vel_ref.setZero();
+    //         rpy_ref = snap.root_rpy_d;
+    //     }
 
-        mpc_state_d_block << rpy_ref, pos_ref, ang_vel_ref, lin_vel_ref, -9.81;
-        mpc_state_d.block<13, 1>(13*i, 0) = mpc_state_d_block;
+    //     mpc_state_d_block << rpy_ref, pos_ref, ang_vel_ref, lin_vel_ref, -9.81;
+    //     mpc_state_d.block<13, 1>(13*i, 0) = mpc_state_d_block;
 
-    }    
+    // }
+
+    // Linear interpolation (more standard, but worse roll+pitch tracking with velocity commands)
+    Eigen::Vector3d final_pos_des = pos_ref + DT_MPC * MPC_HORIZON * snap.root_lin_vel_d;
+    double aleph;
+    for (int i = 1; i <= MPC_HORIZON; i++) {
+        aleph = static_cast<double>(i)/MPC_HORIZON;
+        pos_ref = (1 - aleph) * snap.root_pos + aleph * (snap.root_pos_d + 0.8 * snap.root_lin_vel_d * i * DT_MPC);
+        rpy_ref = (1 - aleph) * snap.root_rpy + aleph * (snap.root_rpy_d + 0.8 * snap.root_ang_vel_d * i * DT_MPC);
+
+        mpc_state_d_block << rpy_ref, pos_ref, snap.root_ang_vel_d, snap.root_lin_vel_d, -9.81;
+        mpc_state_d.block<13, 1>(13*(i-1), 0) = mpc_state_d_block;
+    }
 }
 
 // go1State wrapper for solveMPCForcesForSnapshot

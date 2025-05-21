@@ -212,7 +212,7 @@ void runStartupPD() {
         //     lowCmd.motorCmd[i].q = 0.0;
         //     lowCmd.motorCmd[i].dq = 0.0;
         //     lowCmd.motorCmd[i].Kp = 0.0;
-        //     lowCmd.motorCmd[i].Kd = 0.0;
+        //     lowCmd.motorCmd[i].Kd = 0.0; // maybe change to damping conditional from hardwareCommandSender
         //     lowCmd.motorCmd[i].tau = tester_state.joint_torques(i % 3, i / 3);
         // }
     } else {

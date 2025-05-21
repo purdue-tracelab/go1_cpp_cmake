@@ -27,7 +27,7 @@ Eigen::Matrix4d transformMat(const Eigen::Matrix3d &rotMat, const double dispX, 
     return transformRot * transformDisp;
 }
 
-Eigen::Matrix<double, 3, NUM_LEG> go1FwdKin(const Eigen::VectorXd& jointPos, const Eigen::Vector3d& root_rpy) {
+Eigen::Matrix<double, 3, NUM_LEG> go1BaseFrameWorldRotFwdKin(const Eigen::VectorXd& jointPos, const Eigen::Vector3d& root_rpy) {
 /*
     Finds the transformation matrices between the base and the feet of Go1
     using successive transformations based on the joint positions relayed
@@ -79,7 +79,7 @@ Eigen::Matrix<double, 3, NUM_LEG> go1FwdKin(const Eigen::VectorXd& jointPos, con
     return footPosMat;
 }
 
-Eigen::MatrixXd go1ContactJacobian(const Eigen::VectorXd& jointPos, const Eigen::Vector3d& root_rpy) {
+Eigen::MatrixXd go1WorldFrameContactJacobian(const Eigen::VectorXd& jointPos, const Eigen::Vector3d& root_rpy) {
 /*
     Finds the contact Jacobian connecting the joint velocities to their corresponding
     linear foot velocities for the stance feet during locomotion. One Jacobian is
@@ -123,4 +123,35 @@ Eigen::MatrixXd go1ContactJacobian(const Eigen::VectorXd& jointPos, const Eigen:
             JvRL;
 
     return go1Jac;
+}
+
+Eigen::Matrix3d go1HipFrameLegJacobian(int leg_idx, const Eigen::VectorXd& jointPos) {
+    double l1 = HIP_LINK_LENGTH;
+    double l2 = THIGH_LINK_LENGTH;
+    double l3 = CALF_LINK_LENGTH;
+
+    double sideSign = (leg_idx == 0 || leg_idx == 2) ? -1.0 : 1.0;
+
+    double s1 = sin(jointPos(0 + 3*leg_idx, 0));
+    double s2 = sin(jointPos(1 + 3*leg_idx, 0));
+    double s3 = sin(jointPos(2 + 3*leg_idx, 0));
+
+    double c1 = cos(jointPos(0 + 3*leg_idx, 0));
+    double c2 = cos(jointPos(1 + 3*leg_idx, 0));
+    double c3 = cos(jointPos(2 + 3*leg_idx, 0));
+
+    double c23 = c2*c3 - s2*s3;
+    double s23 = s2*c3 + c2*s3;
+
+    Eigen::Matrix3d hipFrameLegJac = Eigen::Matrix3d::Zero();
+    hipFrameLegJac(1, 0) = -sideSign*l1*s1 + l2*c2*c1 + l3*c23*c1;
+    hipFrameLegJac(2, 0) = sideSign*l1*c1 + l2*c2*s1 + l3*c23*s1;
+    hipFrameLegJac(0, 1) = -l3*c23 - l2*c2;
+    hipFrameLegJac(1, 1) = -l2*s2*s1 - l3*s23*s1;
+    hipFrameLegJac(2, 1) = l2*s2*c1 + l3*s23*c1;
+    hipFrameLegJac(0, 2) = -l3 * c23;
+    hipFrameLegJac(1, 2) = -l3*s23*s1;
+    hipFrameLegJac(2, 2) = l3*s23*c1;
+
+    return hipFrameLegJac;
 }

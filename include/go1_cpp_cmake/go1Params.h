@@ -55,12 +55,12 @@ constexpr double SWING_KP_CART = 3000;
 constexpr double SWING_KD_CART = 40;
 
 // Joint space swing PD gains
-constexpr double SWING_KP_JOINT = 70;
-constexpr double SWING_KD_JOINT = 4;
+constexpr double SWING_KP_JOINT = 40;
+constexpr double SWING_KD_JOINT = 2;
 
 // Swing leg Bezier curve parameters
 constexpr double WALK_HEIGHT = 0.27;
-constexpr double STEP_HEIGHT = 0.10;
+constexpr double STEP_HEIGHT = 0.13;
 constexpr double FOOT_DELTA_X_LIMIT = 0.20;
 constexpr double FOOT_DELTA_Y_LIMIT = 0.10;
 
@@ -158,20 +158,20 @@ constexpr double GO1_LUMPED_INERTIA_ZZ = 0.286839;
 // MPC weight sets //
 /////////////////////
 
-// // Experimental
-// constexpr double q_weight_1 = 500;
-// constexpr double q_weight_2 = 1000;
-// constexpr double q_weight_3 = 500;
-// constexpr double q_weight_4 = 1000;
-// constexpr double q_weight_5 = 1000;
-// constexpr double q_weight_6 = 500;
-// constexpr double q_weight_7 = 0.1;
-// constexpr double q_weight_8 = 0.1;
-// constexpr double q_weight_9 = 1;
-// constexpr double q_weight_10 = 10;
-// constexpr double q_weight_11 = 10;
-// constexpr double q_weight_12 = 10;
-// constexpr double r_weight_val = 1e-6;
+// Experimental
+constexpr double q_weight_1 = 25;
+constexpr double q_weight_2 = 25;
+constexpr double q_weight_3 = 25;
+constexpr double q_weight_4 = 50;
+constexpr double q_weight_5 = 50;
+constexpr double q_weight_6 = 50;
+constexpr double q_weight_7 = 0;
+constexpr double q_weight_8 = 0;
+constexpr double q_weight_9 = 0.1;
+constexpr double q_weight_10 = 0.5;
+constexpr double q_weight_11 = 0.5;
+constexpr double q_weight_12 = 0.5;
+constexpr double r_weight_val = 2e-5;
 
 // // MIT
 // constexpr double q_weight_1 = 1;
@@ -233,19 +233,19 @@ constexpr double GO1_LUMPED_INERTIA_ZZ = 0.286839;
 // constexpr double q_weight_12 = 50;
 // constexpr double r_weight_val = 1e-3;
 
-// Muqun and Leo's hardware
-constexpr double q_weight_1 = 15;
-constexpr double q_weight_2 = 12;
-constexpr double q_weight_3 = 10;
-constexpr double q_weight_4 = 1.5;
-constexpr double q_weight_5 = 1.5;
-constexpr double q_weight_6 = 35;
-constexpr double q_weight_7 = 0;
-constexpr double q_weight_8 = 0;
-constexpr double q_weight_9 = 0.3;
-constexpr double q_weight_10 = 0.2;
-constexpr double q_weight_11 = 0.2;
-constexpr double q_weight_12 = 0.2;
-constexpr double r_weight_val = 4e-5;
+// // Muqun and Leo's hardware
+// constexpr double q_weight_1 = 15;
+// constexpr double q_weight_2 = 12;
+// constexpr double q_weight_3 = 10;
+// constexpr double q_weight_4 = 1.5;
+// constexpr double q_weight_5 = 1.5;
+// constexpr double q_weight_6 = 35;
+// constexpr double q_weight_7 = 0;
+// constexpr double q_weight_8 = 0;
+// constexpr double q_weight_9 = 0.3;
+// constexpr double q_weight_10 = 0.2;
+// constexpr double q_weight_11 = 0.2;
+// constexpr double q_weight_12 = 0.2;
+// constexpr double r_weight_val = 4e-5;
 
 #endif //GO1_PARAMS_H

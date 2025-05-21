@@ -232,27 +232,42 @@ TwoStageKF::TwoStageKF() {
 
     // Initialize covariances
     Q_k.setIdentity();
+
+    // ShuoYang's Q values
     // Q_k.block<3, 3>(0, 0) = 0.01 * DT_CTRL * eye3 / 20.0;
     // Q_k.block<3, 3>(3, 3) = 0.01 * DT_CTRL * 9.81 * eye3 / 20.0;
-    Q_k.block<3, 3>(0, 0) = DT_CTRL / 20.0 * eye3;
-    Q_k.block<3, 3>(3, 3) = DT_CTRL * 9.81 / 20.0 * eye3;
-    Q_k.block<12, 12>(6, 6) = DT_CTRL * Eigen::Matrix<double, 12, 12>::Identity();
+    Q_k.block<3, 3>(0, 0) = 0.02 * DT_CTRL * eye3;
+    Q_k.block<3, 3>(3, 3) = 0.1 * DT_CTRL * 9.81 * eye3;
+
+    for (int i = 0; i < NUM_LEG; i++) {
+        Q_k.block<3, 3>(6 + i*3, 6 + i*3) = 0.03 * DT_CTRL * eye3;
+    }
+
+    // // Muqun's Q values
+    // Q_k.block<3, 3>(0, 0) = DT_CTRL / 20.0 * eye3;
+    // Q_k.block<3, 3>(3, 3) = DT_CTRL * 9.81 / 20.0 * eye3;
+    // Q_k.block<12, 12>(6, 6) = DT_CTRL * Eigen::Matrix<double, 12, 12>::Identity();
 
     R_k.setIdentity();
-    // for (int i = 0; i < NUM_LEG; i++) {
-    //     R_k.block<3, 3>(i*3, i*3) = 0.001 * eye3;
-    //     R_k.block<3, 3>(NUM_LEG*3 + i*3, NUM_LEG*3 + i*3) = 0.1 * eye3;
-    //     R_k(NUM_LEG*6 + i, NUM_LEG*6 + i) = 0.001;
-    // }
+    // ShuoYang's R values
+    for (int i = 0; i < NUM_LEG; i++) {
+        R_k.block<3, 3>(i*3, i*3) = 0.001 * eye3;
+        R_k.block<3, 3>(NUM_LEG*3 + i*3, NUM_LEG*3 + i*3) = 0.1 * eye3;
+        R_k(NUM_LEG*6 + i, NUM_LEG*6 + i) = 0.001;
+    }
 
     P_k.setIdentity();
-    P_k *= 100.0;
-    // P_k.block<3, 3>(0, 0) = 0.1 * eye3;
-    // P_k.block<3, 3>(3, 3) = 0.3 * eye3;
+    // ShuoYang's P values
+    // P_k *= 3.0;
+    P_k.block<3, 3>(0, 0) = 0.1 * eye3;
+    P_k.block<3, 3>(3, 3) = 0.3 * eye3;
 
-    // for (int i = 0;i < NUM_LEG; i++) {
-    //     P_k.block<3, 3>(6 + i*3, 6 + i*3) = eye3;
-    // }
+    for (int i = 0;i < NUM_LEG; i++) {
+        P_k.block<3, 3>(6 + i*3, 6 + i*3) = eye3;
+    }
+
+    // // Muqun's P values
+    // P_k *= 100.0;
 
     // Set up discrete-time dynamics and measurement models
     F_k.setIdentity();
