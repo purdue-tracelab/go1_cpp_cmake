@@ -191,10 +191,10 @@ void go1MPC::updateMPCStatesFromSnapshot(const go1StateSnapshot &snap) {
     Eigen::Vector3d lin_vel_ref = snap.root_lin_vel;
     Eigen::Vector3d ang_vel_ref = snap.root_ang_vel;
 
-    // Consult w/ Muqun on below
+    // Exponential interpolation (scuffed)
     for (int i = 0; i < MPC_HORIZON; i++) {
-        pos_ref = (1 - ALEPH) * pos_ref + ALEPH * (snap.root_pos_d + snap.root_lin_vel_d * i * DT_MPC);
-        rpy_ref = (1 - ALEPH) * rpy_ref + ALEPH * (snap.root_rpy_d + snap.root_ang_vel_d * i * DT_MPC);
+        pos_ref = (1 - ALEPH) * pos_ref + ALEPH * (snap.root_pos_d + lin_vel_ref * i * DT_MPC);
+        rpy_ref = (1 - ALEPH) * rpy_ref + ALEPH * (snap.root_rpy_d + lin_vel_ref * i * DT_MPC);
         lin_vel_ref = (1 - BETTA) * lin_vel_ref + BETTA * snap.root_lin_vel_d;
         ang_vel_ref = (1 - BETTA) * ang_vel_ref + BETTA * snap.root_ang_vel_d;
 
@@ -211,7 +211,7 @@ void go1MPC::updateMPCStatesFromSnapshot(const go1StateSnapshot &snap) {
         mpc_state_d_block << rpy_ref, pos_ref, ang_vel_ref, lin_vel_ref, -9.81;
         mpc_state_d.block<13, 1>(13*i, 0) = mpc_state_d_block;
 
-    }
+    }    
 }
 
 // go1State wrapper for solveMPCForcesForSnapshot
