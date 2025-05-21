@@ -300,6 +300,8 @@ void keyboardControl(go1FSM &fsm) {
 
 void receiveAndSend() {
     udp.Recv();
+    udp.GetRecv(lowState);
+    udp.SetSend(lowCmd);
     udp.Send();
 }
 

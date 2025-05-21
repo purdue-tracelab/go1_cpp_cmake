@@ -158,20 +158,20 @@ constexpr double GO1_LUMPED_INERTIA_ZZ = 0.286839;
 // MPC weight sets //
 /////////////////////
 
-// Experimental
-constexpr double q_weight_1 = 500;
-constexpr double q_weight_2 = 1000;
-constexpr double q_weight_3 = 500;
-constexpr double q_weight_4 = 1000;
-constexpr double q_weight_5 = 1000;
-constexpr double q_weight_6 = 500;
-constexpr double q_weight_7 = 0.1;
-constexpr double q_weight_8 = 0.1;
-constexpr double q_weight_9 = 1;
-constexpr double q_weight_10 = 10;
-constexpr double q_weight_11 = 10;
-constexpr double q_weight_12 = 10;
-constexpr double r_weight_val = 1e-6;
+// // Experimental
+// constexpr double q_weight_1 = 500;
+// constexpr double q_weight_2 = 1000;
+// constexpr double q_weight_3 = 500;
+// constexpr double q_weight_4 = 1000;
+// constexpr double q_weight_5 = 1000;
+// constexpr double q_weight_6 = 500;
+// constexpr double q_weight_7 = 0.1;
+// constexpr double q_weight_8 = 0.1;
+// constexpr double q_weight_9 = 1;
+// constexpr double q_weight_10 = 10;
+// constexpr double q_weight_11 = 10;
+// constexpr double q_weight_12 = 10;
+// constexpr double r_weight_val = 1e-6;
 
 // // MIT
 // constexpr double q_weight_1 = 1;
@@ -218,7 +218,7 @@ constexpr double r_weight_val = 1e-6;
 // constexpr double q_weight_12 = 1;
 // constexpr double r_weight_val = 1e-6;
 
-// // Muqun and Leo's
+// // Muqun and Leo's simulation
 // constexpr double q_weight_1 = 2000;
 // constexpr double q_weight_2 = 2000;
 // constexpr double q_weight_3 = 2000;
@@ -232,5 +232,20 @@ constexpr double r_weight_val = 1e-6;
 // constexpr double q_weight_11 = 10;
 // constexpr double q_weight_12 = 50;
 // constexpr double r_weight_val = 1e-3;
+
+// Muqun and Leo's hardware
+constexpr double q_weight_1 = 15;
+constexpr double q_weight_2 = 12;
+constexpr double q_weight_3 = 10;
+constexpr double q_weight_4 = 1.5;
+constexpr double q_weight_5 = 1.5;
+constexpr double q_weight_6 = 35;
+constexpr double q_weight_7 = 0;
+constexpr double q_weight_8 = 0;
+constexpr double q_weight_9 = 0.3;
+constexpr double q_weight_10 = 0.2;
+constexpr double q_weight_11 = 0.2;
+constexpr double q_weight_12 = 0.2;
+constexpr double r_weight_val = 4e-5;
 
 #endif //GO1_PARAMS_H

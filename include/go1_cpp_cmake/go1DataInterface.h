@@ -216,10 +216,10 @@ struct hardwareCommandSender : lowLevelCommandSender {
 
                     } else {
                         if (state.contacts[leg_idx] == true) { // stance leg
-                            extLowCmd.motorCmd[i].q = extLowCmd.motorCmd[i].q;
-                            extLowCmd.motorCmd[i].dq = extLowCmd.motorCmd[i].dq;
+                            extLowCmd.motorCmd[i].q = 0.0;
+                            extLowCmd.motorCmd[i].dq = 0.0;
                             extLowCmd.motorCmd[i].Kp = 0.0;
-                            extLowCmd.motorCmd[i].Kd = 0.0;
+                            extLowCmd.motorCmd[i].Kd = 5.0;
                             extLowCmd.motorCmd[i].tau = state.joint_torques(i % 3, i / 3);
 
                         } else { // swing leg

@@ -394,7 +394,7 @@ int main() {
     double renderInterval = 1.0/60.0;
 
     // Desired initial state
-    mujoco_go1_state.root_pos_d << 0, 0, 0.27;
+    mujoco_go1_state.root_pos_d << 0, 0, WALK_HEIGHT;
     
     // Walking flag
     mujoco_go1_state.walking_mode = true;

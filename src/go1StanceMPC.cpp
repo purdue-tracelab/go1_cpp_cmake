@@ -17,8 +17,9 @@ go1MPC::go1MPC() {
     Q.resize(13*MPC_HORIZON, 13*MPC_HORIZON);
 
     for (int i = 0; i < 13*MPC_HORIZON; i++) {
-        double w = (i < 13*2 ? 10.0 : 2.0); // consult w/ Muqun
-        Q.insert(i, i) = w * q_weights(i % 13);
+        // double w = (i < 13*2 ? 10.0 : 2.0); // consult w/ Muqun
+        // Q.insert(i, i) = w * q_weights(i % 13);
+        Q.insert(i, i) = q_weights(i % 13);
     }
 
     R.resize(3*NUM_LEG*MPC_HORIZON, 3*NUM_LEG*MPC_HORIZON);
