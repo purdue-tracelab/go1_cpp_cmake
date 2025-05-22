@@ -219,8 +219,8 @@ struct hardwareCommandSender : lowLevelCommandSender {
                             extLowCmd.motorCmd[i].q = 0.0;
                             extLowCmd.motorCmd[i].dq = 0.0;
                             extLowCmd.motorCmd[i].Kp = 0.0;
-                            extLowCmd.motorCmd[i].Kd = 5.0; // maybe adjust this with conditional for MuJoCo style damping: (i % 3 == 0) ? 1.0 : 2.0;
-                            // extLowCmd.motorCmd[i].Kd = (i % 3 == 0) ? 1.5 : 2.5;
+                            extLowCmd.motorCmd[i].Kd = 3.0;
+                            // extLowCmd.motorCmd[i].Kd = (i % 3 == 0) ? 1.5 : 2.5; // MuJoCo model damping
                             extLowCmd.motorCmd[i].tau = state.joint_torques(i % 3, i / 3);
 
                         } else { // swing leg

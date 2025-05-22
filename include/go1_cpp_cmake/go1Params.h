@@ -45,7 +45,7 @@ constexpr int UNITREE_SDK_CONTACT_THRESH = 100;
 // Swing leg PD parameters //
 /////////////////////////////
 
-constexpr int PLANNER_SELECT = 2; // 0: Raibert Heuristic, 1: Raibert Heuristic with Capture Point, 2: HT-LIP
+constexpr int PLANNER_SELECT = 0; // 0: Raibert Heuristic, 1: Raibert Heuristic with Capture Point, 2: HT-LIP
 constexpr int SWING_PD_SELECT = 1; // 0: Cartesian PD, 1: Joint PD
 constexpr double SWING_TRAJ_SELECT = 0; // 0: Bezier, 1: Sinusoidal (sinusoidal broken atm)
 constexpr int SWING_PHASE_MAX = 199; // swap between 0-99 (0.2 s gait cycle) and 0-199 (0.4 s gait cycle) for DT_CTRL = 0.002
@@ -96,14 +96,14 @@ constexpr int MPC_INPUT_DIM = 3 * NUM_LEG * MPC_HORIZON;
 // constexpr double GO1_LUMPED_INERTIA_YZ = -0.000753;
 // constexpr double GO1_LUMPED_INERTIA_ZZ = 0.372901;
 
-// MuJoCo go1_MATLAB.xml model w/o calf
-constexpr double ROBOT_MASS = 11.7914;
-constexpr double GO1_LUMPED_INERTIA_XX = 0.122975;
-constexpr double GO1_LUMPED_INERTIA_XY = 0.000659457;
-constexpr double GO1_LUMPED_INERTIA_XZ = 0.00902957;
-constexpr double GO1_LUMPED_INERTIA_YY = 0.302195;
-constexpr double GO1_LUMPED_INERTIA_YZ = -0.000964625;
-constexpr double GO1_LUMPED_INERTIA_ZZ = 0.286839;
+// // MuJoCo go1_MATLAB.xml model w/o calf
+// constexpr double ROBOT_MASS = 11.7914;
+// constexpr double GO1_LUMPED_INERTIA_XX = 0.122975;
+// constexpr double GO1_LUMPED_INERTIA_XY = 0.000659457;
+// constexpr double GO1_LUMPED_INERTIA_XZ = 0.00902957;
+// constexpr double GO1_LUMPED_INERTIA_YY = 0.302195;
+// constexpr double GO1_LUMPED_INERTIA_YZ = -0.000964625;
+// constexpr double GO1_LUMPED_INERTIA_ZZ = 0.286839;
 
 // // Mujoco go1_MATLAB.xml model w/o thigh + calf
 // constexpr double ROBOT_MASS = 11.7914;
@@ -141,14 +141,14 @@ constexpr double GO1_LUMPED_INERTIA_ZZ = 0.286839;
 // constexpr double GO1_LUMPED_INERTIA_YZ = 0.0;
 // constexpr double GO1_LUMPED_INERTIA_ZZ = 0.2265;
 
-// // Muqun and Leo's
-// constexpr double ROBOT_MASS = 12.03;
-// constexpr double GO1_LUMPED_INERTIA_XX = 0.0481;
-// constexpr double GO1_LUMPED_INERTIA_XY = -0.0002;
-// constexpr double GO1_LUMPED_INERTIA_XZ = -0.0003;
-// constexpr double GO1_LUMPED_INERTIA_YY = 0.2919;
-// constexpr double GO1_LUMPED_INERTIA_YZ = -0.0000;
-// constexpr double GO1_LUMPED_INERTIA_ZZ = 0.2887;
+// Muqun and Leo's
+constexpr double ROBOT_MASS = 12.03;
+constexpr double GO1_LUMPED_INERTIA_XX = 0.0481;
+constexpr double GO1_LUMPED_INERTIA_XY = -0.0002;
+constexpr double GO1_LUMPED_INERTIA_XZ = -0.0003;
+constexpr double GO1_LUMPED_INERTIA_YY = 0.2919;
+constexpr double GO1_LUMPED_INERTIA_YZ = -0.0000;
+constexpr double GO1_LUMPED_INERTIA_ZZ = 0.2887;
 
 /////////////////////
 // MPC weight sets //
