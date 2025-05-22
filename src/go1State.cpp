@@ -576,7 +576,10 @@ void go1State::swingPD(int leg_idx, Eigen::Vector3d footPosRef, Eigen::Vector3d 
     curve references for smooth and precise swing leg control.
 */
     if (contacts[leg_idx] == false && walking_mode) {
-        Eigen::Vector3d foot_posN = foot_pos.col(leg_idx);
+        double sideSign = (leg_idx == 0 || leg_idx == 2) ? -1.0 : 1.0;
+        Eigen::Vector3d foot_posN = foot_pos.col(leg_idx) - Eigen::Vector3d(default_foot_pos(0, leg_idx), 
+                                                                            sideSign * BASE_2_HIP_JOINT_Y,
+                                                                            0);
         Eigen::Vector3d foot_velN = (foot_pos.col(leg_idx) - foot_pos_old.col(leg_idx))/DT_CTRL;
 
         if (SWING_PD_SELECT == 0) {
@@ -591,11 +594,11 @@ void go1State::swingPD(int leg_idx, Eigen::Vector3d footPosRef, Eigen::Vector3d 
             Eigen::Matrix3d rootRotMatT = rootRotMat.transpose();
 
             ////////////////////////////////////////////////////////////////////////////////////////////////////
-            // Double Muqun IK (for reference and current foot positions; not correct method, but works well) //
+            // Double Muqun IK (for reference and current foot positions; nonsensical method, but works well) //
             ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-            // Eigen::Vector3d jointPosRef = computeFutIK(leg_idx, footPosRef);
-            // Eigen::Vector3d jointPosN = computeFutIK(leg_idx, foot_posN);
+            // Eigen::Vector3d jointPosRef = computeHipFrameFutIK(leg_idx, footPosRef);
+            // Eigen::Vector3d jointPosN = computeHipFrameFutIK(leg_idx, foot_posN);
 
             // Eigen::Vector3d jointVelRef = rootRotMatT * contactJacobian.block<3, 3>(leg_idx*3, 6 + leg_idx*3) * footVelRef;
             // Eigen::Vector3d jointVelN = rootRotMatT * contactJacobian.block<3, 3>(leg_idx*3, 6 + leg_idx*3) * foot_velN;
@@ -604,33 +607,32 @@ void go1State::swingPD(int leg_idx, Eigen::Vector3d footPosRef, Eigen::Vector3d 
             // Reading current joint pos & Muqun IK for reference joint pos (IK in hip frame, not body frame) //
             ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-            // Eigen::Vector3d jointPosRef = computeFutIK(leg_idx, (footPosRef - Eigen::Vector3d(default_foot_pos(0, leg_idx), 
-            //                                                                                     default_foot_pos(1, leg_idx),
-            //                                                                                     0)));
-            // joint_pos_d.block<3, 1>(0 + 3*leg_idx, 0) = jointPosRef;
-            // Eigen::Vector3d jointPosN = joint_pos.block<3, 1>(0 + 3*leg_idx, 0);
+            Eigen::Vector3d jointPosRef = computeHipFrameFutIK(leg_idx, (footPosRef - Eigen::Vector3d(default_foot_pos(0, leg_idx), 
+                                                                                                sideSign * BASE_2_HIP_JOINT_Y,
+                                                                                                0)));
+            joint_pos_d.block<3, 1>(0 + 3*leg_idx, 0) = jointPosRef;
+            Eigen::Vector3d jointPosN = joint_pos.block<3, 1>(0 + 3*leg_idx, 0);
 
-            // // Eigen::Vector3d jointVelRef = rootRotMatT * contactJacobian.block<3, 3>(leg_idx*3, 6 + leg_idx*3) * footVelRef;
-            // Eigen::Vector3d jointVelRef = go1HipFrameLegJacobian(leg_idx, joint_pos) * footVelRef;
-            // joint_vel_d.block<3, 1>(0 + 3*leg_idx, 0) = jointVelRef;
-            // Eigen::Vector3d jointVelN = joint_vel.block<3, 1>(0 + 3*leg_idx, 0);
+            Eigen::Vector3d jointVelRef = go1HipFrameLegJacobian(leg_idx, joint_pos).colPivHouseholderQr().solve(footVelRef);
+            joint_vel_d.block<3, 1>(0 + 3*leg_idx, 0) = jointVelRef;
+            Eigen::Vector3d jointVelN = joint_vel.block<3, 1>(0 + 3*leg_idx, 0);
 
             /////////////////////////////////////////////////////////////////////
             // Reading current joint pos & one-shot IK for reference joint pos //
             /////////////////////////////////////////////////////////////////////
 
-            Eigen::Vector3d dx = footPosRef - foot_pos.col(leg_idx);
-            Eigen::Matrix3d legJacobian = rootRotMatT * contactJacobian.block<3, 3>(leg_idx*3, 6 + leg_idx*3);
-            Eigen::Vector3d dq = computeNewtonIK(legJacobian, dx);
+            // Eigen::Vector3d dx = footPosRef - foot_pos.col(leg_idx);
+            // Eigen::Matrix3d legJacobian = rootRotMatT * contactJacobian.block<3, 3>(leg_idx*3, 6 + leg_idx*3);
+            // Eigen::Vector3d dq = computeNewtonIK(legJacobian, dx);
 
-            Eigen::Vector3d jointPosRef = joint_pos.block<3, 1>(0 + 3*leg_idx, 0) + dq;
-            joint_pos_d.block<3, 1>(0 + 3*leg_idx, 0) = jointPosRef;
-            Eigen::Vector3d jointPosN = joint_pos.block<3, 1>(0 + 3*leg_idx, 0);
+            // Eigen::Vector3d jointPosRef = joint_pos.block<3, 1>(0 + 3*leg_idx, 0) + dq;
+            // joint_pos_d.block<3, 1>(0 + 3*leg_idx, 0) = jointPosRef;
+            // Eigen::Vector3d jointPosN = joint_pos.block<3, 1>(0 + 3*leg_idx, 0);
 
-            Eigen::Vector3d jointVelRef = legJacobian * footVelRef; // causes backwards drift?
-            // Eigen::Vector3d jointVelRef = dq/DT_CTRL; // better but more jitter?
-            joint_vel_d.block<3, 1>(0 + 3*leg_idx, 0) = jointVelRef;
-            Eigen::Vector3d jointVelN = joint_vel.block<3, 1>(0 + 3*leg_idx, 0);
+            // Eigen::Vector3d jointVelRef = legJacobian * footVelRef; // causes backwards drift?
+            // // Eigen::Vector3d jointVelRef = dq/DT_CTRL; // better but more jitter?
+            // joint_vel_d.block<3, 1>(0 + 3*leg_idx, 0) = jointVelRef;
+            // Eigen::Vector3d jointVelN = joint_vel.block<3, 1>(0 + 3*leg_idx, 0);
 
             //////////////////////////////////////////////////////////////////////
 

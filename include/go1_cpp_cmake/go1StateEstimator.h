@@ -68,15 +68,24 @@ class TwoStageKF : public go1StateEstimator {
         void setFootHeightResidual(double h) override;
 
     private:
+        // Estimator matrices
         Eigen::Matrix<double, 18, 1> x_k, x_k1;
         Eigen::Vector3d u_k;
         Eigen::Matrix<double, 28, 1> z_k, y_res;
-        Eigen::Matrix<double, 18, 18> F_k, P_k, P_k1, Q_k;
+        Eigen::Matrix<double, 18, 18> F_k, P_k, P_k1, Q_k, Q_0;
         Eigen::Matrix<double, 18, 3> B_k;
         Eigen::Matrix<double, 28, 18> H_k;
-        Eigen::Matrix<double, 28, 28> R_k, S_k;
+        Eigen::Matrix<double, 28, 28> R_k, R_0, S_k;
         Eigen::Matrix<double, 18, 28> K_k;
         Eigen::Matrix3d eye3;
+
+        // Noise constants from Muqun's code
+        double process_noise_pimu = 0.02;
+        double process_noise_vimu = 0.02;
+        double process_noise_pfoot = 0.002;
+        double sensor_noise_pimu_rel_foot = 0.001;
+        double sensor_noise_vimu_rel_foot = 0.1;
+        double sensor_noise_zfoot = 0.001;
 };
 
 class ExtendedKF : public go1StateEstimator {

@@ -227,13 +227,17 @@ TwoStageKF::TwoStageKF() {
     z_k.setZero();
     y_res.setZero();
     P_k1.setZero();
+    Q_k.setZero();
+    R_k.setZero();
     S_k.setZero();
     K_k.setZero();
 
-    // Initialize covariances
-    Q_k.setIdentity();
+    ////////////////////////////
+    // Initialize covariances //
+    /////////////////////////////
 
-    // ShuoYang's Q values
+    // My Q values
+    Q_k.setIdentity();
     // Q_k.block<3, 3>(0, 0) = 0.01 * DT_CTRL * eye3 / 20.0;
     // Q_k.block<3, 3>(3, 3) = 0.01 * DT_CTRL * 9.81 * eye3 / 20.0;
     Q_k.block<3, 3>(0, 0) = 0.02 * DT_CTRL * eye3;
@@ -244,20 +248,25 @@ TwoStageKF::TwoStageKF() {
     }
 
     // // Muqun's Q values
-    // Q_k.block<3, 3>(0, 0) = DT_CTRL / 20.0 * eye3;
-    // Q_k.block<3, 3>(3, 3) = DT_CTRL * 9.81 / 20.0 * eye3;
-    // Q_k.block<12, 12>(6, 6) = DT_CTRL * Eigen::Matrix<double, 12, 12>::Identity();
+    // Q_0.setIdentity();
+    // Q_0.block<3, 3>(0, 0) = DT_CTRL / 20.0 * eye3;
+    // Q_0.block<3, 3>(3, 3) = DT_CTRL * 9.81 / 20.0 * eye3;
+    // Q_0.block<12, 12>(6, 6) = DT_CTRL * Eigen::Matrix<double, 12, 12>::Identity();
 
+    // My R values
     R_k.setIdentity();
-    // ShuoYang's R values
     for (int i = 0; i < NUM_LEG; i++) {
         R_k.block<3, 3>(i*3, i*3) = 0.001 * eye3;
         R_k.block<3, 3>(NUM_LEG*3 + i*3, NUM_LEG*3 + i*3) = 0.1 * eye3;
         R_k(NUM_LEG*6 + i, NUM_LEG*6 + i) = 0.001;
     }
 
+    // // Muqun's R values
+    // R_0.setIdentity();
+
     P_k.setIdentity();
-    // ShuoYang's P values
+
+    // My P values
     // P_k *= 3.0;
     P_k.block<3, 3>(0, 0) = 0.1 * eye3;
     P_k.block<3, 3>(3, 3) = 0.3 * eye3;
@@ -276,12 +285,21 @@ TwoStageKF::TwoStageKF() {
     B_k.block<3, 3>(3, 0) = DT_CTRL * eye3;
 
     H_k.setZero();
+    // My measurement model
     for (int i = 0; i < NUM_LEG; i++) {
         H_k.block<3, 3>(i*3, 0) = -eye3;
         H_k.block<3, 3>(i*3, 6 + i*3) = eye3;
         H_k.block<3, 3>(NUM_LEG*3 + i*3, 3) = -eye3;
         H_k(NUM_LEG*6 + i, 8 + i*3) = 1;
     }
+
+    // // Muqun's measurement model
+    // for (int i = 0; i < NUM_LEG; i++) {
+    //     H_k.block<3, 3>(i*3, 0) = eye3;
+    //     H_k.block<3, 3>(i*3, 6 + i*3) = -eye3;
+    //     H_k.block<3, 3>(NUM_LEG*3 + i*3, 3) = eye3;
+    //     H_k(NUM_LEG*6 +i, 8 + i*3) = 1;
+    // }
 }
 
 void TwoStageKF::collectInitialState(const go1State& state) {
@@ -313,8 +331,23 @@ void TwoStageKF::estimateState(go1State& state) {
     // Calculate input
     u_k = rootRot * state.root_lin_acc_meas + Eigen::Vector3d(0, 0, -9.81);
 
-    // Update covariances based on foot contact
+    //////////////////////////////////////////////
+    // Update covariances based on foot contact //
+    //////////////////////////////////////////////
+
+    // // Muqun's default Q_k and R_k values
+    // Q_k.setIdentity();
+    // Q_k.block<3, 3>(0, 0) = process_noise_pimu * Q_0.block<3, 3>(0, 0);
+    // Q_k.block<3, 3>(3, 3) = process_noise_vimu * Q_0.block<3, 3>(3, 3);
+    // Q_k.block<12, 12>(6, 6) = process_noise_pfoot * Q_0.block<12, 12>(6, 6);
+
+    // R_k.setIdentity();
+    // R_k.block<12, 12>(0, 0) = sensor_noise_pimu_rel_foot * R_0.block<12, 12>(0, 0);
+    // R_k.block<12, 12>(12, 12) = sensor_noise_vimu_rel_foot * R_0.block<12, 12>(12, 12);
+    // R_k.block<4, 4>(24, 24) = sensor_noise_zfoot * R_0.block<4, 4>(24, 24);
+
     double trust;
+    // My Q_k and R_k contact-based values
     for (int i = 0; i < NUM_LEG; i++) {
         trust = state.contacts[i] ? 1.0 : 1e6;
         Q_k.block<3, 3>(6 + i*3, 6 + i*3) = trust * DT_CTRL * 0.03 * eye3;
@@ -323,16 +356,42 @@ void TwoStageKF::estimateState(go1State& state) {
         R_k(NUM_LEG*6 + i, NUM_LEG*6 + i) = trust * 0.001;
     }
 
+    // // Muqun's Q_k and R_k contact-based values
+    // for (int i = 0; i < NUM_LEG; i++) {
+    //     trust = state.contacts[i] ? 1.0 : 100.0;
+    //     Q_k.block<3, 3>(6 + i*3, 6 + i*3) = trust * Q_k.block<3, 3>(6 + i*3, 6 + i*3);
+    //     R_k.block<3, 3>(NUM_LEG*3 + i*3, NUM_LEG*3 + i*3) = trust * R_k.block<3, 3>(NUM_LEG*3 + i*3, NUM_LEG*3 + i*3);
+    //     R_k(NUM_LEG*6 + i, NUM_LEG*6 + i) = trust * R_k(NUM_LEG*6 + i, NUM_LEG*6 + i);
+    // }
+
+    //////////////////////////////////////////////
+
     // Predict next state
     x_k1 = F_k * x_k + B_k * u_k;
     P_k1 = F_k * P_k * F_k.transpose() + Q_k;
 
-    // Find current measurement
+    //////////////////////////////
+    // Find current measurement //
+    //////////////////////////////
+
+    // My measurement model
     for (int i = 0; i < NUM_LEG; i++) {
         z_k.block<3, 1>(i*3, 0) = state.foot_pos_world_rot.col(i);
-        Eigen::Vector3d v_fut = rootRot * (state.foot_pos.col(i) - state.foot_pos_old.col(i)) / DT_CTRL - skew(state.root_ang_vel_meas) * state.foot_pos_world_rot.col(i);
+        Eigen::Vector3d v_fut = rootRot * (state.foot_pos.col(i) - state.foot_pos_old.col(i)) / DT_CTRL 
+                                - skew(state.root_ang_vel_meas) * state.foot_pos_world_rot.col(i);
         z_k.block<3, 1>(NUM_LEG*3 + i*3, 0) = v_fut;
     }
+
+    // // Muqun's measurement model
+    // double trust_2;
+    // for (int i = 0; i < NUM_LEG; i++) {
+    //     trust_2 = state.contacts[i] ? 1.0 : 0.0;
+    //     z_k.block<3, 1>(i*3, 0) = -state.foot_pos_world_rot.col(i);
+    //     Eigen::Vector3d v_fut_rel = (state.foot_pos.col(i) - state.foot_pos_old.col(i)) / DT_CTRL;
+    //     Eigen::Vector3d v_fut = rootRotEst.transpose() * (skew(state.root_ang_vel_meas) * state.foot_pos.col(i) + v_fut_rel);
+    //     z_k.block<3, 1>(NUM_LEG*3 + i*3, 0) = (1.0 - trust_2) * state.root_lin_vel - trust_2 * v_fut;
+    //     z_k(NUM_LEG*6 + i) = (1.0 - trust_2) * (state.root_pos_est.z() + state.foot_pos.col(i).z());
+    // }
 
     // Check residual for calculating optimal Kalman gain
     y_res = z_k - H_k * x_k1;
@@ -343,6 +402,7 @@ void TwoStageKF::estimateState(go1State& state) {
     // Update estimation and covariance
     x_k1 += K_k * y_res;
     P_k1 -= K_k * H_k * P_k1;
+    // P_k1 = (P_k1 + P_k1.transpose()) / 2.0; // Muqun's P_k1 update
 
     // Optional adjustment, not sure why it's used
     if (P_k1.block<2, 2>(0, 0).determinant() > 1e-6) {

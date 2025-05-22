@@ -196,7 +196,7 @@ double thighJointIK(double hipTheta, double calfTheta, Eigen::Vector3d pFut, dou
     return thighTheta;
 }
 
-Eigen::Vector3d computeFutIK(int leg_idx, Eigen::Vector3d pFut) {
+Eigen::Vector3d computeHipFrameFutIK(int leg_idx, Eigen::Vector3d pFut) {
 /*
     Computes the desired joint angles for each leg based on the relative 
     desired foot positions and the leg index. Don't use this for finding 

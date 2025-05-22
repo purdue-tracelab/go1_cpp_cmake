@@ -48,15 +48,15 @@ constexpr int UNITREE_SDK_CONTACT_THRESH = 100;
 constexpr int PLANNER_SELECT = 2; // 0: Raibert Heuristic, 1: Raibert Heuristic with Capture Point, 2: HT-LIP
 constexpr int SWING_PD_SELECT = 1; // 0: Cartesian PD, 1: Joint PD
 constexpr double SWING_TRAJ_SELECT = 0; // 0: Bezier, 1: Sinusoidal (sinusoidal broken atm)
-constexpr int SWING_PHASE_MAX = 199; // swap between 0-99 (0.2 s gait cycle) and 0-199 (0.4 s gait cycle)
+constexpr int SWING_PHASE_MAX = 199; // swap between 0-99 (0.2 s gait cycle) and 0-199 (0.4 s gait cycle) for DT_CTRL = 0.002
 
 // Cartesian space swing PD gains
 constexpr double SWING_KP_CART = 3000;
 constexpr double SWING_KD_CART = 40;
 
 // Joint space swing PD gains
-constexpr double SWING_KP_JOINT = 40;
-constexpr double SWING_KD_JOINT = 2;
+constexpr double SWING_KP_JOINT = 70;
+constexpr double SWING_KD_JOINT = 4;
 
 // Swing leg Bezier curve parameters
 constexpr double WALK_HEIGHT = 0.27;
@@ -82,10 +82,6 @@ constexpr double FZ_MAX = 500.0;
 constexpr int FRIC_PYR = 6;
 constexpr int MPC_REF_DIM = 13 * MPC_HORIZON;
 constexpr int MPC_INPUT_DIM = 3 * NUM_LEG * MPC_HORIZON;
-
-// MPC blending trajectory parameters
-constexpr double ALEPH = 0.8;
-constexpr double BETTA = 0.8;
 
 ///////////////////////////////////////////////
 // Inertia sets (only use one set at a time) //
@@ -158,20 +154,20 @@ constexpr double GO1_LUMPED_INERTIA_ZZ = 0.286839;
 // MPC weight sets //
 /////////////////////
 
-// Experimental
-constexpr double q_weight_1 = 25;
-constexpr double q_weight_2 = 25;
-constexpr double q_weight_3 = 25;
-constexpr double q_weight_4 = 50;
-constexpr double q_weight_5 = 50;
-constexpr double q_weight_6 = 50;
-constexpr double q_weight_7 = 0;
-constexpr double q_weight_8 = 0;
-constexpr double q_weight_9 = 0.1;
-constexpr double q_weight_10 = 0.5;
-constexpr double q_weight_11 = 0.5;
-constexpr double q_weight_12 = 0.5;
-constexpr double r_weight_val = 2e-5;
+// // current hardware default
+// constexpr double q_weight_1 = 25;
+// constexpr double q_weight_2 = 25;
+// constexpr double q_weight_3 = 25;
+// constexpr double q_weight_4 = 5;
+// constexpr double q_weight_5 = 5;
+// constexpr double q_weight_6 = 50;
+// constexpr double q_weight_7 = 0;
+// constexpr double q_weight_8 = 0;
+// constexpr double q_weight_9 = 0.1;
+// constexpr double q_weight_10 = 0.5;
+// constexpr double q_weight_11 = 0.5;
+// constexpr double q_weight_12 = 0.5;
+// constexpr double r_weight_val = 3e-5;
 
 // // MIT
 // constexpr double q_weight_1 = 1;
@@ -188,20 +184,20 @@ constexpr double r_weight_val = 2e-5;
 // constexpr double q_weight_12 = 1;
 // constexpr double r_weight_val = 1e-6;
 
-// // current default
-// constexpr double q_weight_1 = 500;
-// constexpr double q_weight_2 = 500;
-// constexpr double q_weight_3 = 500;
-// constexpr double q_weight_4 = 1000;
-// constexpr double q_weight_5 = 1000;
-// constexpr double q_weight_6 = 1000;
-// constexpr double q_weight_7 = 0.1;
-// constexpr double q_weight_8 = 0.1;
-// constexpr double q_weight_9 = 1;
-// constexpr double q_weight_10 = 10;
-// constexpr double q_weight_11 = 10;
-// constexpr double q_weight_12 = 10;
-// constexpr double r_weight_val = 1e-6;
+// current simulation default
+constexpr double q_weight_1 = 500;
+constexpr double q_weight_2 = 500;
+constexpr double q_weight_3 = 500;
+constexpr double q_weight_4 = 1000;
+constexpr double q_weight_5 = 1000;
+constexpr double q_weight_6 = 1000;
+constexpr double q_weight_7 = 0.1;
+constexpr double q_weight_8 = 0.1;
+constexpr double q_weight_9 = 1;
+constexpr double q_weight_10 = 10;
+constexpr double q_weight_11 = 10;
+constexpr double q_weight_12 = 10;
+constexpr double r_weight_val = 1e-6;
 
 // // MATLAB
 // constexpr double q_weight_1 = 100;
