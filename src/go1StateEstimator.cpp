@@ -402,7 +402,7 @@ void TwoStageKF::estimateState(go1State& state) {
     // Update estimation and covariance
     x_k1 += K_k * y_res;
     P_k1 -= K_k * H_k * P_k1;
-    // P_k1 = (P_k1 + P_k1.transpose()) / 2.0; // Muqun's P_k1 update
+    P_k1 = (P_k1 + P_k1.transpose()) / 2.0; // Muqun's P_k1 update
 
     // Optional adjustment, not sure why it's used
     if (P_k1.block<2, 2>(0, 0).determinant() > 1e-6) {
