@@ -236,7 +236,7 @@ TwoStageKF::TwoStageKF() {
     // Initialize covariances //
     /////////////////////////////
 
-    // My Q values (try increasing )
+    // My Q values (try increasing)
     Q_k.setIdentity();
     Q_k.block<3, 3>(0, 0) = DT_CTRL * eye3 / 20.0;
     Q_k.block<3, 3>(3, 3) = DT_CTRL * 9.81 * eye3 / 20.0;

@@ -150,6 +150,10 @@ std::ostringstream mujoco_datastream;
 SyncLogger data_log("../data/go1_mujoco_data.csv", mujoco_datastream.str());
 std::ostringstream mujoco_data_row;
 
+std::ostringstream estimator_datastream;
+SyncLogger estimator_log("../data/go1_estimator_data.csv", estimator_datastream.str());
+std::ostringstream estimator_data_row;
+
 // Function to write Eigen::Vector in CSV format
 template <typename VectorType>
 void write_vector(const Eigen::MatrixBase<VectorType> &vec, std::ostream &os) {
@@ -283,6 +287,77 @@ void writeCalcTimeCSVHeader(std::ostream &os) {
     os << "state_update_time,estimation_time,MPC_calc_time\n";
 }
 
+void writeStateEstimatorCSVHeader(std::ostream &os) {
+    switch(STATE_EST_SELECT) {
+        case 0:
+            os << "z_k1,z_k2,z_k3,Hx_k1,Hx_k2,Hx_k3,swing_phase\n";
+            break;
+        case 1:
+            os << "z_k1,z_k2,z_k3,"
+                    "z_k4,z_k5,z_k6,"
+                    "z_k7,z_k8,z_k9,"
+                    "z_k10,z_k11,z_k12,"
+                    "z_k13,z_k14,z_k15,"
+                    "z_k16,z_k17,z_k18,"
+                    "z_k19,z_k20,z_k21,"
+                    "z_k22,z_k23,z_k24,"
+                    "z_k25,z_k26,z_k27,z_k28,"
+                    "Hx_k1,Hx_k2,Hx_k3,"
+                    "Hx_k4,Hx_k5,Hx_k6,"
+                    "Hx_k7,Hx_k8,Hx_k9,"
+                    "Hx_k10,Hx_k11,Hx_k12,"
+                    "Hx_k13,Hx_k14,Hx_k15,"
+                    "Hx_k16,Hx_k17,Hx_k18,"
+                    "Hx_k19,Hx_k20,Hx_k21,"
+                    "Hx_k22,Hx_k23,Hx_k24,"
+                    "Hx_k25,Hx_k26,Hx_k27,Hx_k28,swing_phase\n";
+            break;
+        case 2:
+            os << "z_k1,z_k2,z_k3,"
+                    "z_k4,z_k5,z_k6,"
+                    "z_k7,z_k8,z_k9,"
+                    "z_k10,z_k11,z_k12,"
+                    "z_k13,z_k14,z_k15,"
+                    "z_k16,z_k17,z_k18,"
+                    "z_k19,z_k20,z_k21,"
+                    "z_k22,z_k23,z_k24,"
+                    "z_k25,z_k26,z_k27,z_k28,"
+                    "Hx_k1,Hx_k2,Hx_k3,"
+                    "Hx_k4,Hx_k5,Hx_k6,"
+                    "Hx_k7,Hx_k8,Hx_k9,"
+                    "Hx_k10,Hx_k11,Hx_k12,"
+                    "Hx_k13,Hx_k14,Hx_k15,"
+                    "Hx_k16,Hx_k17,Hx_k18,"
+                    "Hx_k19,Hx_k20,Hx_k21,"
+                    "Hx_k22,Hx_k23,Hx_k24,"
+                    "Hx_k25,Hx_k26,Hx_k27,Hx_k28,swing_phase\n";
+            break;
+        case 3:
+            os << "z_k1,z_k2,z_k3,"
+                    "z_k4,z_k5,z_k6,"
+                    "z_k7,z_k8,z_k9,"
+                    "z_k10,z_k11,z_k12,"
+                    "z_k13,z_k14,z_k15,"
+                    "z_k16,z_k17,z_k18,"
+                    "z_k19,z_k20,z_k21,z_k22,"
+                    "Hx_k1,Hx_k2,Hx_k3,"
+                    "Hx_k4,Hx_k5,Hx_k6,"
+                    "Hx_k7,Hx_k8,Hx_k9,"
+                    "Hx_k10,Hx_k11,Hx_k12,"
+                    "Hx_k13,Hx_k14,Hx_k15,"
+                    "Hx_k16,Hx_k17,Hx_k18,"
+                    "Hx_k19,Hx_k20,Hx_k21,Hx_k22,swing_phase\n";
+            break;
+    }
+}
+
+void storeStateEstResidualData(const go1State &state, const Eigen::VectorXd &z_k, const Eigen::MatrixXd &Hx_k, std::ostream &os) {
+    // Store state estimation residual data
+    write_vector(z_k, os); os << ",";
+    write_vector(Hx_k, os); os << ",";
+    os << state.swing_phase << "\n";
+}
+
 ////////////////////////////
 // Main control functions //
 ////////////////////////////
@@ -297,6 +372,7 @@ void keyboardControl(go1FSM &fsm) {
     the physical Go1 robot. Can't continuously rotate, and the
     swing leg control is iffy atm.
 */
+    // Initialize keyboard input w/ ncurses
     if (!keyboardInit) {
         initscr();
         timeout(0);
@@ -460,6 +536,9 @@ int main(void) {
     writeCSVHeader(mujoco_datastream);
     data_log.logLine(mujoco_datastream.str());
 
+    writeStateEstimatorCSVHeader(estimator_datastream);
+    estimator_log.logLine(estimator_datastream.str());
+
     // Initialize data interface + estimator
     auto data_src = make_unique<mujocoDataReader>(mujoco_model, mujoco_data, "trunk", 
                                                 "lin_acc_sensor", "ang_vel_sensor", 
@@ -472,8 +551,13 @@ int main(void) {
     go1FSM fsm(DT_CTRL, DT_MPC_CTRL, std::move(data_src), std::move(estimator), std::move(command_sender));
     fsm.collectInitialState();
     fsm.step();
+
+    // Store data
     storeData(fsm.getState(), mujoco_data_row);
     data_log.logLine(mujoco_data_row.str());
+
+    storeStateEstResidualData(fsm.getState(), fsm.getMeasurement(), fsm.getPrediction(), estimator_data_row);
+    estimator_log.logLine(estimator_data_row.str());
 
     std::cout << "MuJoCo simulation has initialized..." << std::endl;
     running = true;
@@ -486,10 +570,16 @@ int main(void) {
                             [&](){
                                 mj_step(mujoco_model, mujoco_data);
                                 fsm.step();
+
                                 mujoco_data_row.str("");
                                 mujoco_data_row.clear();
                                 storeData(fsm.getState(), mujoco_data_row);
                                 data_log.logLine(mujoco_data_row.str());
+
+                                estimator_data_row.str("");
+                                estimator_data_row.clear();
+                                storeStateEstResidualData(fsm.getState(), fsm.getMeasurement(), fsm.getPrediction(), estimator_data_row);
+                                estimator_log.logLine(estimator_data_row.str());
                             });
     const auto render_interval = std::chrono::milliseconds(16); // ~60 FPS
     auto last_render_time = std::chrono::steady_clock::now();

@@ -29,6 +29,8 @@ class go1FSM {
         go1FiniteState getFiniteState() const;
         const char* go1FiniteState2Str();
         const go1State& getState() const { return state_; }
+        Eigen::VectorXd getMeasurement() const { return estimator_->getMeasurement(); }
+        Eigen::VectorXd getPrediction() const { return estimator_->getPrediction(); }
         void setDesiredPos();
         void setDesiredVel(const Eigen::Vector3d &lin_vel_cmd, double &yaw_cmd);
 

@@ -23,6 +23,8 @@ class go1StateEstimator {
         virtual void collectInitialState(const go1State& state) = 0;
         virtual void estimateState(go1State& state) = 0;
         virtual void setFootHeightResidual(double h) {}
+        virtual Eigen::VectorXd getMeasurement() = 0;
+        virtual Eigen::VectorXd getPrediction() = 0;
 };
 
 class NaiveKF : public go1StateEstimator {
@@ -30,6 +32,8 @@ class NaiveKF : public go1StateEstimator {
         NaiveKF();
         void collectInitialState(const go1State& state) override;
         void estimateState(go1State& state) override;
+        Eigen::VectorXd getMeasurement() override { return z_k; }
+        Eigen::VectorXd getPrediction() override { return x_k1; }
 
     private:
         Eigen::Matrix<double, 9, 1> x_k, x_k1;
@@ -47,6 +51,8 @@ class KinematicKF : public go1StateEstimator {
         void collectInitialState(const go1State& state) override;
         void estimateState(go1State& state) override;
         void setFootHeightResidual(double h) override;
+        Eigen::VectorXd getMeasurement() override { return z_k; }
+        Eigen::VectorXd getPrediction() override { return x_k1; }
 
     private:
         Eigen::Matrix<double, 18, 1> x_k, x_k1;
@@ -66,6 +72,8 @@ class TwoStageKF : public go1StateEstimator {
         void collectInitialState(const go1State& state) override;
         void estimateState(go1State& state) override;
         void setFootHeightResidual(double h) override;
+        Eigen::VectorXd getMeasurement() override { return z_k; }
+        Eigen::VectorXd getPrediction() override { return x_k1; }
 
     private:
         // Estimator matrices
@@ -93,6 +101,8 @@ class ExtendedKF : public go1StateEstimator {
         ExtendedKF();
         void collectInitialState(const go1State& state) override;
         void estimateState(go1State& state) override;
+        Eigen::VectorXd getMeasurement() override { return z_k; }
+        Eigen::VectorXd getPrediction() override { return x_k1; }
     
     private:
         Eigen::Matrix<double, 22, 1> x_k, x_k1;

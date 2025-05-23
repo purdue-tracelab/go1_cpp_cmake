@@ -26,6 +26,7 @@ find_package(osqp REQUIRED)
 find_package(OsqpEigen REQUIRED)
 
 add_definitions(-DEIGEN_STACK_ALLOCATION_LIMIT=0) # Disable stack allocation limit for Eigen if desired
+add_definitions(-DBOOST_BIND_GLOBAL_PLACEHOLDERS) # silence Boost::bind deprecation warnings
 
 # Find graphics and interaction libraries
 find_package(Threads REQUIRED)
@@ -204,6 +205,7 @@ install(PROGRAMS
   py_src/plotGo1MujocoData.py
   py_src/plotGo1CalcTime.py
   py_src/plotGo1HardwareData.py
+  py_src/plotGo1EstResidualData.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

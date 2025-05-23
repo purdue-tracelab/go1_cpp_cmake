@@ -165,6 +165,7 @@ void keyboardControl(go1FSM &fsm) {
     the physical Go1 robot. Can't continuously rotate, and the
     swing leg control is iffy atm.
 */
+    // Initialize keyboard input w/ ncurses
     if (!keyboardInit) {
         initscr();
         timeout(0);
