@@ -55,12 +55,12 @@ constexpr double SWING_KP_CART = 3000;
 constexpr double SWING_KD_CART = 40;
 
 // Joint space swing PD gains
-constexpr double SWING_KP_JOINT = 60;
+constexpr double SWING_KP_JOINT = 80;
 constexpr double SWING_KD_JOINT = 3;
 
 // Swing leg Bezier curve parameters
 constexpr double WALK_HEIGHT = 0.27;
-constexpr double STEP_HEIGHT = 0.13;
+constexpr double STEP_HEIGHT = 0.10;
 constexpr double FOOT_DELTA_X_LIMIT = 0.20;
 constexpr double FOOT_DELTA_Y_LIMIT = 0.10;
 

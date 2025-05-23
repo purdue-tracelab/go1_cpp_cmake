@@ -597,11 +597,15 @@ void go1State::swingPD(int leg_idx, Eigen::Vector3d footPosRef, Eigen::Vector3d 
             // Double Muqun IK (for reference and current foot positions; nonsensical method, but works well) //
             ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-            // Eigen::Vector3d jointPosRef = computeHipFrameFutIK(leg_idx, footPosRef);
-            // Eigen::Vector3d jointPosN = computeHipFrameFutIK(leg_idx, foot_posN);
+            // Eigen::Vector3d jointPosRef = computeHipFrameFutIK(leg_idx, (footPosRef - Eigen::Vector3d(default_foot_pos(0, leg_idx), 
+            //                                                                                     sideSign * BASE_2_HIP_JOINT_Y,
+            //                                                                                     0)));
+            // joint_pos_d.block<3, 1>(0 + 3*leg_idx, 0) = jointPosRef;
+            // Eigen::Vector3d jointPosN = computeHipFrameFutIK(leg_idx, foot_posN); // mark here
 
-            // Eigen::Vector3d jointVelRef = rootRotMatT * contactJacobian.block<3, 3>(leg_idx*3, 6 + leg_idx*3) * footVelRef;
-            // Eigen::Vector3d jointVelN = rootRotMatT * contactJacobian.block<3, 3>(leg_idx*3, 6 + leg_idx*3) * foot_velN;
+            // Eigen::Vector3d jointVelRef = go1HipFrameLegJacobian(leg_idx, joint_pos).colPivHouseholderQr().solve(footVelRef);
+            // joint_vel_d.block<3, 1>(0 + 3*leg_idx, 0) = jointVelRef;
+            // Eigen::Vector3d jointVelN = go1HipFrameLegJacobian(leg_idx, joint_pos).colPivHouseholderQr().solve(foot_velN); // mark here 2
 
             ////////////////////////////////////////////////////////////////////////////////////////////////////
             // Reading current joint pos & Muqun IK for reference joint pos (IK in hip frame, not body frame) //
@@ -611,11 +615,11 @@ void go1State::swingPD(int leg_idx, Eigen::Vector3d footPosRef, Eigen::Vector3d 
                                                                                                 sideSign * BASE_2_HIP_JOINT_Y,
                                                                                                 0)));
             joint_pos_d.block<3, 1>(0 + 3*leg_idx, 0) = jointPosRef;
-            Eigen::Vector3d jointPosN = joint_pos.block<3, 1>(0 + 3*leg_idx, 0);
+            Eigen::Vector3d jointPosN = joint_pos.block<3, 1>(0 + 3*leg_idx, 0); // mark here
 
             Eigen::Vector3d jointVelRef = go1HipFrameLegJacobian(leg_idx, joint_pos).colPivHouseholderQr().solve(footVelRef);
             joint_vel_d.block<3, 1>(0 + 3*leg_idx, 0) = jointVelRef;
-            Eigen::Vector3d jointVelN = joint_vel.block<3, 1>(0 + 3*leg_idx, 0);
+            Eigen::Vector3d jointVelN = joint_vel.block<3, 1>(0 + 3*leg_idx, 0); // mark here 2
 
             /////////////////////////////////////////////////////////////////////
             // Reading current joint pos & one-shot IK for reference joint pos //

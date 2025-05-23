@@ -236,12 +236,12 @@ TwoStageKF::TwoStageKF() {
     // Initialize covariances //
     /////////////////////////////
 
-    // My Q values
+    // My Q values (try increasing )
     Q_k.setIdentity();
-    // Q_k.block<3, 3>(0, 0) = 0.01 * DT_CTRL * eye3 / 20.0;
-    // Q_k.block<3, 3>(3, 3) = 0.01 * DT_CTRL * 9.81 * eye3 / 20.0;
-    Q_k.block<3, 3>(0, 0) = 0.02 * DT_CTRL * eye3;
-    Q_k.block<3, 3>(3, 3) = 0.1 * DT_CTRL * 9.81 * eye3;
+    Q_k.block<3, 3>(0, 0) = DT_CTRL * eye3 / 20.0;
+    Q_k.block<3, 3>(3, 3) = DT_CTRL * 9.81 * eye3 / 20.0;
+    // Q_k.block<3, 3>(0, 0) = 0.02 * DT_CTRL * eye3;
+    // Q_k.block<3, 3>(3, 3) = 0.1 * DT_CTRL * 9.81 * eye3;
 
     for (int i = 0; i < NUM_LEG; i++) {
         Q_k.block<3, 3>(6 + i*3, 6 + i*3) = 0.03 * DT_CTRL * eye3;
@@ -267,12 +267,11 @@ TwoStageKF::TwoStageKF() {
     P_k.setIdentity();
 
     // My P values
-    // P_k *= 3.0;
-    P_k.block<3, 3>(0, 0) = 0.1 * eye3;
-    P_k.block<3, 3>(3, 3) = 0.3 * eye3;
+    P_k.block<3, 3>(0, 0) = 0.01 * eye3;
+    P_k.block<3, 3>(3, 3) = 0.01 * eye3;
 
     for (int i = 0;i < NUM_LEG; i++) {
-        P_k.block<3, 3>(6 + i*3, 6 + i*3) = eye3;
+        P_k.block<3, 3>(6 + i*3, 6 + i*3) = 0.01 * eye3;
     }
 
     // // Muqun's P values
@@ -329,7 +328,7 @@ void TwoStageKF::estimateState(go1State& state) {
     state.root_ang_vel_est = state.root_ang_vel_meas;
 
     // Calculate input
-    u_k = rootRot * state.root_lin_acc_meas + Eigen::Vector3d(0, 0, -9.81);
+    u_k = rootRotEst * state.root_lin_acc_meas + Eigen::Vector3d(0, 0, -9.81);
 
     //////////////////////////////////////////////
     // Update covariances based on foot contact //
@@ -351,10 +350,10 @@ void TwoStageKF::estimateState(go1State& state) {
     for (int i = 0; i < NUM_LEG; i++) {
         trust = state.contacts[i] ? 1.0 : 1e6;
         Q_k.block<3, 3>(6 + i*3, 6 + i*3) = trust * DT_CTRL * 0.03 * eye3;
-        R_k.block<3, 3>(i*3, i*3) = trust * 0.001 * eye3;
-        R_k.block<3, 3>(NUM_LEG*3 + i*3, NUM_LEG*3 + i*3) = trust * 0.1 * eye3;
+        R_k.block<3, 3>(i*3, i*3) = trust * 0.005 * eye3;
+        R_k.block<3, 3>(NUM_LEG*3 + i*3, NUM_LEG*3 + i*3) = trust * 0.3 * eye3;
         R_k(NUM_LEG*6 + i, NUM_LEG*6 + i) = trust * 0.001;
-    }
+    } 
 
     // // Muqun's Q_k and R_k contact-based values
     // for (int i = 0; i < NUM_LEG; i++) {
@@ -378,8 +377,9 @@ void TwoStageKF::estimateState(go1State& state) {
     for (int i = 0; i < NUM_LEG; i++) {
         z_k.block<3, 1>(i*3, 0) = state.foot_pos_world_rot.col(i);
         Eigen::Vector3d v_fut = rootRot * (state.foot_pos.col(i) - state.foot_pos_old.col(i)) / DT_CTRL 
-                                - skew(state.root_ang_vel_meas) * state.foot_pos_world_rot.col(i);
+                                + rootRot * skew(state.root_ang_vel_meas) * state.foot_pos.col(i);
         z_k.block<3, 1>(NUM_LEG*3 + i*3, 0) = v_fut;
+        z_k(NUM_LEG*6 + i) = 0.02; // removes z-height offset for foot position
     }
 
     // // Muqun's measurement model
