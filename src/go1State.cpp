@@ -507,6 +507,10 @@ void go1State::amirHLIP() {
     X_hlip_error_minus = X_hlip_minus - X_hlip_ref_minus;
     Y_hlip_error_minus = Y_hlip_minus - Y_hlip_ref_minus;
 
+    //////////////////////////
+    // QP-solved HLIP gains //
+    //////////////////////////
+
     // HLIP Hessian, gradient, linear constraints, and bounds
     // e << root (<-- incomplete line, double check Amir's HLIP formulation)
     for (int i = 0; i < 4; i++){
@@ -546,6 +550,12 @@ void go1State::amirHLIP() {
 
     // Solve the HLIP QP to get HLIP gains
     GainsHLIP = solver_hlip.getSolution(); //4x1
+
+    ///////////////////////////
+    // Hard-coded HLIP gains //
+    ///////////////////////////
+
+    GainsHLIP << 1.0, 0.16, 1.0, 0.16; // hard-coded gains corresponding to 3/s^2 surface acceleration according to Amir
     
     // HLIP based step lengths in xy plane
     double stepLengthX = root_lin_vel_d(0) * DT_CTRL * (SWING_PHASE_MAX/2) + (GainsHLIP.segment<2>(0).dot(X_hlip_error_minus));
