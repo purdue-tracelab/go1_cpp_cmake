@@ -351,7 +351,7 @@ void writeStateEstimatorCSVHeader(std::ostream &os) {
     }
 }
 
-void storeStateEstResidualData(const go1State &state, const Eigen::VectorXd &z_k, const Eigen::MatrixXd &Hx_k, std::ostream &os) {
+void storeStateEstResidualData(const go1State &state, const Eigen::VectorXd &z_k, const Eigen::VectorXd &Hx_k, std::ostream &os) {
     // Store state estimation residual data
     write_vector(z_k, os); os << ",";
     write_vector(Hx_k, os); os << ",";

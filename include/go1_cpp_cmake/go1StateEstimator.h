@@ -33,7 +33,7 @@ class NaiveKF : public go1StateEstimator {
         void collectInitialState(const go1State& state) override;
         void estimateState(go1State& state) override;
         Eigen::VectorXd getMeasurement() override { return z_k; }
-        Eigen::VectorXd getPrediction() override { return x_k1; }
+        Eigen::VectorXd getPrediction() override { return H_k*x_k1; }
 
     private:
         Eigen::Matrix<double, 9, 1> x_k, x_k1;
@@ -52,7 +52,7 @@ class KinematicKF : public go1StateEstimator {
         void estimateState(go1State& state) override;
         void setFootHeightResidual(double h) override;
         Eigen::VectorXd getMeasurement() override { return z_k; }
-        Eigen::VectorXd getPrediction() override { return x_k1; }
+        Eigen::VectorXd getPrediction() override { return H_k*x_k1; }
 
     private:
         Eigen::Matrix<double, 18, 1> x_k, x_k1;
@@ -73,7 +73,7 @@ class TwoStageKF : public go1StateEstimator {
         void estimateState(go1State& state) override;
         void setFootHeightResidual(double h) override;
         Eigen::VectorXd getMeasurement() override { return z_k; }
-        Eigen::VectorXd getPrediction() override { return x_k1; }
+        Eigen::VectorXd getPrediction() override { return H_k*x_k1; }
 
     private:
         // Estimator matrices
@@ -102,7 +102,7 @@ class ExtendedKF : public go1StateEstimator {
         void collectInitialState(const go1State& state) override;
         void estimateState(go1State& state) override;
         Eigen::VectorXd getMeasurement() override { return z_k; }
-        Eigen::VectorXd getPrediction() override { return x_k1; }
+        Eigen::VectorXd getPrediction() override { return H_k*x_k1; }
     
     private:
         Eigen::Matrix<double, 22, 1> x_k, x_k1;
