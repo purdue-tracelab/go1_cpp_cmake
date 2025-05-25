@@ -121,8 +121,8 @@ target_link_libraries(run_go1MujocoSim
 )
 
 # Basic Go1 + platform MuJoCo simulation executable
-add_executable(run_experimentMujocoSim src/runExperimentMujoco.cpp)
-target_link_libraries(run_experimentMujocoSim
+add_executable(run_go1ExperimentMujocoSim src/runExperimentMujoco.cpp)
+target_link_libraries(run_go1ExperimentMujocoSim
     go1_main_lib
     glfw
     ${GLEW_LIBRARIES}
@@ -188,7 +188,7 @@ install(TARGETS
     run_go1InertiaCalc
     run_go1Tests
     run_go1MujocoSim
-    run_experimentMujocoSim
+    run_go1ExperimentMujocoSim
     run_go1FSMMujoco
     run_go1FSMMujocoLoopFunc
     run_go1FSMHardware

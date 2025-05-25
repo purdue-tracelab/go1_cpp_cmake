@@ -25,6 +25,7 @@ class go1StateEstimator {
         virtual void setFootHeightResidual(double h) {}
         virtual Eigen::VectorXd getMeasurement() = 0;
         virtual Eigen::VectorXd getPrediction() = 0;
+        virtual Eigen::VectorXd getPostFitResidual() = 0;
 };
 
 class NaiveKF : public go1StateEstimator {
@@ -34,6 +35,7 @@ class NaiveKF : public go1StateEstimator {
         void estimateState(go1State& state) override;
         Eigen::VectorXd getMeasurement() override { return z_k; }
         Eigen::VectorXd getPrediction() override { return H_k*x_k1; }
+        Eigen::VectorXd getPostFitResidual() override { return z_k - H_k*x_k1; }
 
     private:
         Eigen::Matrix<double, 9, 1> x_k, x_k1;
@@ -53,6 +55,7 @@ class KinematicKF : public go1StateEstimator {
         void setFootHeightResidual(double h) override;
         Eigen::VectorXd getMeasurement() override { return z_k; }
         Eigen::VectorXd getPrediction() override { return H_k*x_k1; }
+        Eigen::VectorXd getPostFitResidual() override { return z_k - H_k*x_k1; }
 
     private:
         Eigen::Matrix<double, 18, 1> x_k, x_k1;
@@ -74,6 +77,7 @@ class TwoStageKF : public go1StateEstimator {
         void setFootHeightResidual(double h) override;
         Eigen::VectorXd getMeasurement() override { return z_k; }
         Eigen::VectorXd getPrediction() override { return H_k*x_k1; }
+        Eigen::VectorXd getPostFitResidual() override { return z_k - H_k*x_k1; }
 
     private:
         // Estimator matrices
@@ -103,6 +107,7 @@ class ExtendedKF : public go1StateEstimator {
         void estimateState(go1State& state) override;
         Eigen::VectorXd getMeasurement() override { return z_k; }
         Eigen::VectorXd getPrediction() override { return H_k*x_k1; }
+        Eigen::VectorXd getPostFitResidual() override { return z_k - H_k*x_k1; }
     
     private:
         Eigen::Matrix<double, 22, 1> x_k, x_k1;

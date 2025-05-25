@@ -31,6 +31,7 @@ class go1FSM {
         const go1State& getState() const { return state_; }
         Eigen::VectorXd getMeasurement() const { return estimator_->getMeasurement(); }
         Eigen::VectorXd getPrediction() const { return estimator_->getPrediction(); }
+        Eigen::VectorXd getPostFitResidual() const { return estimator_->getPostFitResidual(); }
         void setDesiredPos();
         void setDesiredVel(const Eigen::Vector3d &lin_vel_cmd, double &yaw_cmd);
 
