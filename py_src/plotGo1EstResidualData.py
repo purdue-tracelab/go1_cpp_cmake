@@ -133,7 +133,7 @@ def plot_state_data(csv_file, state_est_select=2):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/FR_pos_vel.png")
+    plt.savefig("data/estimator_tuning/FR_pos_vel.png")
 
     ##################
     ## FL pos + vel ##
@@ -208,7 +208,7 @@ def plot_state_data(csv_file, state_est_select=2):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/FL_pos_vel.png")
+    plt.savefig("data/estimator_tuning/FL_pos_vel.png")
 
     ##################
     ## RR pos + vel ##
@@ -283,7 +283,7 @@ def plot_state_data(csv_file, state_est_select=2):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/RR_pos_vel.png")
+    plt.savefig("data/estimator_tuning/RR_pos_vel.png")
 
     ##################
     ## RL pos + vel ##
@@ -357,7 +357,7 @@ def plot_state_data(csv_file, state_est_select=2):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/RL_pos_vel.png")
+    plt.savefig("data/estimator_tuning/RL_pos_vel.png")
 
     ####################
     ## Foot z heights ##
@@ -410,7 +410,7 @@ def plot_state_data(csv_file, state_est_select=2):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/foot_z_pos.png")
+    plt.savefig("data/estimator_tuning/foot_z_pos.png")
 
     plt.show()
 

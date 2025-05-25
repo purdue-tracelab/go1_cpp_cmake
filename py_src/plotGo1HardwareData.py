@@ -167,7 +167,7 @@ def plot_state_data(csv_file, absolute=False):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/root_pose.png")
+    plt.savefig("data/hardware_tests/root_pose.png")
 
     ##############
     ## Root vel ##
@@ -236,7 +236,7 @@ def plot_state_data(csv_file, absolute=False):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/root_vel.png")
+    plt.savefig("data/hardware_tests/root_vel.png")
 
     #################
     ## Foot forces ##
@@ -318,7 +318,7 @@ def plot_state_data(csv_file, absolute=False):
     # plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/foot_forces.png")
+    plt.savefig("data/hardware_tests/foot_forces.png")
 
     #####################
     ## Joint positions ##
@@ -369,7 +369,7 @@ def plot_state_data(csv_file, absolute=False):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/joint_pos.png")
+    plt.savefig("data/hardware_tests/joint_pos.png")
 
     ########################
     ## Joint pos tracking ##
@@ -498,7 +498,7 @@ def plot_state_data(csv_file, absolute=False):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/joint_pos_tracking.png")
+    plt.savefig("data/hardware_tests/joint_pos_tracking.png")
 
     ######################
     ## Joint velocities ##
@@ -543,7 +543,7 @@ def plot_state_data(csv_file, absolute=False):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/joint_vel.png")
+    plt.savefig("data/hardware_tests/joint_vel.png")
 
     ########################
     ## Joint vel tracking ##
@@ -672,7 +672,7 @@ def plot_state_data(csv_file, absolute=False):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/joint_vel_tracking.png")
+    plt.savefig("data/hardware_tests/joint_vel_tracking.png")
 
     ###################
     ## Joint torques ##
@@ -723,7 +723,7 @@ def plot_state_data(csv_file, absolute=False):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/joint_torques.png")
+    plt.savefig("data/hardware_tests/joint_torques.png")
 
     ####################
     ## Foot positions ##
@@ -900,7 +900,7 @@ def plot_state_data(csv_file, absolute=False):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/2d_foot_pos.png")
+    plt.savefig("data/hardware_tests/2d_foot_pos.png")
 
     ###################
     ## Foot contacts ##
@@ -920,18 +920,18 @@ def plot_state_data(csv_file, absolute=False):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/foot_contacts.png")
+    plt.savefig("data/hardware_tests/foot_contacts.png")
 
     # plt.close(root_pose_plot)
     # plt.close(root_vel_plot)
     # plt.close(foot_pos_plot)
     # plt.close(foot_force_plot)
-    # plt.close(joint_pos_plot)
-    # plt.close(joint_pos_tracking_plot)
-    # plt.close(joint_vel_plot)
-    # plt.close(joint_vel_tracking_plot)
+    plt.close(joint_pos_plot)
+    plt.close(joint_pos_tracking_plot)
+    plt.close(joint_vel_plot)
+    plt.close(joint_vel_tracking_plot)
     # plt.close(joint_torque_plot)
-    # plt.close(foot_contact_plot)
+    plt.close(foot_contact_plot)
     plt.show()
 
 csv_file = "data/go1_hardware_data.csv"

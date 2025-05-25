@@ -38,7 +38,7 @@ def plot_calc_time(csv_file):
 
     # Show the plot
     plt.tight_layout()
-    plt.savefig("data/sim_calc_times.png")
+    plt.savefig("data/calc_times/sim_calc_times.png")
     plt.show()
 
 csv_file = 'data/go1_mujoco_calc_time.csv'

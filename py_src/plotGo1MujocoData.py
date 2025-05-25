@@ -175,7 +175,7 @@ def plot_state_data(csv_file, absolute=False):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/root_pose.png")
+    plt.savefig("data/mujoco_sim/root_pose.png")
 
     ##############
     ## Root vel ##
@@ -250,7 +250,7 @@ def plot_state_data(csv_file, absolute=False):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/root_vel.png")
+    plt.savefig("data/mujoco_sim/root_vel.png")
 
     #################
     ## Foot forces ##
@@ -331,7 +331,7 @@ def plot_state_data(csv_file, absolute=False):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/foot_forces.png")
+    plt.savefig("data/mujoco_sim/foot_forces.png")
 
     #####################
     ## Joint positions ##
@@ -382,7 +382,7 @@ def plot_state_data(csv_file, absolute=False):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/joint_pos.png")
+    plt.savefig("data/mujoco_sim/joint_pos.png")
 
     ###################
     ## Joint torques ##
@@ -433,7 +433,7 @@ def plot_state_data(csv_file, absolute=False):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/joint_torques.png")
+    plt.savefig("data/mujoco_sim/joint_torques.png")
 
     ####################
     ## Foot positions ##
@@ -610,7 +610,7 @@ def plot_state_data(csv_file, absolute=False):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/2d_foot_pos.png")
+    plt.savefig("data/mujoco_sim/2d_foot_pos.png")
 
     ###################
     ## Foot contacts ##
@@ -630,11 +630,11 @@ def plot_state_data(csv_file, absolute=False):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/foot_contacts.png")
+    plt.savefig("data/mujoco_sim/foot_contacts.png")
 
     # plt.close(root_pose_plot)
     # plt.close(root_vel_plot)
-    # plt.close(joint_pos_plot)
+    plt.close(joint_pos_plot)
     # plt.close(foot_pos_plot)
     # plt.close(foot_force_plot)
     # plt.close(joint_torque_plot)
