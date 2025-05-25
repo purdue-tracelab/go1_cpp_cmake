@@ -163,7 +163,7 @@ class go1State {
         Eigen::VectorXd hlip_gradient;
         Eigen::VectorXd hlip_ub; 
         Eigen::VectorXd hlip_lb;
-        Eigen::VectorXd GainsHLIP; // HLIP-based stepping controller gains
+        Eigen::Vector4d GainsHLIP; // HLIP-based stepping controller gains
 };
 
 #endif //GO1_STATE_H

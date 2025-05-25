@@ -511,45 +511,45 @@ void go1State::amirHLIP() {
     // QP-solved HLIP gains //
     //////////////////////////
 
-    // HLIP Hessian, gradient, linear constraints, and bounds
-    // e << root (<-- incomplete line, double check Amir's HLIP formulation)
-    for (int i = 0; i < 4; i++){
-        hlip_dense_hessian(i,i) = 2.0 * (a1*a1 + a3*a3);
-        hlip_dense_linearConst(i+2,i) = 1.0;
-    }
+    // // HLIP Hessian, gradient, linear constraints, and bounds
+    // // e << root (<-- incomplete line, double check Amir's HLIP formulation)
+    // for (int i = 0; i < 4; i++){
+    //     hlip_dense_hessian(i,i) = 2.0 * (a1*a1 + a3*a3);
+    //     hlip_dense_linearConst(i+2,i) = 1.0;
+    // }
 
-    hlip_gradient.resize(4);
-    hlip_gradient << -2*(a1*a1 + a3*a3), -2*(a1*a2 + a3*a4),-2*(a1*a1 + a3*a3), -2*(a1*a2 + a3*a4);
+    // hlip_gradient.resize(4);
+    // hlip_gradient << -2*(a1*a1 + a3*a3), -2*(a1*a2 + a3*a4),-2*(a1*a1 + a3*a3), -2*(a1*a2 + a3*a4);
 
-    hlip_dense_linearConst(0,0) = X_hlip_error_minus(0);
-    hlip_dense_linearConst(0,1) = X_hlip_error_minus(1);
-    hlip_dense_linearConst(1,2) = Y_hlip_error_minus(0);
-    hlip_dense_linearConst(1,3) = Y_hlip_error_minus(1);
+    // hlip_dense_linearConst(0,0) = X_hlip_error_minus(0);
+    // hlip_dense_linearConst(0,1) = X_hlip_error_minus(1);
+    // hlip_dense_linearConst(1,2) = Y_hlip_error_minus(0);
+    // hlip_dense_linearConst(1,3) = Y_hlip_error_minus(1);
 
-    hlip_lb.resize(6);
-    hlip_ub.resize(6);
-    hlip_lb << -FOOT_DELTA_X_LIMIT - u_ref(0), -FOOT_DELTA_Y_LIMIT - u_ref(1), 0.5, 0.0, 0.5, 0.0;
-    hlip_ub << FOOT_DELTA_X_LIMIT + u_ref(0), FOOT_DELTA_Y_LIMIT + u_ref(1), 1.5, 0.5, 1.5, 0.5;
+    // hlip_lb.resize(6);
+    // hlip_ub.resize(6);
+    // hlip_lb << -FOOT_DELTA_X_LIMIT - u_ref(0), -FOOT_DELTA_Y_LIMIT - u_ref(1), 0.5, 0.0, 0.5, 0.0;
+    // hlip_ub << FOOT_DELTA_X_LIMIT + u_ref(0), FOOT_DELTA_Y_LIMIT + u_ref(1), 1.5, 0.5, 1.5, 0.5;
 
-    hlip_hessian = hlip_dense_hessian.sparseView();
-    hlip_linearConst = hlip_dense_linearConst.sparseView();
+    // hlip_hessian = hlip_dense_hessian.sparseView();
+    // hlip_linearConst = hlip_dense_linearConst.sparseView();
 
-    // instantiate HLIP QP solver
-    OsqpEigen::Solver solver_hlip;
-    solver_hlip.settings()->setVerbosity(false);
-    solver_hlip.settings()->setWarmStart(false);
-    solver_hlip.data()->setNumberOfVariables(4);
-    solver_hlip.data()->setNumberOfConstraints(6);
-    solver_hlip.data()->setLinearConstraintsMatrix(hlip_linearConst);
-    solver_hlip.data()->setHessianMatrix(hlip_hessian);
-    solver_hlip.data()->setGradient(hlip_gradient);
-    solver_hlip.data()->setLowerBound(hlip_lb);
-    solver_hlip.data()->setUpperBound(hlip_ub);
-    solver_hlip.initSolver();
-    solver_hlip.solveProblem();
+    // // instantiate HLIP QP solver
+    // OsqpEigen::Solver solver_hlip;
+    // solver_hlip.settings()->setVerbosity(false);
+    // solver_hlip.settings()->setWarmStart(false);
+    // solver_hlip.data()->setNumberOfVariables(4);
+    // solver_hlip.data()->setNumberOfConstraints(6);
+    // solver_hlip.data()->setLinearConstraintsMatrix(hlip_linearConst);
+    // solver_hlip.data()->setHessianMatrix(hlip_hessian);
+    // solver_hlip.data()->setGradient(hlip_gradient);
+    // solver_hlip.data()->setLowerBound(hlip_lb);
+    // solver_hlip.data()->setUpperBound(hlip_ub);
+    // solver_hlip.initSolver();
+    // solver_hlip.solveProblem();
 
-    // Solve the HLIP QP to get HLIP gains
-    GainsHLIP = solver_hlip.getSolution(); //4x1
+    // // Solve the HLIP QP to get HLIP gains
+    // GainsHLIP = solver_hlip.getSolution(); //4x1
 
     ///////////////////////////
     // Hard-coded HLIP gains //
@@ -558,8 +558,8 @@ void go1State::amirHLIP() {
     GainsHLIP << 1.0, 0.16, 1.0, 0.16; // hard-coded gains corresponding to 3/s^2 surface acceleration according to Amir
     
     // HLIP based step lengths in xy plane
-    double stepLengthX = root_lin_vel_d(0) * DT_CTRL * (SWING_PHASE_MAX/2) + (GainsHLIP.segment<2>(0).dot(X_hlip_error_minus));
-    double stepLengthY = root_lin_vel_d(1) * DT_CTRL * (SWING_PHASE_MAX/2) + (GainsHLIP.segment<2>(2).dot(Y_hlip_error_minus));
+    double stepLengthX = root_lin_vel_d(0) * DT_CTRL * ((SWING_PHASE_MAX + 1)/2) + (GainsHLIP.segment<2>(0).dot(X_hlip_error_minus));
+    double stepLengthY = root_lin_vel_d(1) * DT_CTRL * ((SWING_PHASE_MAX + 1)/2) + (GainsHLIP.segment<2>(2).dot(Y_hlip_error_minus));
     
     // Saturation/clipping
     if (stepLengthX < -FOOT_DELTA_X_LIMIT) {
