@@ -351,7 +351,8 @@ void TwoStageKF::estimateState(go1State& state) {
         trust = state.contacts[i] ? 1.0 : 1e6;
         Q_k.block<3, 3>(6 + i*3, 6 + i*3) = trust * DT_CTRL * 0.03 * eye3;
         R_k.block<3, 3>(i*3, i*3) = trust * 0.005 * eye3;
-        R_k.block<3, 3>(NUM_LEG*3 + i*3, NUM_LEG*3 + i*3) = trust * 0.6 * eye3; //trust * 0.3 * eye3;
+        R_k.block<3, 3>(NUM_LEG*3 + i*3, NUM_LEG*3 + i*3) = trust * 2.0 * eye3; //trust * 0.6 * eye3; //trust * 0.3 * eye3;
+        R_k(NUM_LEG*3 + i*3 + 2, NUM_LEG*3 + i*3 + 2) = trust * 0.3; // z height tuning
         R_k(NUM_LEG*6 + i, NUM_LEG*6 + i) = trust * 0.001;
     } 
 

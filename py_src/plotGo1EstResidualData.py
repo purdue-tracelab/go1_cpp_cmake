@@ -350,6 +350,7 @@ def plot_state_data(csv_file, state_est_select=2):
     shade_by_phase(plt.subplot(3, 2, 6), time, swing_phase)
     plt.plot(time, foot_vel_meas[:, 11], label="Measured", color='b')
     plt.plot(time, foot_vel_pred[:, 11], label="Predicted", color='g')
+    plt.plot(time, vel_res_post_fit[:, 11], label="Post Fit", color='r')
     plt.title("RL z velocity")
     plt.xlabel("Time (s)")
     plt.ylabel("Z vel (m/s)")
