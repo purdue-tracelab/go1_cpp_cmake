@@ -119,6 +119,7 @@ class ExtendedKF : public go1StateEstimator {
         Eigen::Matrix<double, 12, 22> H_P;
         Eigen::Matrix<double, 12, 22> S_k_invT;
         Eigen::Matrix<double, 12, 1> foot_pos_abs;
+        Eigen::Matrix<double, 12, 1> foot_pos;
         Eigen::LDLT<decltype(S_k)> S_k_ldlt;
         // Eigen::LLT<decltype(P_k)> P_k_llt;
         Eigen::Matrix3d eye3;

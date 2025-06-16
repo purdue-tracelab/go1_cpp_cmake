@@ -23,12 +23,11 @@ NaiveKF::NaiveKF() {
     S_k.setZero();
     K_k.setZero();
 
-    // Initialize covariances (adjust P, Q, and R for residual-whiteness [nu_k ~= 1])
-    P_k = (Eigen::Matrix<double, 9, 1>() << 1e-4, 1e-4, 1e-4, 1e-4, 1e-4, 1e-4, 1e-2, 1e-2, 1e-2).finished().asDiagonal();
-    Q_k.setIdentity();
-    Q_k *= 1.0;
+    // Initialize covariances
+    P_k = (Eigen::Matrix<double, 9, 1>() << 1e-2, 1e-2, 1e-2, 1e-2, 1e-2, 1e-2, 1e-3, 1e-3, 1e-3).finished().asDiagonal();
+    Q_k = (Eigen::Matrix<double, 9, 1>() << 1e-6, 1e-6, 1e-6, 1e-4, 1e-4, 1e-4, 1e-2, 1e-2, 1e-2).finished().asDiagonal();
     R_k.setIdentity();
-    R_k *= 1e-6;
+    R_k *= 1e-4;
 
     // Set up discrete-time dynamics and measurement models
     F_k.setIdentity();
@@ -51,6 +50,7 @@ void NaiveKF::estimateState(go1State& state) {
 
     // Check residual to calculate optimal Kalman gain
     Eigen::Matrix3d rootRot = rotZ(state.root_rpy_est(2))*rotY(state.root_rpy_est(1))*rotX(state.root_rpy_est(0));
+    // z_k = rootRot.transpose() * state.root_lin_acc_meas + Eigen::Vector3d(0, 0, -9.81); // way worse than incorrect version below
     z_k = state.root_lin_acc_meas + rootRot.transpose() * Eigen::Vector3d(0, 0, -9.81);
     y_res = z_k - H_k * x_k1;
     S_k = H_k * P_k1 * H_k.transpose() + R_k;
@@ -477,6 +477,10 @@ void ExtendedKF::estimateState(go1State& state) {
                     state.foot_pos_abs.col(1), 
                     state.foot_pos_abs.col(2), 
                     state.foot_pos_abs.col(3);
+    // foot_pos << state.foot_pos.col(0), 
+    //             state.foot_pos.col(1), 
+    //             state.foot_pos.col(2), 
+    //             state.foot_pos.col(3);
 
     // Update covariances based on foot contact
     for (int i = 0; i < NUM_LEG; i++) {
@@ -493,6 +497,7 @@ void ExtendedKF::estimateState(go1State& state) {
     P_k1 += Q_k;
 
     y_res = foot_pos_abs - hState(x_k1);
+    // y_res = foot_pos - hState(x_k1);
     S_k.noalias() = H_k * P_k1 * H_k.transpose();
     S_k += R_k;
 

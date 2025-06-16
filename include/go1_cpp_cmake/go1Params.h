@@ -36,16 +36,16 @@ constexpr double SQUAT_JOINT_KD = 3;
 ////////////////////////////////
 
 constexpr double DT_CTRL = 0.002; // General control frequency (500 Hz)
-constexpr int STATE_EST_SELECT = 2; // O: naive KF, 1: kinematic KF, 2: two-stage KF, 3: extended KF
-constexpr bool USE_EST_FOR_CONTROL = true; // false: no, use ground truth info, true: yes, use estimated info (ALWAYS USE ESTIMATE FOR HARDWARE)
+constexpr int STATE_EST_SELECT = 0; // O: naive KF, 1: kinematic KF, 2: two-stage KF, 3: extended KF
+constexpr bool USE_EST_FOR_CONTROL = true; // true: yes, use estimated info (ALWAYS USE ESTIMATE FOR HARDWARE), false: no, use ground truth info, 
 constexpr double MUJOCO_CONTACT_THRESH = 3.0;
-constexpr int UNITREE_SDK_CONTACT_THRESH = 100;
+constexpr int UNITREE_SDK_CONTACT_THRESH = 135; // robot-dependent
 
 /////////////////////////////
 // Swing leg PD parameters //
 /////////////////////////////
 
-constexpr int PLANNER_SELECT = 2; // 0: Raibert Heuristic, 1: Raibert Heuristic with Capture Point, 2: HT-LIP
+constexpr int PLANNER_SELECT = 0; // 0: Raibert Heuristic, 1: Raibert Heuristic with Capture Point, 2: HT-LIP
 constexpr int SWING_PD_SELECT = 1; // 0: Cartesian PD, 1: Joint PD (Joint PD recommended for hardware)
 constexpr double SWING_TRAJ_SELECT = 0; // 0: Bezier, 1: Sinusoidal (sinusoidal broken atm)
 constexpr int SWING_PHASE_MAX = 199; // swap between 0-99 (0.2 s gait cycle) and 0-199 (0.4 s gait cycle) for DT_CTRL = 0.002

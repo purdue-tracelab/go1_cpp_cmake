@@ -399,7 +399,12 @@ int main(int argc, char** argv) {
     double renderInterval = 1.0/60.0;
 
     // Desired initial state
-    mujoco_go1_state.root_pos_d << 0, 0, 0.27;
+    if (USE_EST_FOR_CONTROL) {
+        mujoco_go1_state.root_pos_d << 0, 0, WALK_HEIGHT;
+    } else {
+        mujoco_go1_state.root_pos_d << 0, 0, 1.0 + WALK_HEIGHT;
+    }
+    
 
     // Walking flag
     mujoco_go1_state.walking_mode = true;
@@ -421,7 +426,11 @@ int main(int argc, char** argv) {
 
     if (STATE_EST_SELECT == 1 || STATE_EST_SELECT == 2) {
         for (int i = 0; i < NUM_LEG; i++) {
-            estimator->setFootHeightResidual(1.02);
+            if (USE_EST_FOR_CONTROL) {
+                estimator->setFootHeightResidual(1.02);
+            } else {
+                estimator->setFootHeightResidual(0.02);
+            }
         }
     }
 
