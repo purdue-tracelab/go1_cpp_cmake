@@ -50,8 +50,8 @@ void NaiveKF::estimateState(go1State& state) {
 
     // Check residual to calculate optimal Kalman gain
     Eigen::Matrix3d rootRot = rotZ(state.root_rpy_est(2))*rotY(state.root_rpy_est(1))*rotX(state.root_rpy_est(0));
-    // z_k = rootRot.transpose() * state.root_lin_acc_meas + Eigen::Vector3d(0, 0, -9.81); // way worse than incorrect version below
-    z_k = state.root_lin_acc_meas + rootRot.transpose() * Eigen::Vector3d(0, 0, -9.81);
+    z_k = rootRot.transpose() * state.root_lin_acc_meas + Eigen::Vector3d(0, 0, -9.81); // way worse than incorrect(?) version below
+    // z_k = state.root_lin_acc_meas + rootRot.transpose() * Eigen::Vector3d(0, 0, -9.81);
     y_res = z_k - H_k * x_k1;
     S_k = H_k * P_k1 * H_k.transpose() + R_k;
     S_k = (S_k + S_k.transpose()) / 2.0;
@@ -471,16 +471,16 @@ void ExtendedKF::collectInitialState(const go1State& state) {
 }
 
 void ExtendedKF::estimateState(go1State& state) {
-    // Predict next state
+    // Predict next state (make sure to use relative foot position as measurement)
     x_k1 = fState(x_k, state.root_lin_acc_meas, state.root_ang_vel_meas);
-    foot_pos_abs << state.foot_pos_abs.col(0), 
-                    state.foot_pos_abs.col(1), 
-                    state.foot_pos_abs.col(2), 
-                    state.foot_pos_abs.col(3);
-    // foot_pos << state.foot_pos.col(0), 
-    //             state.foot_pos.col(1), 
-    //             state.foot_pos.col(2), 
-    //             state.foot_pos.col(3);
+    // foot_pos_abs << state.foot_pos_abs.col(0), 
+    //                 state.foot_pos_abs.col(1), 
+    //                 state.foot_pos_abs.col(2), 
+    //                 state.foot_pos_abs.col(3);
+    foot_pos << state.foot_pos_world_rot.col(0), 
+                state.foot_pos_world_rot.col(1), 
+                state.foot_pos_world_rot.col(2), 
+                state.foot_pos_world_rot.col(3);
 
     // Update covariances based on foot contact
     for (int i = 0; i < NUM_LEG; i++) {
@@ -496,8 +496,8 @@ void ExtendedKF::estimateState(go1State& state) {
     P_k1.noalias() = F_P_k * F_k.transpose();
     P_k1 += Q_k;
 
-    y_res = foot_pos_abs - hState(x_k1);
-    // y_res = foot_pos - hState(x_k1);
+    // y_res = foot_pos_abs - hState(x_k1);
+    y_res = foot_pos - hState(x_k1);
     S_k.noalias() = H_k * P_k1 * H_k.transpose();
     S_k += R_k;
 
