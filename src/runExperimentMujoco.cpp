@@ -25,6 +25,9 @@ go1State mujoco_go1_state;
 std::unique_ptr<go1StateEstimator> mujoco_go1_estimator;
 go1MPC mujoco_go1_MPC;
 Eigen::Matrix<double, 12, 1> joint_torques_stacked;
+float pitch_ctrl;
+float ground_truth_height_des;
+float go1_pos_shift = 0.5; // Shift the Go1 position in the x-direction
 
 // Mouse state variables
 bool button_left = false, button_middle = false, button_right = false;
@@ -253,86 +256,6 @@ void writeCalcTimeCSVHeader(std::ostream &os) {
     os << "state_update_time,estimation_time,MPC_calc_time\n";
 }
 
-void keyControl(const mjtNum simTime) {
-/*
-    Keyboard terminal commands for sending desired velocities to
-    the MuJoCo Go1 robot model. Can't continuously rotate, and the
-    swing leg control is iffy atm.
-*/
-    static bool hold_forward = false;
-    static bool hold_backward = false;
-    static bool hold_left = false;
-    static bool hold_right = false;
-    static bool hold_yawL = false;
-    static bool hold_yawR = false;
-
-    int ch;
-    while ((ch = getch()) != ERR) {
-        switch(ch) {
-            case 'w': hold_forward = true; break;
-            case 's': hold_backward = true; break;
-            case 'a': hold_left = true; break;
-            case 'd': hold_right = true; break;
-            case 'q': hold_yawL = true; break;
-            case 'e': hold_yawR = true; break;
-
-            case 'p':
-                mujoco_go1_state.walking_mode = !mujoco_go1_state.walking_mode;
-
-                if (!mujoco_go1_state.walking_mode) {
-                    hold_forward = hold_backward = false;
-                    hold_left = hold_right = false;
-                    hold_yawL = hold_yawR = false;
-                }
-
-                break;
-
-            case 'x':
-                hold_forward = hold_backward = false;
-                hold_left = hold_right = false;
-                break;
-
-            case 'z':
-                hold_yawL = hold_yawR = false;
-                break;
-
-            default:
-                break;
-        }
-    }
-
-    Eigen::Vector3d v_cmd = Eigen::Vector3d::Zero();
-    double yaw_cmd = 0;
-
-    if (hold_forward) v_cmd.x() += 0.2;
-    if (hold_backward) v_cmd.x() -= 0.2;
-    if (hold_left) v_cmd.y() += 0.2;
-    if (hold_right) v_cmd.y() -= 0.2;
-    if (hold_yawL) yaw_cmd += 1.0;
-    if (hold_yawR) yaw_cmd -= 1.0;
-
-    double yaw = USE_EST_FOR_CONTROL ? mujoco_go1_state.root_rpy_est(2) : mujoco_go1_state.root_rpy(2);
-    Eigen::Matrix3d rootRotZ = rotZ(yaw);
-    Eigen::Vector3d v_world = rootRotZ * v_cmd;
-
-    mujoco_go1_state.root_lin_vel_d = v_world;
-    mujoco_go1_state.root_ang_vel_d(2) = yaw_cmd;
-
-    mujoco_go1_state.root_pos_d += mujoco_go1_state.root_lin_vel_d * DT_CTRL;
-    auto rpy = mujoco_go1_state.root_rpy_d;
-    double new_yaw = rpy(2) + mujoco_go1_state.root_ang_vel_d(2) * DT_CTRL;
-    new_yaw = std::atan2(std::sin(new_yaw), std::cos(new_yaw));
-    rpy(2) = new_yaw;
-    mujoco_go1_state.root_rpy_d = rpy;
-
-    // Debug output
-    mvprintw(0, 0,
-        "v: [%.2f, %.2f], yaw_rate: %.2f",
-        v_cmd.x(), v_cmd.y(), yaw_cmd
-        );
-    refresh();
-}
-
 int main(int argc, char** argv) {
     std::cout << "Initializing MuJoCo..." << std::endl;
 
@@ -400,11 +323,12 @@ int main(int argc, char** argv) {
 
     // Desired initial state
     if (USE_EST_FOR_CONTROL) {
-        mujoco_go1_state.root_pos_d << 0, 0, WALK_HEIGHT;
+        // mujoco_go1_state.root_pos_d << 0, 0, WALK_HEIGHT;
+        mujoco_go1_state.root_pos_d << go1_pos_shift, 0, WALK_HEIGHT; // shifted forward
     } else {
-        mujoco_go1_state.root_pos_d << 0, 0, 1.0 + WALK_HEIGHT;
+        // mujoco_go1_state.root_pos_d << 0, 0, 1.0 + WALK_HEIGHT;
+        mujoco_go1_state.root_pos_d << go1_pos_shift, 0, 1.0 + WALK_HEIGHT; // shifted forward
     }
-    
 
     // Walking flag
     mujoco_go1_state.walking_mode = true;
@@ -434,23 +358,73 @@ int main(int argc, char** argv) {
         }
     }
 
-    // // Initialize ncurses
-    // initscr(); // Start ncurses mode
-    // timeout(0); // Non-blocking input, no delay
-    // nodelay(stdscr, TRUE);
-    // noecho();            // Don't display pressed keys
-    // cbreak();            // Disable line buffering (don't need to press Enter)
-
     // Main simulation loop
     while (running && !glfwWindowShouldClose(window)) {
         auto loop_start = std::chrono::high_resolution_clock::now();
         std::cout << "Simulation time: " << mujoco_data->time << std::endl;
 
+        ///////////////////////
+        // TREADMILL CONTROL //
+        ///////////////////////
+
+        switch (test_case) {
+            case 0:
+                mujoco_data->ctrl[12] = 0;  // Sway oscillation in meters
+                mujoco_data->ctrl[13] = 0;  // Pitch oscillation in radians
+                break;
+
+            case 1:
+                mujoco_data->ctrl[12] = 0;
+                mujoco_data->ctrl[13] = (4*M_PI/180) * (sin(3.0 * mujoco_data->time) + sin(mujoco_data->time * sqrt(0.5 * mujoco_data->time + 1)));
+                pitch_ctrl = (4*M_PI/180) * (sin(3.0 * mujoco_data->time) + sin(mujoco_data->time * sqrt(0.5 * mujoco_data->time + 1))); // Store pitch control for later use
+                break;
+
+            case 2:
+                mujoco_data->ctrl[12] = 0;
+                mujoco_data->ctrl[13] = (4*M_PI/180) * (sin(6.0 * mujoco_data->time) + sin(0.1 * pow(mujoco_data->time, 2)));
+                pitch_ctrl = (4*M_PI/180) * (sin(6.0 * mujoco_data->time) + sin(0.1 * pow(mujoco_data->time, 2)));
+                break;
+
+            case 3:
+                mujoco_data->ctrl[12] = 0;
+                mujoco_data->ctrl[13] = (0.2*M_PI/180) * pow(mujoco_data->time, 2) * sin(sqrt(100 * mujoco_data->time + 1)) * exp(mujoco_data->time / -10);
+                pitch_ctrl = (0.2*M_PI/180) * pow(mujoco_data->time, 2) * sin(sqrt(100 * mujoco_data->time + 1)) * exp(mujoco_data->time / -10);
+                break;
+
+            case 4:
+                if (mujoco_data->time <= 83) {
+                    mujoco_data->ctrl[12] = 0;
+                } else if (mujoco_data->time <= 122) {
+                    mujoco_data->ctrl[12] = 40/1000 * sin(M_PI * mujoco_data->time);
+                } else if (mujoco_data->time <= 160) {
+                    mujoco_data->ctrl[12] = 65/1000 * sin(M_PI * mujoco_data->time);
+                } else {
+                    mujoco_data->ctrl[12] = 0;
+                }
+                mujoco_data->ctrl[13] = (4*M_PI/180) * (sin(3.0 * mujoco_data->time) + sin(mujoco_data->time * sqrt(0.5 * mujoco_data->time + 1)));
+                pitch_ctrl = (4*M_PI/180) * (sin(3.0 * mujoco_data->time) + sin(mujoco_data->time * sqrt(0.5 * mujoco_data->time + 1)));
+                break;
+
+            case 5:
+                mujoco_data->ctrl[12] = 0;
+                mujoco_data->ctrl[13] = (2.5*M_PI/180) * (sin(3.0 * mujoco_data->time) + sin(mujoco_data->time * sqrt(0.5 * mujoco_data->time + 1)));
+                pitch_ctrl = (2.5*M_PI/180) * (sin(3.0 * mujoco_data->time) + sin(mujoco_data->time * sqrt(0.5 * mujoco_data->time + 1)));
+                break;
+
+            default:
+                std::cerr << "There are only 5 test cases" << std::endl;
+                return 0;
+        }
+
         /////////////////
         // GO1 CONTROL //
         /////////////////
 
-        // keyControl(mujoco_data->time);
+        // Desired height (only for ground truth control)
+        if (!USE_EST_FOR_CONTROL) {
+            ground_truth_height_des = 1.0 + WALK_HEIGHT - go1_pos_shift * sin(pitch_ctrl);
+            mujoco_go1_state.root_pos_d << go1_pos_shift, 0, ground_truth_height_des; // 1.25 m forward
+        }
 
         // Update Go1 state from MuJoCo & perform swing PD force control (500 Hz)
         auto start1 = std::chrono::high_resolution_clock::now();
@@ -491,54 +465,6 @@ int main(int argc, char** argv) {
                                 mujoco_go1_state.joint_torques.col(3); // RL
 
         command_sender->setCommand(mujoco_go1_state);
-
-        ///////////////////////
-        // TREADMILL CONTROL //
-        ///////////////////////
-
-        switch (test_case) {
-            case 0:
-                mujoco_data->ctrl[12] = 0;  // Sway oscillation in meters
-                mujoco_data->ctrl[13] = 0;  // Pitch oscillation in radians
-                break;
-
-            case 1:
-                mujoco_data->ctrl[12] = 0;
-                mujoco_data->ctrl[13] = (4*M_PI/180) * (sin(3.0 * mujoco_data->time) + sin(mujoco_data->time * sqrt(0.5 * mujoco_data->time + 1)));
-                break;
-
-            case 2:
-                mujoco_data->ctrl[12] = 0;
-                mujoco_data->ctrl[13] = (4*M_PI/180) * (sin(6.0 * mujoco_data->time) + sin(0.1 * pow(mujoco_data->time, 2)));
-                break;
-
-            case 3:
-                mujoco_data->ctrl[12] = 0;
-                mujoco_data->ctrl[13] = (0.2*M_PI/180) * pow(mujoco_data->time, 2) * sin(sqrt(100 * mujoco_data->time + 1)) * exp(mujoco_data->time / -10);
-                break;
-
-            case 4:
-                if (mujoco_data->time <= 83) {
-                    mujoco_data->ctrl[12] = 0;
-                } else if (mujoco_data->time <= 122) {
-                    mujoco_data->ctrl[12] = 40/1000 * sin(M_PI * mujoco_data->time);
-                } else if (mujoco_data->time <= 160) {
-                    mujoco_data->ctrl[12] = 65/1000 * sin(M_PI * mujoco_data->time);
-                } else {
-                    mujoco_data->ctrl[12] = 0;
-                }
-                mujoco_data->ctrl[13] = (4*M_PI/180) * (sin(3.0 * mujoco_data->time) + sin(mujoco_data->time * sqrt(0.5 * mujoco_data->time + 1)));
-                break;
-
-            case 5:
-                mujoco_data->ctrl[12] = 0;
-                mujoco_data->ctrl[13] = (2.5*M_PI/180) * (sin(3.0 * mujoco_data->time) + sin(mujoco_data->time * sqrt(0.5 * mujoco_data->time + 1)));
-                break;
-
-            default:
-                std::cerr << "There are only 5 test cases" << std::endl;
-                return 0;
-        }
 
         // Render at ~60 Hz
         if (mujoco_data->time - lastRenderSimTime >= renderInterval) {

@@ -251,7 +251,7 @@
         <inertial pos="0 0 0" mass="1" diaginertia="0.5 0.5 0.5"/>
         <joint name="platform_slide" type="slide" axis="0 1 0" damping="1000"/>
         <joint name="platform_pitch" type="hinge" axis="0 1 0" damping="1000"/>
-        <geom name="platform.geom" type="box" size="2 2 0.025" rgba="0.6 0.3 0.3 1"/>
+        <geom name="platform.geom" type="box" size="1.15 0.6 0.025" rgba="0.6 0.3 0.3 1"/>
     </body>
   </worldbody>
 
@@ -293,8 +293,14 @@
   <!-- ctrl="hip_FR, thigh_FR, calf_FR, hip_FL, thigh_FL, calf_FL, hip_RR, thigh_RR, calf_RR, hip_RL, thigh_RL, calf_RL, plat_pitch, plat_sway" -->
 
   <keyframe>
-    <key name="fast_start" 
+    <!-- Fast start at center of treadmill -->
+    <!-- <key name="fast_start" 
       qpos="0 0 1.27 1 0 0 0 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8 0 0"
+      ctrl="0 0 0 0 0 0 0 0 0 0 0 0 0 0"/> -->
+
+    <!-- Fast start at futher end of treadmill -->
+    <key name="fast_start" 
+      qpos="0.5 0 1.27 1 0 0 0 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8 0 0"
       ctrl="0 0 0 0 0 0 0 0 0 0 0 0 0 0"/>
 
     <key name="slow_start"
