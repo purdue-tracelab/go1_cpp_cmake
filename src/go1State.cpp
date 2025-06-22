@@ -89,6 +89,7 @@ void go1State::resetState() {
     swing_phase = 0; // ranges from 0 to SWING_PHASE_MAX
     foot_deltaX = 0;
     foot_deltaY = 0;
+    rel_surface_pitch = 0;
 
     std::fill(std::begin(contacts), std::end(contacts), true);
     std::fill(std::begin(contacts_old), std::end(contacts_old), true);
@@ -175,8 +176,8 @@ void go1State::updateLocomotionPlan() {
 
         // Pick planner based on PLANNER_SELECT
         switch (PLANNER_SELECT) {
-            case 0: raibertHeuristic(false); break;
-            case 1: raibertHeuristic(); break;
+            case 0: raibertHeuristic(); break;
+            case 1: raibertHeuristic(true); break;
             case 2: amirHLIP(); break;
             default: 
                 std::cerr << "Error: Invalid PLANNER_SELECT value, check go1Params.h" << std::endl; 
@@ -187,10 +188,14 @@ void go1State::updateLocomotionPlan() {
         Eigen::Vector3d futPosRef;
         Eigen::Vector3d futVelRef;
 
+        if (USE_TERRAIN_ADAPT) {
+            calcRelativeSurfacePitch(); // calculate relative surface pitch for terrain adaptation
+        }
+
         for (int i = 0; i < NUM_LEG; i++) {
             if (SWING_TRAJ_SELECT == 0) {
-                futPosRef = bezierPos(i);
-                futVelRef = bezierVel(i);
+                futPosRef = bezierPos(i, USE_TERRAIN_ADAPT);
+                futVelRef = bezierVel(i, USE_TERRAIN_ADAPT);
                 
             } else if (SWING_TRAJ_SELECT == 1) {
                 futPosRef = sinusoidalPos(i);
@@ -263,7 +268,7 @@ void go1State::convertForcesToTorques() {
     joint_torques_swing.setZero();
 }
 
-Eigen::Vector3d go1State::bezierPos(int leg_idx) {
+Eigen::Vector3d go1State::bezierPos(int leg_idx, bool terrainAdapt) {
 /*
     Computes the reference position along a Bezier curve between zero pos
     and a foot position ahead by foot_deltaX and foot_deltaY. The z height
@@ -274,7 +279,17 @@ Eigen::Vector3d go1State::bezierPos(int leg_idx) {
 
     Eigen::Vector3d p0 = foot_pos_liftoff.col(leg_idx);
     Eigen::Vector3d p_c1 = p0;
-    Eigen::Vector3d p_c2 = default_foot_pos.col(leg_idx) + Eigen::Vector3d(foot_deltaX, foot_deltaY, 0);
+    Eigen::Vector3d p_c2;
+
+    if (terrainAdapt) {
+        double z_shift_leg_select = (leg_idx == 0 || leg_idx == 1) ? 1.0 : -1.0;
+        double target_z_shift = z_shift_leg_select * 0.3 * sin(rel_surface_pitch);
+        p_c2 = default_foot_pos.col(leg_idx) + Eigen::Vector3d(foot_deltaX, foot_deltaY, target_z_shift);
+
+    } else {
+        p_c2 = default_foot_pos.col(leg_idx) + Eigen::Vector3d(foot_deltaX, foot_deltaY, 0);
+    }
+
     Eigen::Vector3d p2 = p_c2;
     Eigen::Vector3d p1 = (p0 + p2)/2.0 + Eigen::Vector3d(0, 0, STEP_HEIGHT*2);
 
@@ -290,7 +305,7 @@ Eigen::Vector3d go1State::bezierPos(int leg_idx) {
     return fut_posDes;
 }
 
-Eigen::Vector3d go1State::bezierVel(int leg_idx) {
+Eigen::Vector3d go1State::bezierVel(int leg_idx, bool terrainAdapt) {
 /*
     Computes the reference velocity along a Bezier curve between zero pos
     and a foot position ahead by foot_deltaX and foot_deltaY. Essentially
@@ -301,7 +316,17 @@ Eigen::Vector3d go1State::bezierVel(int leg_idx) {
 
     Eigen::Vector3d p0 = foot_pos_liftoff.col(leg_idx);
     Eigen::Vector3d p_c1 = p0;
-    Eigen::Vector3d p_c2 = default_foot_pos.col(leg_idx) + Eigen::Vector3d(foot_deltaX, foot_deltaY, 0);
+    Eigen::Vector3d p_c2;
+
+    if (terrainAdapt) {
+        double z_shift_leg_select = (leg_idx == 0 || leg_idx == 1) ? 1.0 : -1.0;
+        double target_z_shift = z_shift_leg_select * 0.3 * sin(rel_surface_pitch);
+        p_c2 = default_foot_pos.col(leg_idx) + Eigen::Vector3d(foot_deltaX, foot_deltaY, target_z_shift);
+        
+    } else {
+        p_c2 = default_foot_pos.col(leg_idx) + Eigen::Vector3d(foot_deltaX, foot_deltaY, 0);
+    }
+
     Eigen::Vector3d p2 = p_c2;
     Eigen::Vector3d p1 = (p0 + p2)/2.0 + Eigen::Vector3d(0, 0, STEP_HEIGHT*2);
 
@@ -762,6 +787,10 @@ void go1State::computeShutdownPD() {
 }
 
 go1StateSnapshot go1State::getSnapshot() const {
+/*
+    Get a snapshot of the current go1State for sending to the go1MPC solver for
+    ground reaction force stance leg control.
+*/
     go1StateSnapshot stateSnap;
 
     stateSnap.foot_pos_world_rot = foot_pos_world_rot; // overwrite with estimate or new variable?
@@ -783,5 +812,33 @@ go1StateSnapshot go1State::getSnapshot() const {
 }
 
 void go1State::retrieveGRF(const Eigen::Matrix<double, 3, NUM_LEG> &grf) {
+/*
+    Retrieve the ground reaction force solution from the go1MPC solver.
+*/
     foot_forces_grf = grf;
+}
+
+void go1State::calcRelativeSurfacePitch() {
+/*
+    Computes the angle between two planes formed by the most recent contact foot positions
+    and the "flat" base plane. This is used to adjust the target foot heights and the base pitch
+    in order to adapt to sloped terrain and improve stability.
+*/
+    Eigen::Vector4d foot_pos_z = Eigen::Vector4d::Zero();
+    Eigen::Matrix<double, NUM_LEG, 3> W = Eigen::Matrix<double, NUM_LEG, 3>::Zero();
+    W.col(0).setOnes();
+
+    for (int i = 0; i < NUM_LEG; i++) {
+        if (contacts[i]) {
+            W.block<1, 2>(i, 1) = foot_pos.block<2, 1>(0, i).transpose();
+            foot_pos_z(i) = foot_pos(2, i);
+        } else {
+            W.block<1, 2>(i, 1) = foot_pos_liftoff.block<2, 1>(0, i).transpose();
+            foot_pos_z(i) = foot_pos_liftoff(2, i);
+        }
+    }
+
+    Eigen::Vector3d planeNormal = (W.transpose() * W).ldlt().solve(W.transpose() * foot_pos_z);
+    planeNormal.normalize();
+    rel_surface_pitch = std::atan2(-planeNormal(0), planeNormal(2));
 }

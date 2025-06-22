@@ -128,6 +128,9 @@ Eigen::Quaterniond quatMult(const Eigen::Quaterniond &quat1, const Eigen::Quater
 }
 
 Eigen::Quaterniond euler2Quat(const Eigen::Vector3d &vec) {
+/*
+    Converts roll-pitch-yaw (Euler) angles to a quaternion.
+*/
     Eigen::Quaterniond newQuat;
     double phi = vec.norm();
 
@@ -140,6 +143,10 @@ Eigen::Quaterniond euler2Quat(const Eigen::Vector3d &vec) {
 }
 
 Eigen::Matrix3d computeGamma0(const Eigen::Vector3d& gyro) {
+/*
+    Computes the Gamma_0 matrix for the given angular velocity. Used in the
+    Extended Kalman Filter (EKF) for orientation estimation.
+*/
     double phi = gyro.norm();
 
     if (phi < 1e-5) {
@@ -201,7 +208,7 @@ Eigen::Vector3d computeHipFrameFutIK(int leg_idx, Eigen::Vector3d pFut) {
     Computes the desired joint angles for each leg based on the relative 
     desired foot positions and the leg index. Don't use this for finding 
     the desired joint velocities, just multiply the Jacobian transpose with 
-    the desired foot velocities.
+    the desired foot velocities. THIS IS IN THE HIP FRAME, NOT BODY FRAME!
 
     REMEMBER LEG ORDER: FR, FL, RR, RL
 */
@@ -234,6 +241,14 @@ Eigen::Vector3d computeNewtonIK(Eigen::Matrix3d legJacobian, Eigen::Vector3d dx)
     corresponding leg Jacobian.
 */
     return legJacobian.colPivHouseholderQr().solve(dx);
+}
+
+double computeDihedralAngle(const Eigen::Vector3d &planeNormal) {
+/*
+    Computes the dihedral angle between the flat plane and a provided plane normal.
+    Unused since it calculates the magnitude of the angle, not the direction.
+*/
+    return std::acos(1/std::sqrt(std::pow(planeNormal(1), 2) + std::pow(planeNormal(2), 2) + 1)); 
 }
 
 /////////////////////////////////////

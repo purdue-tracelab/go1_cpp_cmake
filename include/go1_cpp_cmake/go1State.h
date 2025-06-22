@@ -60,8 +60,8 @@ class go1State {
         void amirHLIP();
 
         // foot trajectory functions
-        Eigen::Vector3d bezierPos(int leg_idx);
-        Eigen::Vector3d bezierVel(int leg_idx);
+        Eigen::Vector3d bezierPos(int leg_idx, bool terrainAdapt = false);
+        Eigen::Vector3d bezierVel(int leg_idx, bool terrainAdapt = false);
         Eigen::Vector3d sinusoidalPos(int leg_idx);
         Eigen::Vector3d sinusoidalVel(int leg_idx);
 
@@ -80,6 +80,7 @@ class go1State {
         bool getWalkingMode() const { return walking_mode; } // feels useless
         void setWalkingMode(bool v) { walking_mode = v; } // feels useless
         int getSwingPhase() const { return swing_phase; } // feels useless
+        void calcRelativeSurfacePitch();
 
         // default information
         Eigen::Matrix3d go1_lumped_inertia;
@@ -123,12 +124,12 @@ class go1State {
         Eigen::Matrix<double, 3, NUM_LEG> default_foot_pos; // relative frame
         Eigen::Matrix<double, 3, NUM_LEG> foot_pos_world_rot; // relative frame, but world orientation
         Eigen::Matrix<double, 3, NUM_LEG> foot_pos; // relative frame & relatve orientation
-        Eigen::Matrix<double, 3, NUM_LEG> foot_pos_old;
+        Eigen::Matrix<double, 3, NUM_LEG> foot_pos_old; // relative frame & relative orientation
         Eigen::Matrix<double, 3, NUM_LEG> foot_pos_abs; // world frame & world orientation
         Eigen::Matrix<double, 3, NUM_LEG> foot_pos_abs_est;
         Eigen::Matrix<double, 3, NUM_LEG> foot_pos_d;
         Eigen::Matrix<double, 3, NUM_LEG> foot_vel_d;
-        Eigen::Matrix<double, 3, NUM_LEG> foot_pos_liftoff;
+        Eigen::Matrix<double, 3, NUM_LEG> foot_pos_liftoff; // relative frame & relative orientation
 
         // sensor/estimated variables
         Eigen::Vector3d root_pos_est;
@@ -144,6 +145,7 @@ class go1State {
         Eigen::Matrix<double, 12, 1> joint_vel;
         Eigen::Matrix<double, 12, 1> joint_vel_d;
         Eigen::Vector4d est_contacts;
+        double rel_surface_pitch;
 
         // Amir's HLIP
         Eigen::Vector2d stanceFeetSumXY;
