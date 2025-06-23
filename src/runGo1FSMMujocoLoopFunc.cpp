@@ -295,6 +295,7 @@ void writeStateEstimatorCSVHeader(std::ostream &os) {
                     "y_k1,y_k2,y_k3,"
                     "swing_phase\n";
             break;
+
         case 1:
             os << "z_k1,z_k2,z_k3,"
                     "z_k4,z_k5,z_k6,"
@@ -325,6 +326,7 @@ void writeStateEstimatorCSVHeader(std::ostream &os) {
                     "y_k25,y_k26,y_k27,y_k28,"
                     "swing_phase\n";
             break;
+
         case 2:
             os << "z_k1,z_k2,z_k3,"
                     "z_k4,z_k5,z_k6,"
@@ -355,28 +357,20 @@ void writeStateEstimatorCSVHeader(std::ostream &os) {
                     "y_k25,y_k26,y_k27,y_k28,"
                     "swing_phase\n";
             break;
+            
         case 3:
             os << "z_k1,z_k2,z_k3,"
                     "z_k4,z_k5,z_k6,"
                     "z_k7,z_k8,z_k9,"
                     "z_k10,z_k11,z_k12,"
-                    "z_k13,z_k14,z_k15,"
-                    "z_k16,z_k17,z_k18,"
-                    "z_k19,z_k20,z_k21,z_k22,"
                     "Hx_k1,Hx_k2,Hx_k3,"
                     "Hx_k4,Hx_k5,Hx_k6,"
                     "Hx_k7,Hx_k8,Hx_k9,"
                     "Hx_k10,Hx_k11,Hx_k12,"
-                    "Hx_k13,Hx_k14,Hx_k15,"
-                    "Hx_k16,Hx_k17,Hx_k18,"
-                    "Hx_k19,Hx_k20,Hx_k21,Hx_k22,"
                     "y_k1,y_k2,y_k3,"
                     "y_k4,y_k5,y_k6,"
                     "y_k7,y_k8,y_k9,"
                     "y_k10,y_k11,y_k12,"
-                    "y_k13,y_k14,y_k15,"
-                    "y_k16,y_k17,y_k18,"
-                    "y_k19,y_k20,y_k21,y_k22,"
                     "swing_phase\n";
             break;
     }
@@ -593,7 +587,7 @@ int main(void) {
 
     storeStateEstResidualData(fsm.getState(), fsm.getMeasurement(), 
                                                 fsm.getPrediction(), 
-                                                fsm.getPostFitResidual(), 
+                                                fsm.getPostFitPrediction(), 
                                                 estimator_data_row);
     estimator_log.logLine(estimator_data_row.str());
 
@@ -618,7 +612,7 @@ int main(void) {
                                 estimator_data_row.clear();
                                 storeStateEstResidualData(fsm.getState(), fsm.getMeasurement(), 
                                                                             fsm.getPrediction(), 
-                                                                            fsm.getPostFitResidual(), 
+                                                                            fsm.getPostFitPrediction(), 
                                                                             estimator_data_row);
                                 estimator_log.logLine(estimator_data_row.str());
                             });

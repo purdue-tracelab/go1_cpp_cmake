@@ -50,8 +50,7 @@ void NaiveKF::estimateState(go1State& state) {
 
     // Check residual to calculate optimal Kalman gain
     Eigen::Matrix3d rootRot = rotZ(state.root_rpy_est(2))*rotY(state.root_rpy_est(1))*rotX(state.root_rpy_est(0));
-    z_k = rootRot.transpose() * state.root_lin_acc_meas + Eigen::Vector3d(0, 0, -9.81); // way worse than incorrect(?) version below
-    // z_k = state.root_lin_acc_meas + rootRot.transpose() * Eigen::Vector3d(0, 0, -9.81);
+    z_k = rootRot * state.root_lin_acc_meas + Eigen::Vector3d(0, 0, -9.81);
     y_res = z_k - H_k * x_k1;
     S_k = H_k * P_k1 * H_k.transpose() + R_k;
     S_k = (S_k + S_k.transpose()) / 2.0;
@@ -86,7 +85,7 @@ KinematicKF::KinematicKF() {
 
     x_k: [p, v, p_FR, p_FL, p_RR, p_RL]^T
     u_k: imu_accel
-    z_k: [p_FR, p_FL, p_RR, p_RL, v_FR, v_FL, v_RR, v_RL, fut_height]^T
+    z_k: [p_FR - p, p_FL - p, p_RR - p, p_RL, v_FR - v, v_FL - v, v_RR - v, v_RL - v, fut_height]^T
 */
     eye3.setIdentity();
 
@@ -216,7 +215,7 @@ TwoStageKF::TwoStageKF() {
 
     x_k: [p, v, p_FR, p_FL, p_RR, p_RL]^T
     u_k: imu_accel
-    z_k: [p_FR, p_FL, p_RR, p_RL, v_FR, v_FL, v_RR, v_RL, fut_height]^T
+    z_k: [p_FR - p, p_FL - p, p_RR - p, p_RL, v_FR - v, v_FL - v, v_RR - v, v_RL - v, fut_height]^T
 */
     eye3.setIdentity();
 
@@ -435,29 +434,55 @@ ExtendedKF::ExtendedKF() {
 
     x_k: [p, v, q, p_FR, p_FL, p_RR, p_RL]^T, q = root_quat (start using this or convert from)
     u_k: N/A
-    z_k: [p_FR, p_FL, p_RR, p_RL]^T
+    z_k: [p_FR - p, p_FL - p, p_RR - p, p_RL - p]^T
 */
     eye3.setIdentity();
-    foot_pos_abs.setZero();
 
-    //Resize
+    //////////////////////////////
+    // Clear internal variables //
+    //////////////////////////////
+
     x_k.setZero();
-    x_k1.setZero();
+    x_k1.setZero(); delta_x_k1_man.setZero();
     z_k.setZero();
+    foot_pos.setZero();
     y_res.setZero();
     S_k.setZero();
-    F_k.setZero();
-    H_k.setZero();
-    P_k1.setZero();
-    K_k.setZero();
 
-    // Initialize covariances
-    Q_k.setIdentity();
-    Q_k *= 0.01;
+    // // Numerical method-related variables
+    // F_k.setZero();
+    // H_k.setZero();
+    // P_k1.setZero();
+    // K_k.setZero();
+
+    // Analytical method-related variables
+    F_k_man.setZero();
+    H_k_man.setZero();
+    P_k1_man.setZero();
+    K_k_man.setZero();
+
+    ////////////////////////////
+    // Initialize covariances //
+    ////////////////////////////
+
+    // // Numerical method-related covariances
+    // Q_k.setIdentity();
+    // Q_k *= 0.01;
+
+    // R_k.setIdentity();
+    // P_k.setIdentity();
+    // P_k *= 10.0;
+
+    // Analytical method-related covariances
+    Q_k_man.setIdentity();
+    Q_k_man *= 0.01;
 
     R_k.setIdentity();
-    P_k.setIdentity();
-    P_k *= 10.0;
+    P_k_man.setIdentity();
+    P_k_man.block<3, 3>(0, 0) *= 100.0; // position
+    P_k_man.block<3, 3>(3, 3) *= 100.0; // velocity
+    P_k_man.block<3, 3>(6, 6) *= 10.0; // orientation
+    P_k_man.block<12, 12>(9, 9) *= 100.0; // foot positions
 }
 
 void ExtendedKF::collectInitialState(const go1State& state) {
@@ -470,6 +495,7 @@ void ExtendedKF::collectInitialState(const go1State& state) {
             state.foot_pos_abs.col(3);
 }
 
+/* // Numertical EKF state estimation
 void ExtendedKF::estimateState(go1State& state) {
     // Predict next state (make sure to use relative foot position as measurement)
     x_k1 = fState(x_k, state.root_lin_acc_meas, state.root_ang_vel_meas);
@@ -487,7 +513,7 @@ void ExtendedKF::estimateState(go1State& state) {
         Q_k.block<3, 3>(10 + i*3, 10 + i*3) = (1.0 + (1 - state.contacts[i]) * 1.0e10) * 0.01 * eye3;
     }
 
-    // Find state dynamics Jacobians
+    // Find model and measurement Jacobians numerically
     F_k = numericalJacobianFixedSize<22, 22>(fState, x_k, 1e-6, false, state.root_lin_acc_meas, state.root_ang_vel_meas);
     H_k = numericalJacobianFixedSize<12, 22>(hState, x_k1, 1e-6, false);
 
@@ -531,4 +557,83 @@ void ExtendedKF::estimateState(go1State& state) {
     // Push back
     x_k = x_k1;
     P_k = P_k1;
+}
+*/
+
+// Analytical EKF state estimation
+void ExtendedKF::estimateState(go1State& state) {
+    // Predict next state
+    x_k1 = fState(x_k, state.root_lin_acc_meas, state.root_ang_vel_meas);
+    
+    // Pull out measurement and useful rotation variables
+    foot_pos << state.foot_pos.col(0), 
+                state.foot_pos.col(1), 
+                state.foot_pos.col(2), 
+                state.foot_pos.col(3);
+
+    Eigen::Matrix3d C_kT_plus = quat2RotM(x_k.segment<4>(6)).transpose(); // make note this rotation should be from x_k, not x_k1
+    Eigen::Matrix3d C_k_minus = quat2RotM(x_k1.segment<4>(6)); // make note this rotation should be from x_k1, not x_k
+
+    // Update covariances based on foot contact (fix this later)
+    double trust;
+    for (int i = 0; i < NUM_LEG; i++) {
+        trust = state.contacts[i] ? 1.0 : 1e6;
+        Q_k_man.block<3, 3>(9 + i*3, 9 + i*3) = trust * 2.0 * eye3;
+        R_k.block<3, 3>(i*3, i*3) = trust * 0.001 * eye3;
+    }
+
+    // Find model Jacobian analytically (w/o bias states)
+    F_k_man.setIdentity();
+    F_k_man.block<3, 3>(0, 3) = DT_CTRL * eye3;
+    Eigen::Matrix3d skew_acc = skew(state.root_lin_acc_meas);
+    Eigen::Matrix3d C_kT_plus_f = -DT_CTRL * C_kT_plus * skew_acc;
+    F_k_man.block<3, 3>(0, 6) = 0.5 * DT_CTRL * C_kT_plus_f;
+    F_k_man.block<3, 3>(3, 6) = C_kT_plus_f;
+    F_k_man.block<3, 3>(6, 6) = computeGamma0(state.root_ang_vel_meas).transpose();
+
+    // Find measurement Jacobian analytically (w/o bias states)
+    for (int i = 0; i < NUM_LEG; i++) {
+        H_k_man.block<3, 3>(i*3, 0) = -C_k_minus;
+        H_k_man.block<3, 3>(i*3, 6) = skew(C_k_minus * (x_k1.segment<3>(10 + i*3) - x_k1.segment<3>(0)));
+        H_k_man.block<3, 3>(i*3, 9 + i*3) = C_k_minus;
+    }
+
+    // Check residual for calculating optimal Kalman gain
+    P_k1_man = F_k_man * P_k_man * F_k_man.transpose() + Q_k_man;
+    y_res = foot_pos - hState(x_k1);
+    S_k = H_k_man * P_k1_man * H_k_man.transpose() + R_k;
+    S_k = (S_k + S_k.transpose()) / 2.0;
+    K_k_man = P_k1_man * H_k_man.transpose() * S_k.inverse();
+
+    // Update estimation and covariance
+    P_k1_man -= K_k_man * H_k_man * P_k1_man;
+    delta_x_k1_man = K_k_man * y_res;
+    
+    // Bring back to full-sized state vector after update (rpy -> quat)
+    x_k1.segment<3>(0) += delta_x_k1_man.segment<3>(0);
+    x_k1.segment<3>(3) += delta_x_k1_man.segment<3>(3);
+    x_k1.segment<12>(10) += delta_x_k1_man.segment<12>(9);
+
+    Eigen::Quaterniond dq;
+    double delta_phi = delta_x_k1_man.segment<3>(6).norm();
+    if (delta_phi < 1e-8) {
+        dq = Eigen::Quaterniond(1, 0.5*delta_x_k1_man(6), 0.5*delta_x_k1_man(7), 0.5*delta_x_k1_man(8));
+    } else {
+        dq = Eigen::Quaterniond(Eigen::AngleAxisd(delta_phi, delta_x_k1_man.segment<3>(6).normalized()));
+    }
+
+    Eigen::Quaterniond q_k = Eigen::Quaterniond(x_k1(6), x_k1(7), x_k1(8), x_k1(9));
+    Eigen::Quaterniond q_k1 = q_k * dq;
+
+    // Send estimates to go1State object
+    state.root_pos_est = x_k1.segment<3>(0);
+    state.root_lin_vel_est = x_k1.segment<3>(3);
+    state.root_lin_acc_est = state.root_lin_acc_meas;
+    state.root_quat_est = q_k1.normalized();
+    state.root_rpy_est = quat2Euler(state.root_quat_est);
+    state.root_ang_vel_est = state.root_ang_vel_meas;
+
+    // Push back
+    x_k = x_k1;
+    P_k_man = P_k1_man;
 }

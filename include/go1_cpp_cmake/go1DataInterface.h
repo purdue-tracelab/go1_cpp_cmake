@@ -67,6 +67,9 @@ struct mujocoDataReader : lowLevelDataReader {
             // Copy ground truth initial position into estimated for no jumps in experiment 
             if (state.init) {
                 state.root_pos_est = state.root_pos;
+                state.root_quat_est = state.root_quat;
+                state.root_rpy_est = state.root_rpy;
+                state.root_lin_vel_est = state.root_lin_vel;
             }
 
             // calculate foot position & Jacobian before state estimation
