@@ -512,7 +512,7 @@ def plot_ekf_data(csv_file):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/estimator_tuning/CAEKF_FL_pos_vel.png")
+    plt.savefig("data/estimator_tuning/CAEKF_FL_pos.png")
 
     ############
     ## RR pos ##
@@ -554,7 +554,7 @@ def plot_ekf_data(csv_file):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/estimator_tuning/CAEKF_RR_pos_vel.png")
+    plt.savefig("data/estimator_tuning/CAEKF_RR_pos.png")
 
     ############
     ## RL pos ##
@@ -596,7 +596,7 @@ def plot_ekf_data(csv_file):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig("data/estimator_tuning/CAEKF_RL_pos_vel.png")
+    plt.savefig("data/estimator_tuning/CAEKF_RL_pos.png")
 
     plt.show()
 
