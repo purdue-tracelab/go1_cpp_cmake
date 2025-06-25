@@ -36,8 +36,12 @@ constexpr double SQUAT_JOINT_KD = 3;
 ////////////////////////////////
 
 constexpr double DT_CTRL = 0.002; // General control frequency (500 Hz)
-constexpr int STATE_EST_SELECT = 3; // 0: naive KF, 1: kinematic KF, 2: two-stage KF, 3: extended KF
+constexpr double WALK_HEIGHT = 0.27;
+
+constexpr int STATE_EST_SELECT = 2; // 0: naive KF, 1: kinematic KF, 2: two-stage KF, 3: extended KF
 constexpr bool USE_EST_FOR_CONTROL = true; // true: yes, use estimated info (ALWAYS USE ESTIMATE FOR HARDWARE), false: no, use ground truth info, 
+constexpr int USE_TERRAIN_ADAPT = false; // false: no terrain adaptation, true: use terrain adaptation (adjusts target foot height and base pitch)
+
 constexpr double MUJOCO_CONTACT_THRESH = 3.0;
 constexpr int UNITREE_SDK_CONTACT_THRESH = 135; // robot-dependent
 
@@ -45,8 +49,7 @@ constexpr int UNITREE_SDK_CONTACT_THRESH = 135; // robot-dependent
 // Swing leg PD parameters //
 /////////////////////////////
 
-constexpr int PLANNER_SELECT = 2; // 0: Raibert Heuristic, 1: Raibert Heuristic with Capture Point, 2: HT-LIP
-constexpr int USE_TERRAIN_ADAPT = false; // false: no terrain adaptation, true: use terrain adaptation (adjusts target foot height and base pitch)
+constexpr int PLANNER_SELECT = 0; // 0: Raibert Heuristic, 1: Raibert Heuristic with Capture Point, 2: HT-LIP
 constexpr int SWING_PD_SELECT = 1; // 0: Cartesian PD, 1: Joint PD (Joint PD recommended for hardware)
 constexpr double SWING_TRAJ_SELECT = 0; // 0: Bezier, 1: Sinusoidal (sinusoidal broken atm)
 constexpr int SWING_PHASE_MAX = 199; // swap between 0-99 (0.2 s gait cycle) and 0-199 (0.4 s gait cycle) for DT_CTRL = 0.002
@@ -60,7 +63,6 @@ constexpr double SWING_KP_JOINT = 80;
 constexpr double SWING_KD_JOINT = 3;
 
 // Swing leg Bezier curve parameters
-constexpr double WALK_HEIGHT = 0.27;
 constexpr double STEP_HEIGHT = 0.10;
 constexpr double FOOT_DELTA_X_LIMIT = 0.20;
 constexpr double FOOT_DELTA_Y_LIMIT = 0.10;

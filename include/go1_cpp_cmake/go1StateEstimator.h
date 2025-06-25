@@ -35,12 +35,13 @@ class NaiveKF : public go1StateEstimator {
         void collectInitialState(const go1State& state) override;
         void estimateState(go1State& state) override;
         Eigen::VectorXd getMeasurement() override { return z_k; }
-        Eigen::VectorXd getPrediction() override { return H_k*x_k1; }
+        Eigen::VectorXd getPrediction() override { return H_k*x_k1_getter; }
         Eigen::VectorXd getPostFitResidual() override { return z_k - H_k*x_k1; }
         Eigen::VectorXd getPostFitPrediction() override { return H_k*x_k; }
 
     private:
         Eigen::Matrix<double, 9, 1> x_k, x_k1;
+        Eigen::Matrix<double, 9, 1> x_k1_getter; // stores x_k1 from BEFORE the Kalman update
         Eigen::Vector3d z_k, y_res;
         Eigen::Matrix<double, 9, 9> F_k, P_k, P_k1, Q_k;
         Eigen::Matrix<double, 3, 9> H_k;
@@ -56,12 +57,13 @@ class KinematicKF : public go1StateEstimator {
         void estimateState(go1State& state) override;
         void setFootHeightResidual(double h) override;
         Eigen::VectorXd getMeasurement() override { return z_k; }
-        Eigen::VectorXd getPrediction() override { return H_k*x_k1; }
+        Eigen::VectorXd getPrediction() override { return H_k*x_k1_getter; }
         Eigen::VectorXd getPostFitResidual() override { return z_k - H_k*x_k1; }
         Eigen::VectorXd getPostFitPrediction() override { return H_k*x_k; }
 
     private:
         Eigen::Matrix<double, 18, 1> x_k, x_k1;
+        Eigen::Matrix<double, 18, 1> x_k1_getter; // stores x_k1 from BEFORE the Kalman update
         Eigen::Vector3d u_k;
         Eigen::Matrix<double, 28, 1> z_k, y_res;
         Eigen::Matrix<double, 18, 18> F_k, P_k, P_k1, Q_k;
@@ -79,13 +81,14 @@ class TwoStageKF : public go1StateEstimator {
         void estimateState(go1State& state) override;
         void setFootHeightResidual(double h) override;
         Eigen::VectorXd getMeasurement() override { return z_k; }
-        Eigen::VectorXd getPrediction() override { return H_k*x_k1; }
+        Eigen::VectorXd getPrediction() override { return H_k*x_k1_getter; }
         Eigen::VectorXd getPostFitResidual() override { return z_k - H_k*x_k1; }
         Eigen::VectorXd getPostFitPrediction() override { return H_k*x_k; }
 
     private:
         // Estimator matrices
         Eigen::Matrix<double, 18, 1> x_k, x_k1;
+        Eigen::Matrix<double, 18, 1> x_k1_getter; // stores x_k1 from BEFORE the Kalman update
         Eigen::Vector3d u_k;
         Eigen::Matrix<double, 28, 1> z_k, y_res;
         Eigen::Matrix<double, 18, 18> F_k, P_k, P_k1, Q_k, Q_0;
@@ -170,16 +173,16 @@ class ExtendedKF : public go1StateEstimator {
         void collectInitialState(const go1State& state) override;
         void estimateState(go1State& state) override;
         Eigen::VectorXd getMeasurement() override { return z_k; }
-        Eigen::VectorXd getPrediction() override { return hState(x_k1); }
+        Eigen::VectorXd getPrediction() override { return hState(x_k1_getter); }
         Eigen::VectorXd getPostFitResidual() override { return z_k - hState(x_k1); }
         Eigen::VectorXd getPostFitPrediction() override { return hState(x_k); }
     
     private:
         // Generic state variables and matrices
         Eigen::Matrix<double, 22, 1> x_k, x_k1;
+        Eigen::Matrix<double, 22, 1> x_k1_getter; // stores x_k1 from BEFORE the Kalman update
         Eigen::Matrix<double, 12, 1> z_k, y_res;
         Eigen::Matrix<double, 12, 12> R_k, S_k;
-        Eigen::Matrix<double, 12, 1> foot_pos;
         Eigen::Matrix3d eye3;
 
         // // Numerical method-related matrices
@@ -193,6 +196,8 @@ class ExtendedKF : public go1StateEstimator {
         Eigen::Matrix<double, 21, 21> F_k_man, Q_k_man, P_k_man, P_k1_man;
         Eigen::Matrix<double, 21, 12> K_k_man;
         Eigen::Matrix<double, 12, 21> H_k_man;
+
+        // Empirical noise covariance calculations
 };
 
 // virtual interface pointer function to create designated estimator object

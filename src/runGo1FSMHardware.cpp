@@ -277,8 +277,8 @@ void keyboardControl(go1FSM &fsm) {
     Eigen::Vector3d v_cmd = Eigen::Vector3d::Zero();
     double yaw_cmd = 0;
 
-    if (hold_forward) v_cmd.x() += 0.2;
-    if (hold_backward) v_cmd.x() -= 0.2;
+    if (hold_forward) v_cmd.x() += 0.205; // 0.22 // 0.2
+    if (hold_backward) v_cmd.x() -= 0.205;
     if (hold_left) v_cmd.y() += 0.2;
     if (hold_right) v_cmd.y() -= 0.2;
     if (hold_yawL) yaw_cmd += 1.0;

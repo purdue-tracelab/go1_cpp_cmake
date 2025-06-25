@@ -16,7 +16,7 @@ NaiveKF::NaiveKF() {
 
     // Clear internal variables
     x_k.setZero();
-    x_k1.setZero();
+    x_k1.setZero(); x_k1_getter.setZero();
     z_k.setZero();
     y_res.setZero();
     P_k1.setZero();
@@ -46,6 +46,7 @@ void NaiveKF::collectInitialState(const go1State& state) {
 void NaiveKF::estimateState(go1State& state) {
     // Predict next state
     x_k1 = F_k * x_k;
+    x_k1_getter = x_k1; // Store x_k1 before the Kalman update
     P_k1 = F_k * P_k * F_k.transpose() + Q_k;
 
     // Check residual to calculate optimal Kalman gain
@@ -91,7 +92,7 @@ KinematicKF::KinematicKF() {
 
     // Clear internal variables
     x_k.setZero();
-    x_k1.setZero();
+    x_k1.setZero(); x_k1_getter.setZero();
     u_k.setZero();
     z_k.setZero();
     y_res.setZero();
@@ -165,6 +166,7 @@ void KinematicKF::estimateState(go1State& state) {
 
     // Predict next state
     x_k1 = F_k * x_k + B_k * u_k;
+    x_k1_getter = x_k1; // Store x_k1 before the Kalman update
     P_k1 = F_k * P_k * F_k.transpose() + Q_k;
 
     // Find current measurement
@@ -221,7 +223,7 @@ TwoStageKF::TwoStageKF() {
 
     // Clear internal variables
     x_k.setZero();
-    x_k1.setZero();
+    x_k1.setZero(); x_k1_getter.setZero();
     u_k.setZero();
     z_k.setZero();
     y_res.setZero();
@@ -235,16 +237,11 @@ TwoStageKF::TwoStageKF() {
     // Initialize covariances //
     /////////////////////////////
 
-    // My Q values (try increasing)
+    // My Q values
     Q_k.setIdentity();
     Q_k.block<3, 3>(0, 0) = DT_CTRL * eye3 / 20.0;
     Q_k.block<3, 3>(3, 3) = DT_CTRL * 9.81 * eye3 / 20.0;
-    // Q_k.block<3, 3>(0, 0) = 0.02 * DT_CTRL * eye3;
-    // Q_k.block<3, 3>(3, 3) = 0.1 * DT_CTRL * 9.81 * eye3;
-
-    for (int i = 0; i < NUM_LEG; i++) {
-        Q_k.block<3, 3>(6 + i*3, 6 + i*3) = 0.03 * DT_CTRL * eye3;
-    }
+    Q_k.block<12, 12>(6, 6) = DT_CTRL * Eigen::Matrix<double, 12, 12>::Identity();
 
     // // Muqun's Q values
     // Q_0.setIdentity();
@@ -254,11 +251,7 @@ TwoStageKF::TwoStageKF() {
 
     // My R values
     R_k.setIdentity();
-    for (int i = 0; i < NUM_LEG; i++) {
-        R_k.block<3, 3>(i*3, i*3) = 0.001 * eye3;
-        R_k.block<3, 3>(NUM_LEG*3 + i*3, NUM_LEG*3 + i*3) = 0.1 * eye3;
-        R_k(NUM_LEG*6 + i, NUM_LEG*6 + i) = 0.001;
-    }
+    // R_k *= 0.001; // trying new idea of always trusting the measurements consistently
 
     // // Muqun's R values
     // R_0.setIdentity();
@@ -266,12 +259,7 @@ TwoStageKF::TwoStageKF() {
     P_k.setIdentity();
 
     // My P values
-    P_k.block<3, 3>(0, 0) = 0.01 * eye3;
-    P_k.block<3, 3>(3, 3) = 0.01 * eye3;
-
-    for (int i = 0;i < NUM_LEG; i++) {
-        P_k.block<3, 3>(6 + i*3, 6 + i*3) = 0.01 * eye3;
-    }
+    P_k *= 0.01;
 
     // // Muqun's P values
     // P_k *= 100.0;
@@ -348,11 +336,13 @@ void TwoStageKF::estimateState(go1State& state) {
     // My Q_k and R_k contact-based values
     for (int i = 0; i < NUM_LEG; i++) {
         trust = state.contacts[i] ? 1.0 : 1e6;
-        Q_k.block<3, 3>(6 + i*3, 6 + i*3) = trust * DT_CTRL * 0.03 * eye3;
-        R_k.block<3, 3>(i*3, i*3) = trust * 0.005 * eye3;
-        R_k.block<3, 3>(NUM_LEG*3 + i*3, NUM_LEG*3 + i*3) = trust * 2.0 * eye3; //trust * 0.6 * eye3; //trust * 0.3 * eye3;
-        R_k(NUM_LEG*3 + i*3 + 2, NUM_LEG*3 + i*3 + 2) = trust * 0.3; // z height tuning
-        R_k(NUM_LEG*6 + i, NUM_LEG*6 + i) = trust * 0.001;
+        Q_k.block<3, 3>(6 + i*3, 6 + i*3) = trust * DT_CTRL * 0.06 * eye3;
+
+        // New idea: why is R being affected by contact if FK for rigid body is accurate? So keep R constant?
+        R_k.block<3, 3>(i*3, i*3) = trust * 0.002 * eye3;
+        R_k.block<3, 3>(NUM_LEG*3 + i*3, NUM_LEG*3 + i*3) = trust * 0.5 * eye3; // trust * 2.0 * eye3;
+        R_k(NUM_LEG*3 + i*3 + 2, NUM_LEG*3 + i*3 + 2) = trust * 0.03; // z velocity tuning
+        R_k(NUM_LEG*6 + i, NUM_LEG*6 + i) = trust * 0.01;
     } 
 
     // // Muqun's Q_k and R_k contact-based values
@@ -367,6 +357,7 @@ void TwoStageKF::estimateState(go1State& state) {
 
     // Predict next state
     x_k1 = F_k * x_k + B_k * u_k;
+    x_k1_getter = x_k1; // Store x_k1 before the Kalman update
     P_k1 = F_k * P_k * F_k.transpose() + Q_k;
 
     //////////////////////////////
@@ -443,9 +434,8 @@ ExtendedKF::ExtendedKF() {
     //////////////////////////////
 
     x_k.setZero();
-    x_k1.setZero(); delta_x_k1_man.setZero();
+    x_k1.setZero(); delta_x_k1_man.setZero(); x_k1_getter.setZero();
     z_k.setZero();
-    foot_pos.setZero();
     y_res.setZero();
     S_k.setZero();
 
@@ -475,14 +465,20 @@ ExtendedKF::ExtendedKF() {
 
     // Analytical method-related covariances
     Q_k_man.setIdentity();
+
+    // // Best position Q_k gains
+    // Q_k_man.block<3, 3>(0, 0) = DT_CTRL * eye3 / 20.0;
+    // Q_k_man.block<3, 3>(3, 3) = DT_CTRL * 9.81 * eye3 / 20.0;
+    // Q_k_man.block<3, 3>(3, 3) *= 0.01;
+
+    // Best orientation Q_k gains
     Q_k_man *= 0.01;
 
     R_k.setIdentity();
+
     P_k_man.setIdentity();
-    P_k_man.block<3, 3>(0, 0) *= 100.0; // position
-    P_k_man.block<3, 3>(3, 3) *= 100.0; // velocity
-    P_k_man.block<3, 3>(6, 6) *= 10.0; // orientation
-    P_k_man.block<12, 12>(9, 9) *= 100.0; // foot positions
+    // P_k_man *= 0.01; // best position P_k gains
+    P_k_man *= 100.0; // best orientation P_k gains
 }
 
 void ExtendedKF::collectInitialState(const go1State& state) {
@@ -564,12 +560,13 @@ void ExtendedKF::estimateState(go1State& state) {
 void ExtendedKF::estimateState(go1State& state) {
     // Predict next state
     x_k1 = fState(x_k, state.root_lin_acc_meas, state.root_ang_vel_meas);
+    x_k1_getter = x_k1; // Store x_k1 before the Kalman update
     
     // Pull out measurement and useful rotation variables
-    foot_pos << state.foot_pos.col(0), 
-                state.foot_pos.col(1), 
-                state.foot_pos.col(2), 
-                state.foot_pos.col(3);
+    z_k << state.foot_pos.col(0), 
+            state.foot_pos.col(1), 
+            state.foot_pos.col(2), 
+            state.foot_pos.col(3);
 
     Eigen::Matrix3d C_kT_plus = quat2RotM(x_k.segment<4>(6)).transpose(); // make note this rotation should be from x_k, not x_k1
     Eigen::Matrix3d C_k_minus = quat2RotM(x_k1.segment<4>(6)); // make note this rotation should be from x_k1, not x_k
@@ -578,8 +575,10 @@ void ExtendedKF::estimateState(go1State& state) {
     double trust;
     for (int i = 0; i < NUM_LEG; i++) {
         trust = state.contacts[i] ? 1.0 : 1e6;
-        Q_k_man.block<3, 3>(9 + i*3, 9 + i*3) = trust * 2.0 * eye3;
-        R_k.block<3, 3>(i*3, i*3) = trust * 0.001 * eye3;
+        // Q_k_man.block<3, 3>(9 + i*3, 9 + i*3) = trust * DT_CTRL * 0.06 * eye3; // best position Q_k gains
+        Q_k_man.block<3, 3>(9 + i*3, 9 + i*3) = trust * DT_CTRL * 2.0 * eye3; // best orientation Q_k gains
+        // R_k.block<3, 3>(i*3, i*3) = trust * 0.002 * eye3; // best position R_k gains
+        R_k.block<3, 3>(i*3, i*3) = trust * 0.001 * eye3; // best orientation R_k gains
     }
 
     // Find model Jacobian analytically (w/o bias states)
@@ -600,7 +599,7 @@ void ExtendedKF::estimateState(go1State& state) {
 
     // Check residual for calculating optimal Kalman gain
     P_k1_man = F_k_man * P_k_man * F_k_man.transpose() + Q_k_man;
-    y_res = foot_pos - hState(x_k1);
+    y_res = z_k - hState(x_k1);
     S_k = H_k_man * P_k1_man * H_k_man.transpose() + R_k;
     S_k = (S_k + S_k.transpose()) / 2.0;
     K_k_man = P_k1_man * H_k_man.transpose() * S_k.inverse();
