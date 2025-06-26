@@ -38,7 +38,7 @@ def shade_by_phase(ax, time, phase, threshold=99,
 
 def plot_state_data(csv_file, absolute=False):
     # Load data
-    df = pd.read_csv(csv_file)
+    df = pd.read_csv(csv_file, on_bad_lines='skip', engine='python', encoding='utf-8', encoding_errors='ignore')
     data_length = len(df)
     time = np.arange(0, data_length * 0.002, 0.002)
 

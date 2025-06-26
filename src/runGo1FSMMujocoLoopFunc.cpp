@@ -520,12 +520,7 @@ void keyboardControl(go1FSM &fsm) {
     if (hold_yawL) yaw_cmd += 1.0;
     if (hold_yawR) yaw_cmd -= 1.0;
 
-    double yaw = fsm.getState().root_rpy_est(2);
-    Eigen::Matrix3d rootRotZ = rotZ(yaw);
-    Eigen::Vector3d v_world = rootRotZ * v_cmd;
-
-    fsm.setDesiredVel(v_world, yaw_cmd);
-    fsm.setDesiredPos();
+    fsm.setDesiredTrajectory(v_cmd, yaw_cmd);
 
     // Debug output
     mvprintw(0, 0,

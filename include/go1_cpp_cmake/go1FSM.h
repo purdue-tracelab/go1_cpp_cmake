@@ -33,8 +33,7 @@ class go1FSM {
         Eigen::VectorXd getPrediction() const { return estimator_->getPrediction(); }
         Eigen::VectorXd getPostFitResidual() const { return estimator_->getPostFitResidual(); }
         Eigen::VectorXd getPostFitPrediction() const {return estimator_->getPostFitPrediction(); }
-        void setDesiredPos();
-        void setDesiredVel(const Eigen::Vector3d &lin_vel_cmd, double &yaw_cmd);
+        void setDesiredTrajectory(const Eigen::Vector3d &lin_vel_cmd, double &yaw_cmd);
 
         void collectInitialState() {
             data_interface_->pullSensorData(state_);

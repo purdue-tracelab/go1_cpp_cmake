@@ -59,16 +59,15 @@ const char* go1FSM::go1FiniteState2Str() {
     }
 }
 
-void go1FSM::setDesiredVel(const Eigen::Vector3d &lin_vel_cmd, double &yaw_cmd) {
-    state_.root_lin_vel_d = lin_vel_cmd;
+void go1FSM::setDesiredTrajectory(const Eigen::Vector3d &lin_vel_cmd, double &yaw_cmd) {
     state_.root_ang_vel_d(2) = yaw_cmd;
-}
 
-void go1FSM::setDesiredPos() {
-    state_.root_pos_d += state_.root_lin_vel_d * DT_CTRL;
     auto rpy = state_.root_rpy_d;
     double new_yaw = rpy(2) + state_.root_ang_vel_d(2) * DT_CTRL;
     new_yaw = std::atan2(std::sin(new_yaw), std::cos(new_yaw));
+    state_.root_lin_vel_d = rotZ(new_yaw)*lin_vel_cmd;
+
+    state_.root_pos_d += state_.root_lin_vel_d * DT_CTRL;
     rpy(2) = new_yaw;
     state_.root_rpy_d = rpy; 
 }

@@ -311,19 +311,16 @@ void keyControl(const mjtNum simTime) {
     if (hold_yawL) yaw_cmd += 1.0;
     if (hold_yawR) yaw_cmd -= 1.0;
 
-    double yaw = USE_EST_FOR_CONTROL ? mujoco_go1_state.root_rpy_est(2) : mujoco_go1_state.root_rpy(2);
-    Eigen::Matrix3d rootRotZ = rotZ(yaw);
-    Eigen::Vector3d v_world = rootRotZ * v_cmd;
-
-    mujoco_go1_state.root_lin_vel_d = v_world;
     mujoco_go1_state.root_ang_vel_d(2) = yaw_cmd;
 
-    mujoco_go1_state.root_pos_d += mujoco_go1_state.root_lin_vel_d * DT_CTRL;
     auto rpy = mujoco_go1_state.root_rpy_d;
     double new_yaw = rpy(2) + mujoco_go1_state.root_ang_vel_d(2) * DT_CTRL;
     new_yaw = std::atan2(std::sin(new_yaw), std::cos(new_yaw));
+    mujoco_go1_state.root_lin_vel_d = rotZ(new_yaw)*v_cmd;
+
+    mujoco_go1_state.root_pos_d += mujoco_go1_state.root_lin_vel_d * DT_CTRL;
     rpy(2) = new_yaw;
-    mujoco_go1_state.root_rpy_d = rpy;
+    mujoco_go1_state.root_rpy_d = rpy; 
 
     // Debug output
     mvprintw(0, 0,

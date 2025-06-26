@@ -38,7 +38,7 @@ constexpr double SQUAT_JOINT_KD = 3;
 constexpr double DT_CTRL = 0.002; // General control frequency (500 Hz)
 constexpr double WALK_HEIGHT = 0.27;
 
-constexpr int STATE_EST_SELECT = 2; // 0: naive KF, 1: kinematic KF, 2: two-stage KF, 3: extended KF
+constexpr int STATE_EST_SELECT = 3; // 0: naive KF, 1: kinematic KF, 2: two-stage KF, 3: extended KF
 constexpr bool USE_EST_FOR_CONTROL = true; // true: yes, use estimated info (ALWAYS USE ESTIMATE FOR HARDWARE), false: no, use ground truth info, 
 constexpr int USE_TERRAIN_ADAPT = false; // false: no terrain adaptation, true: use terrain adaptation (adjusts target foot height and base pitch)
 

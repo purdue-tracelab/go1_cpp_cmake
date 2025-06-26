@@ -475,6 +475,7 @@ ExtendedKF::ExtendedKF() {
     Q_k_man *= 0.01;
 
     R_k.setIdentity();
+    R_k *= 0.001;
 
     P_k_man.setIdentity();
     // P_k_man *= 0.01; // best position P_k gains
@@ -578,7 +579,7 @@ void ExtendedKF::estimateState(go1State& state) {
         // Q_k_man.block<3, 3>(9 + i*3, 9 + i*3) = trust * DT_CTRL * 0.06 * eye3; // best position Q_k gains
         Q_k_man.block<3, 3>(9 + i*3, 9 + i*3) = trust * DT_CTRL * 2.0 * eye3; // best orientation Q_k gains
         // R_k.block<3, 3>(i*3, i*3) = trust * 0.002 * eye3; // best position R_k gains
-        R_k.block<3, 3>(i*3, i*3) = trust * 0.001 * eye3; // best orientation R_k gains
+        // R_k.block<3, 3>(i*3, i*3) = trust * 0.001 * eye3; // best orientation R_k gains
     }
 
     // Find model Jacobian analytically (w/o bias states)
@@ -593,7 +594,7 @@ void ExtendedKF::estimateState(go1State& state) {
     // Find measurement Jacobian analytically (w/o bias states)
     for (int i = 0; i < NUM_LEG; i++) {
         H_k_man.block<3, 3>(i*3, 0) = -C_k_minus;
-        H_k_man.block<3, 3>(i*3, 6) = skew(C_k_minus * (x_k1.segment<3>(10 + i*3) - x_k1.segment<3>(0)));
+        H_k_man.block<3, 3>(i*3, 6) = -skew(C_k_minus * (x_k1.segment<3>(10 + i*3) - x_k1.segment<3>(0)));
         H_k_man.block<3, 3>(i*3, 9 + i*3) = C_k_minus;
     }
 
