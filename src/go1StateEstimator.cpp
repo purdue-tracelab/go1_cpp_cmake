@@ -75,141 +75,9 @@ void NaiveKF::estimateState(go1State& state) {
 
 /////////////////////////////////////////////
 
-KinematicKF::KinematicKF() {
+MIT_TwoStageKF::MIT_TwoStageKF() {
 /*
-    KinematicKF executes the kinematic Kalman filter by using integrated sensor 
-    measurements like NaiveKF, but also estimates foot positions using forward
-    kinematics of Go1, adding an "anchor" to resist typical drift since using
-    accurate and precise joint encoders is typically stable and adds observability
-    to the filter as a whole. Copied from ShuoYang's filter, which is similar to
-    MIT's two-state controller.
-
-    x_k: [p, v, p_FR, p_FL, p_RR, p_RL]^T
-    u_k: imu_accel
-    z_k: [p_FR - p, p_FL - p, p_RR - p, p_RL, v_FR - v, v_FL - v, v_RR - v, v_RL - v, fut_height]^T
-*/
-    eye3.setIdentity();
-
-    // Clear internal variables
-    x_k.setZero();
-    x_k1.setZero(); x_k1_getter.setZero();
-    u_k.setZero();
-    z_k.setZero();
-    y_res.setZero();
-    P_k1.setZero();
-    S_k.setZero();
-    K_k.setZero();
-
-    // Initialize covariances
-    Q_k.setIdentity();
-    Q_k.block<3, 3>(0, 0) = 0.01 * DT_CTRL * eye3 / 20.0;
-    Q_k.block<3, 3>(3, 3) = 0.01 * DT_CTRL * 9.81 * eye3 / 20.0;
-
-    for (int i = 0; i < NUM_LEG; i++) {
-        Q_k.block<3, 3>(6 + i*3, 6 + i*3) = 0.03 * DT_CTRL * eye3;
-    }
-
-    R_k.setIdentity();
-    for (int i = 0; i < NUM_LEG; i++) {
-        R_k.block<3, 3>(i*3, i*3) = 0.001 * eye3;
-        R_k.block<3, 3>(NUM_LEG*3 + i*3, NUM_LEG*3 + i*3) = 0.1 * eye3;
-        R_k(NUM_LEG*6 + i, NUM_LEG*6 + i) = 0.001;
-    }
-
-    P_k.setIdentity();
-    P_k *= 3;
-
-    // Set up discrete-time dynamics and measurement models
-    F_k.setIdentity();
-    F_k.block<3, 3>(0, 3) = DT_CTRL * eye3;
-    B_k.setZero();
-    B_k.block<3, 3>(3, 0) = DT_CTRL * eye3;
-
-    H_k.setZero();
-    for (int i = 0; i < NUM_LEG; i++) {
-        H_k.block<3, 3>(i*3, 0) = -eye3;
-        H_k.block<3, 3>(i*3, 6 + i*3) = eye3;
-        H_k.block<3, 3>(NUM_LEG*3 + i*3, 3) = -eye3;
-        H_k(NUM_LEG*6 + i, 8 + i*3) = 1;
-    }
-}
-
-void KinematicKF::collectInitialState(const go1State& state) {
-    x_k << state.root_pos, 
-        state.root_lin_vel, 
-        state.foot_pos_abs.col(0),
-        state.foot_pos_abs.col(1),
-        state.foot_pos_abs.col(2),
-        state.foot_pos_abs.col(3);
-}
-
-void KinematicKF::setFootHeightResidual(double h) {
-    for (int i = 0; i < NUM_LEG; i++) {
-        z_k(NUM_LEG*6 + i) = h;
-    }
-}
-
-void KinematicKF::estimateState(go1State& state) {
-    // Collect input
-    Eigen::Matrix3d rootRot = rotZ(state.root_rpy_est(2))*rotY(state.root_rpy_est(1))*rotX(state.root_rpy_est(0));
-    u_k = rootRot * state.root_lin_acc_meas + Eigen::Vector3d(0, 0, -9.81);
-
-    // Update covariances based on foot contact
-    double trust;
-    for (int i = 0; i < NUM_LEG; i++) {
-        trust = state.contacts[i] ? 1.0 : 1e6;
-        Q_k.block<3, 3>(6 + i*3, 6 + i*3) = trust * DT_CTRL * 0.03 * eye3;
-        R_k.block<3, 3>(i*3, i*3) = trust * 0.001 * eye3;
-        R_k.block<3, 3>(NUM_LEG*3 + i*3, NUM_LEG*3 + i*3) = trust * 0.1 * eye3;
-        R_k(NUM_LEG*6 + i, NUM_LEG*6 + i) = trust * 0.001;
-    }
-
-    // Predict next state
-    x_k1 = F_k * x_k + B_k * u_k;
-    x_k1_getter = x_k1; // Store x_k1 before the Kalman update
-    P_k1 = F_k * P_k * F_k.transpose() + Q_k;
-
-    // Find current measurement
-    for (int i = 0; i < NUM_LEG; i++) {
-        z_k.block<3, 1>(i*3, 0) = state.foot_pos_world_rot.col(i);
-        Eigen::Vector3d v_fut = rootRot * (state.foot_pos.col(i) - state.foot_pos_old.col(i)) / DT_CTRL - skew(state.root_ang_vel_meas) * state.foot_pos_world_rot.col(i);
-        z_k.block<3, 1>(NUM_LEG*3 + i*3, 0) = v_fut;
-    }
-
-    // Check residual for calculating optimal Kalman gain
-    y_res = z_k - H_k * x_k1;
-    S_k = H_k * P_k1 * H_k.transpose() + R_k;
-    S_k = (S_k + S_k.transpose()) / 2.0;
-    K_k = P_k1 * H_k.transpose() * S_k.inverse();
-
-    // Update estimation and covariance
-    x_k1 += K_k * y_res;
-    P_k1 -= K_k * H_k * P_k1;
-
-    // Optional adjustment, not sure why it's used
-    if (P_k1.block<2, 2>(0, 0).determinant() > 1e-6) {
-        P_k1.block<2, 16>(0, 2).setZero();
-        P_k1.block<16, 2>(2, 0).setZero();
-        P_k1.block<2, 2>(0, 0) /= 10.0;
-    }
-
-    // Send estimates to go1State object
-    state.root_pos_est = x_k1.segment<3>(0);
-    state.root_lin_vel_est = x_k1.segment<3>(3);
-    state.root_lin_acc_est = state.root_lin_acc_meas;
-    state.root_rpy_est = state.root_rpy + DT_CTRL * state.root_ang_vel_meas;
-    state.root_ang_vel_est = state.root_ang_vel_meas;
-    
-    // Push back
-    x_k = x_k1;
-    P_k = P_k1;
-}
-
-/////////////////////////////////////////////
-
-TwoStageKF::TwoStageKF() {
-/*
-    TwoStageKF executes the two-state Kalman filter method by first
+    MIT_TwoStageKF executes the two-state Kalman filter method by first
     estimating the orientation change of Go1, then using said estimations
     for estimating position and velocity changes. Found in MIT's Cheetah
     3 Convex MPC paper. Attempts to alleviate deviations due to
@@ -288,7 +156,7 @@ TwoStageKF::TwoStageKF() {
     // }
 }
 
-void TwoStageKF::collectInitialState(const go1State& state) {
+void MIT_TwoStageKF::collectInitialState(const go1State& state) {
     x_k << state.root_pos,
             state.root_lin_vel,
             state.foot_pos_abs.col(0),
@@ -297,13 +165,13 @@ void TwoStageKF::collectInitialState(const go1State& state) {
             state.foot_pos_abs.col(3);
 }
 
-void TwoStageKF::setFootHeightResidual(double h) {
+void MIT_TwoStageKF::setFootHeightResidual(double h) {
     for (int i = 0; i < NUM_LEG; i++) {
         z_k(NUM_LEG*6 + i) = h;
     }
 }
 
-void TwoStageKF::estimateState(go1State& state) {
+void MIT_TwoStageKF::estimateState(go1State& state) {
     // Estimate orientation
     double kappa = 0.1 * std::clamp(1.0 - (state.root_lin_acc_meas - Eigen::Vector3d(0, 0, 9.81)).norm() / 9.81, 0.0, 1.0);
     Eigen::Matrix3d rootRot = rotZ(state.root_rpy_est(2))*rotY(state.root_rpy_est(1))*rotX(state.root_rpy_est(0));
@@ -367,8 +235,8 @@ void TwoStageKF::estimateState(go1State& state) {
     // My measurement model
     for (int i = 0; i < NUM_LEG; i++) {
         z_k.block<3, 1>(i*3, 0) = state.foot_pos_world_rot.col(i);
-        Eigen::Vector3d v_fut = rootRot * (state.foot_pos.col(i) - state.foot_pos_old.col(i)) / DT_CTRL 
-                                + rootRot * skew(state.root_ang_vel_meas) * state.foot_pos.col(i);
+        Eigen::Vector3d v_fut = rootRotEst * (state.foot_pos.col(i) - state.foot_pos_old.col(i)) / DT_CTRL 
+                                + rootRotEst * skew(state.root_ang_vel_meas) * state.foot_pos.col(i);
         z_k.block<3, 1>(NUM_LEG*3 + i*3, 0) = v_fut;
         z_k(NUM_LEG*6 + i) = 0.02; // removes z-height offset for foot position
     }
@@ -414,12 +282,12 @@ void TwoStageKF::estimateState(go1State& state) {
 
 /////////////////////////////////////////////
 
-ExtendedKF::ExtendedKF() {
+ETHZ_EKF::ETHZ_EKF() {
 /*
-    ExtendedKF executes the extended Kalman filter by linearizing the
+    ETHZ_EKF executes the extended Kalman filter by linearizing the
     nonlinear dynamics and relationship between position and orientation by
     finding the Jacobian of the continuous state dynamics at each
-    state according to fState & hState in the header file. Should be
+    state according to fState_ETHZ & hState_ETHZ in the header file. Should be
     more accurate than all the linear Kalman filters, but not perfect.
     Based on the ETH Zurich paper showed to me by Zijian & Falak.
 
@@ -429,60 +297,37 @@ ExtendedKF::ExtendedKF() {
 */
     eye3.setIdentity();
 
-    //////////////////////////////
-    // Clear internal variables //
-    //////////////////////////////
-
+    // Clear internal variables
     x_k.setZero();
-    x_k1.setZero(); delta_x_k1_man.setZero(); x_k1_getter.setZero();
+    x_k1.setZero(); delta_x_k1.setZero(); x_k1_getter.setZero();
     z_k.setZero();
     y_res.setZero();
     S_k.setZero();
+    F_k.setZero();
+    H_k.setZero();
+    P_k1.setZero();
+    K_k.setZero();
 
-    // // Numerical method-related variables
-    // F_k.setZero();
-    // H_k.setZero();
-    // P_k1.setZero();
-    // K_k.setZero();
-
-    // Analytical method-related variables
-    F_k_man.setZero();
-    H_k_man.setZero();
-    P_k1_man.setZero();
-    K_k_man.setZero();
-
-    ////////////////////////////
-    // Initialize covariances //
-    ////////////////////////////
-
-    // // Numerical method-related covariances
-    // Q_k.setIdentity();
-    // Q_k *= 0.01;
-
-    // R_k.setIdentity();
-    // P_k.setIdentity();
-    // P_k *= 10.0;
-
-    // Analytical method-related covariances
-    Q_k_man.setIdentity();
+    // Initialize covariances
+    Q_k.setIdentity();
 
     // // Best position Q_k gains
-    // Q_k_man.block<3, 3>(0, 0) = DT_CTRL * eye3 / 20.0;
-    // Q_k_man.block<3, 3>(3, 3) = DT_CTRL * 9.81 * eye3 / 20.0;
-    // Q_k_man.block<3, 3>(3, 3) *= 0.01;
+    // Q_k.block<3, 3>(0, 0) = DT_CTRL * eye3 / 20.0;
+    // Q_k.block<3, 3>(3, 3) = DT_CTRL * 9.81 * eye3 / 20.0;
+    // Q_k.block<3, 3>(3, 3) *= 0.01;
 
     // Best orientation Q_k gains
-    Q_k_man *= 0.01;
+    Q_k *= 0.01;
 
     R_k.setIdentity();
     R_k *= 0.001; // comment out to match Zijian's gain
 
-    P_k_man.setIdentity();
-    // P_k_man *= 0.01; // best position P_k gains
-    P_k_man *= 100.0; // best orientation P_k gains
+    P_k.setIdentity();
+    // P_k *= 0.01; // best position P_k gains
+    P_k *= 100.0; // best orientation P_k gains
 }
 
-void ExtendedKF::collectInitialState(const go1State& state) {
+void ETHZ_EKF::collectInitialState(const go1State& state) {
     x_k << state.root_pos,
             state.root_lin_vel,
             state.root_quat.w(), state.root_quat.x(), state.root_quat.y(), state.root_quat.z(),
@@ -492,75 +337,10 @@ void ExtendedKF::collectInitialState(const go1State& state) {
             state.foot_pos_abs.col(3);
 }
 
-/* // Numertical EKF state estimation
-void ExtendedKF::estimateState(go1State& state) {
-    // Predict next state (make sure to use relative foot position as measurement)
-    x_k1 = fState(x_k, state.root_lin_acc_meas, state.root_ang_vel_meas);
-    // foot_pos_abs << state.foot_pos_abs.col(0), 
-    //                 state.foot_pos_abs.col(1), 
-    //                 state.foot_pos_abs.col(2), 
-    //                 state.foot_pos_abs.col(3);
-    foot_pos << state.foot_pos_world_rot.col(0), 
-                state.foot_pos_world_rot.col(1), 
-                state.foot_pos_world_rot.col(2), 
-                state.foot_pos_world_rot.col(3);
-
-    // Update covariances based on foot contact
-    for (int i = 0; i < NUM_LEG; i++) {
-        Q_k.block<3, 3>(10 + i*3, 10 + i*3) = (1.0 + (1 - state.contacts[i]) * 1.0e10) * 0.01 * eye3;
-    }
-
-    // Find model and measurement Jacobians numerically
-    F_k = numericalJacobianFixedSize<22, 22>(fState, x_k, 1e-6, false, state.root_lin_acc_meas, state.root_ang_vel_meas);
-    H_k = numericalJacobianFixedSize<12, 22>(hState, x_k1, 1e-6, false);
-
-    // Check residual for calculating optimal Kalman gain
-    F_P_k.noalias() = F_k * P_k;
-    P_k1.noalias() = F_P_k * F_k.transpose();
-    P_k1 += Q_k;
-
-    // y_res = foot_pos_abs - hState(x_k1);
-    y_res = foot_pos - hState(x_k1);
-    S_k.noalias() = H_k * P_k1 * H_k.transpose();
-    S_k += R_k;
-
-    // Invert S_k w/ LDLT instead of S_k.inverse() for speed + stability
-    S_k_ldlt.compute(S_k.selfadjointView<Eigen::Upper>());
-
-    if (S_k_ldlt.info() != Eigen::Success) {
-        std::ostringstream oss;
-        oss << "NaN/Inf in S_k ";
-        throw std::runtime_error(oss.str());
-    }
-
-    H_P.noalias() = H_k * P_k1;
-    S_k_invT = S_k_ldlt.solve(H_P);
-    K_k = S_k_invT.transpose();
-
-    // Update estimation and covariance
-    x_k1.noalias() = x_k1 + K_k * y_res;
-    K_H_P_k.noalias() = K_k * H_k * P_k1;
-    P_k1 -= K_H_P_k;
-
-    // Send estimates to go1State object
-    state.root_pos_est = x_k1.segment<3>(0);
-    state.root_lin_vel_est = x_k1.segment<3>(3);
-    state.root_lin_acc_est = state.root_lin_acc_meas;
-    Eigen::Quaterniond temp_q(x_k1(6), x_k1(7), x_k1(8), x_k1(9));
-    state.root_quat_est = temp_q.normalized();
-    state.root_rpy_est = quat2Euler(state.root_quat_est);
-    state.root_ang_vel_est = state.root_ang_vel_meas;
-
-    // Push back
-    x_k = x_k1;
-    P_k = P_k1;
-}
-*/
-
 // Analytical EKF state estimation
-void ExtendedKF::estimateState(go1State& state) {
+void ETHZ_EKF::estimateState(go1State& state) {
     // Predict next state
-    x_k1 = fState(x_k, state.root_lin_acc_meas, state.root_ang_vel_meas);
+    x_k1 = fState_ETHZ(x_k, state.root_lin_acc_meas, state.root_ang_vel_meas);
     x_k1_getter = x_k1; // Store x_k1 before the Kalman update
     
     // Pull out measurement and useful rotation variables
@@ -576,51 +356,51 @@ void ExtendedKF::estimateState(go1State& state) {
     double trust;
     for (int i = 0; i < NUM_LEG; i++) {
         trust = state.contacts[i] ? 1.0 : 1e6;
-        // Q_k_man.block<3, 3>(9 + i*3, 9 + i*3) = trust * DT_CTRL * 0.06 * eye3; // best position Q_k gains
-        Q_k_man.block<3, 3>(9 + i*3, 9 + i*3) = trust * DT_CTRL * 2.0 * eye3; // best orientation Q_k gains
-        // Q_k_man.block<3, 3>(9 + i*3, 9 + i*3) = trust * eye3; // matching Zijian's gains
+        // Q_k.block<3, 3>(9 + i*3, 9 + i*3) = trust * DT_CTRL * 0.06 * eye3; // best position Q_k gains
+        Q_k.block<3, 3>(9 + i*3, 9 + i*3) = trust * DT_CTRL * 2.0 * eye3; // best orientation Q_k gains
+        // Q_k.block<3, 3>(9 + i*3, 9 + i*3) = trust * eye3; // matching Zijian's gains
         // R_k.block<3, 3>(i*3, i*3) = trust * 0.002 * eye3; // best position R_k gains
         // R_k.block<3, 3>(i*3, i*3) = trust * 0.001 * eye3; // best orientation R_k gains
     }
 
     // Find model Jacobian analytically (w/o bias states)
-    F_k_man.setIdentity();
-    F_k_man.block<3, 3>(0, 3) = DT_CTRL * eye3;
+    F_k.setIdentity();
+    F_k.block<3, 3>(0, 3) = DT_CTRL * eye3;
     Eigen::Matrix3d skew_acc = skew(state.root_lin_acc_meas);
     Eigen::Matrix3d C_kT_plus_f = -DT_CTRL * C_kT_plus * skew_acc;
-    F_k_man.block<3, 3>(0, 6) = 0.5 * DT_CTRL * C_kT_plus_f;
-    F_k_man.block<3, 3>(3, 6) = C_kT_plus_f;
-    F_k_man.block<3, 3>(6, 6) = computeGamma0(state.root_ang_vel_meas).transpose();
+    F_k.block<3, 3>(0, 6) = 0.5 * DT_CTRL * C_kT_plus_f;
+    F_k.block<3, 3>(3, 6) = C_kT_plus_f;
+    F_k.block<3, 3>(6, 6) = computeGamma0(state.root_ang_vel_meas).transpose();
 
     // Find measurement Jacobian analytically (w/o bias states)
     for (int i = 0; i < NUM_LEG; i++) {
-        H_k_man.block<3, 3>(i*3, 0) = -C_k_minus;
-        H_k_man.block<3, 3>(i*3, 6) = -skew(C_k_minus * (x_k1.segment<3>(10 + i*3) - x_k1.segment<3>(0)));
-        H_k_man.block<3, 3>(i*3, 9 + i*3) = C_k_minus;
+        H_k.block<3, 3>(i*3, 0) = -C_k_minus;
+        H_k.block<3, 3>(i*3, 6) = -skew(C_k_minus * (x_k1.segment<3>(10 + i*3) - x_k1.segment<3>(0)));
+        H_k.block<3, 3>(i*3, 9 + i*3) = C_k_minus;
     }
 
     // Check residual for calculating optimal Kalman gain
-    P_k1_man = F_k_man * P_k_man * F_k_man.transpose() + Q_k_man;
-    y_res = z_k - hState(x_k1);
-    S_k = H_k_man * P_k1_man * H_k_man.transpose() + R_k;
+    P_k1 = F_k * P_k * F_k.transpose() + Q_k;
+    y_res = z_k - hState_ETHZ(x_k1);
+    S_k = H_k * P_k1 * H_k.transpose() + R_k;
     S_k = (S_k + S_k.transpose()) / 2.0;
-    K_k_man = P_k1_man * H_k_man.transpose() * S_k.inverse();
+    K_k = P_k1 * H_k.transpose() * S_k.inverse();
 
     // Update estimation and covariance
-    P_k1_man -= K_k_man * H_k_man * P_k1_man;
-    delta_x_k1_man = K_k_man * y_res;
+    P_k1 -= K_k * H_k * P_k1;
+    delta_x_k1 = K_k * y_res;
     
     // Bring back to full-sized state vector after update (rpy -> quat)
-    x_k1.segment<3>(0) += delta_x_k1_man.segment<3>(0);
-    x_k1.segment<3>(3) += delta_x_k1_man.segment<3>(3);
-    x_k1.segment<12>(10) += delta_x_k1_man.segment<12>(9);
+    x_k1.segment<3>(0) += delta_x_k1.segment<3>(0);
+    x_k1.segment<3>(3) += delta_x_k1.segment<3>(3);
+    x_k1.segment<12>(10) += delta_x_k1.segment<12>(9);
 
     Eigen::Quaterniond dq;
-    double delta_phi = delta_x_k1_man.segment<3>(6).norm();
+    double delta_phi = delta_x_k1.segment<3>(6).norm();
     if (delta_phi < 1e-8) {
-        dq = Eigen::Quaterniond(1, 0.5*delta_x_k1_man(6), 0.5*delta_x_k1_man(7), 0.5*delta_x_k1_man(8));
+        dq = Eigen::Quaterniond(1, 0.5*delta_x_k1(6), 0.5*delta_x_k1(7), 0.5*delta_x_k1(8));
     } else {
-        dq = Eigen::Quaterniond(Eigen::AngleAxisd(delta_phi, delta_x_k1_man.segment<3>(6).normalized()));
+        dq = Eigen::Quaterniond(Eigen::AngleAxisd(delta_phi, delta_x_k1.segment<3>(6).normalized()));
     }
 
     Eigen::Quaterniond q_k = Eigen::Quaterniond(x_k1(6), x_k1(7), x_k1(8), x_k1(9));
@@ -637,5 +417,149 @@ void ExtendedKF::estimateState(go1State& state) {
 
     // Push back
     x_k = x_k1;
-    P_k_man = P_k1_man;
+    P_k = P_k1;
+}
+
+/////////////////////////////////////////////
+
+CMU_EKF::CMU_EKF() {
+/*
+    ETHZ_EKF executes the extended Kalman filter by linearizing the
+    nonlinear dynamics and relationship between position and orientation by
+    finding the Jacobian of the continuous state dynamics at each
+    state according to fState_ETHZ & hState_ETHZ in the header file. Should be
+    more accurate than all the linear Kalman filters, but not perfect.
+    Based on the ETH Zurich paper showed to me by Zijian & Falak.
+
+    x_k: [p, v, q, p_FR, p_FL, p_RR, p_RL]^T, q = root_quat (start using this or convert from)
+    u_k: N/A
+    z_k: [p_FR - p, p_FL - p, p_RR - p, p_RL - p]^T
+*/
+    eye3.setIdentity();
+
+    // Clear internal variables
+    x_k.setZero();
+    x_k1.setZero(); delta_x_k1.setZero(); x_k1_getter.setZero();
+    z_k.setZero();
+    y_res.setZero();
+    S_k.setZero();
+    F_k.setZero();
+    H_k.setZero();
+    P_k1.setZero();
+    K_k.setZero();
+
+    // Initialize covariances
+    Q_k.setIdentity();
+
+    // // Best position Q_k gains
+    // Q_k.block<3, 3>(0, 0) = DT_CTRL * eye3 / 20.0;
+    // Q_k.block<3, 3>(3, 3) = DT_CTRL * 9.81 * eye3 / 20.0;
+    // Q_k.block<3, 3>(3, 3) *= 0.01;
+
+    // Best orientation Q_k gains
+    Q_k *= 0.01;
+
+    R_k.setIdentity();
+    R_k *= 0.001; // comment out to match Zijian's gain
+
+    P_k.setIdentity();
+    // P_k *= 0.01; // best position P_k gains
+    P_k *= 100.0; // best orientation P_k gains
+}
+
+void CMU_EKF::collectInitialState(const go1State& state) {
+    x_k << state.root_pos,
+            state.root_lin_vel,
+            state.root_quat.w(), state.root_quat.x(), state.root_quat.y(), state.root_quat.z(),
+            state.foot_pos_abs.col(0),
+            state.foot_pos_abs.col(1),
+            state.foot_pos_abs.col(2),
+            state.foot_pos_abs.col(3);
+}
+
+// Analytical EKF state estimation
+void CMU_EKF::estimateState(go1State& state) {
+    // Predict next state
+    x_k1 = fState_CMU(x_k, state.root_lin_acc_meas, state.root_ang_vel_meas);
+    x_k1_getter = x_k1; // Store x_k1 before the Kalman update
+    
+    // Pull out measurement and useful rotation variables
+    Eigen::Matrix3d rootRot = rotZ(state.root_rpy_est(2))*rotY(state.root_rpy_est(1))*rotX(state.root_rpy_est(0));
+    for (int i = 0; i < NUM_LEG; i++) {
+        z_k.block<3, 1>(i*3, 0) = state.foot_pos_world_rot.col(i);
+        Eigen::Vector3d v_fut = rootRot * (state.foot_pos.col(i) - state.foot_pos_old.col(i)) / DT_CTRL 
+                                + rootRot * skew(state.root_ang_vel_meas) * state.foot_pos.col(i);
+        z_k.block<3, 1>(NUM_LEG*3 + i*3, 0) = v_fut;
+    }
+
+    Eigen::Matrix3d C_kT_plus = quat2RotM(x_k.segment<4>(6)).transpose(); // make note this rotation should be from x_k, not x_k1
+    Eigen::Matrix3d C_k_minus = quat2RotM(x_k1.segment<4>(6)); // make note this rotation should be from x_k1, not x_k
+
+    // Update covariances based on foot contact
+    double trust;
+    for (int i = 0; i < NUM_LEG; i++) {
+        trust = state.contacts[i] ? 1.0 : 1e6;
+        Q_k.block<3, 3>(6 + i*3, 6 + i*3) = trust * DT_CTRL * 0.06 * eye3;
+
+        // New idea: why is R being affected by contact if FK for rigid body is accurate? So keep R constant?
+        R_k.block<3, 3>(i*3, i*3) = trust * 0.002 * eye3;
+        R_k.block<3, 3>(NUM_LEG*3 + i*3, NUM_LEG*3 + i*3) = trust * 0.5 * eye3; // trust * 2.0 * eye3;
+        R_k(NUM_LEG*3 + i*3 + 2, NUM_LEG*3 + i*3 + 2) = trust * 0.03; // z velocity tuning
+    }
+
+    // Find model Jacobian analytically (w/o bias states)
+    F_k.setIdentity();
+    F_k.block<3, 3>(0, 3) = DT_CTRL * eye3;
+    Eigen::Matrix3d skew_acc = skew(state.root_lin_acc_meas);
+    Eigen::Matrix3d C_kT_plus_f = -DT_CTRL * C_kT_plus * skew_acc;
+    F_k.block<3, 3>(0, 6) = 0.5 * DT_CTRL * C_kT_plus_f;
+    F_k.block<3, 3>(3, 6) = C_kT_plus_f;
+    F_k.block<3, 3>(6, 6) = computeGamma0(state.root_ang_vel_meas).transpose();
+
+    // Find measurement Jacobian analytically (w/o bias states)
+    for (int i = 0; i < NUM_LEG; i++) {
+        H_k.block<3, 3>(i*3, 0) = -C_k_minus;
+        H_k.block<3, 3>(i*3, 6) = -skew(C_k_minus * (x_k1.segment<3>(10 + i*3) - x_k1.segment<3>(0)));
+        H_k.block<3, 3>(i*3, 9 + i*3) = C_k_minus;
+    }
+
+    // Check residual for calculating optimal Kalman gain
+    P_k1 = F_k * P_k * F_k.transpose() + Q_k;
+    y_res = z_k - hState_CMU(x_k1);
+    S_k = H_k * P_k1 * H_k.transpose() + R_k;
+    S_k = (S_k + S_k.transpose()) / 2.0;
+    K_k = P_k1 * H_k.transpose() * S_k.inverse();
+
+    // Update estimation and covariance
+    P_k1 -= K_k * H_k * P_k1;
+    delta_x_k1 = K_k * y_res;
+    
+    // Bring back to full-sized state vector after update (rpy -> quat)
+    x_k1.segment<3>(0) += delta_x_k1.segment<3>(0);
+    x_k1.segment<3>(3) += delta_x_k1.segment<3>(3);
+    x_k1.segment<12>(10) += delta_x_k1.segment<12>(9);
+
+    Eigen::Quaterniond dq;
+    double delta_phi = delta_x_k1.segment<3>(6).norm();
+    if (delta_phi < 1e-8) {
+        dq = Eigen::Quaterniond(1, 0.5*delta_x_k1(6), 0.5*delta_x_k1(7), 0.5*delta_x_k1(8));
+    } else {
+        dq = Eigen::Quaterniond(Eigen::AngleAxisd(delta_phi, delta_x_k1.segment<3>(6).normalized()));
+    }
+
+    Eigen::Quaterniond q_k = Eigen::Quaterniond(x_k1(6), x_k1(7), x_k1(8), x_k1(9));
+    Eigen::Quaterniond q_k1 = q_k * dq;
+    x_k1.segment<4>(6) << q_k1.w(), q_k1.x(), q_k1.y(), q_k1.z();
+
+    // Send estimates to go1State object
+    state.root_pos_est = x_k1.segment<3>(0);
+    state.root_lin_vel_est = x_k1.segment<3>(3);
+    state.root_lin_acc_est = state.root_lin_acc_meas;
+    state.root_quat_est = q_k1.normalized();
+    state.root_rpy_est = quat2Euler(state.root_quat_est);
+    state.root_ang_vel_est = state.root_ang_vel_meas;
+
+    // Push back
+    x_k = x_k1;
+    P_k = P_k1;
 }
