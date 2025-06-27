@@ -56,6 +56,7 @@ def plot_contact_kf_data(csv_file):
     foot_vel_post_fit = df[['y_k13', 'y_k14', 'y_k15', 'y_k16', 'y_k17', 'y_k18', 'y_k19', 'y_k20', 'y_k21', 'y_k22', 'y_k23', 'y_k24']].values
     foot_pos_z_post_fit = df[['y_k25', 'y_k26', 'y_k27', 'y_k28']].values
 
+    kalman_gain_norm = df['K_k_norm'].values
     swing_phase = df['swing_phase'].values
 
     # Plot data
@@ -413,6 +414,21 @@ def plot_contact_kf_data(csv_file):
     plt.tight_layout()
     plt.savefig("data/estimator_tuning/CAKF_foot_z_pos.png")
 
+    ######################
+    ## Kalman gain norm ##
+    ######################
+
+    kalman_gain_norm_plot = plt.figure(6, figsize=(12, 8))
+
+    plt.plot(time, kalman_gain_norm, color='r')
+    plt.title("Kalman gain norm")
+    plt.xlabel("Time (s)")
+    plt.ylabel("||K_k||")
+    plt.xlim(0, time[-1])
+
+    plt.tight_layout()
+    plt.savefig("data/estimator_tuning/CAKF_Kalman_norm.png")
+
     plt.show()
 
 def plot_ekf_data(csv_file):
@@ -425,6 +441,7 @@ def plot_ekf_data(csv_file):
     foot_pos_meas = df[['z_k1', 'z_k2', 'z_k3', 'z_k4', 'z_k5', 'z_k6', 'z_k7', 'z_k8', 'z_k9', 'z_k10', 'z_k11', 'z_k12']].values
     foot_pos_pred = df[['Hx_k1', 'Hx_k2', 'Hx_k3', 'Hx_k4', 'Hx_k5', 'Hx_k6', 'Hx_k7', 'Hx_k8', 'Hx_k9', 'Hx_k10', 'Hx_k11', 'Hx_k12']].values
     foot_pos_post_fit = df[['y_k1', 'y_k2', 'y_k3', 'y_k4', 'y_k5', 'y_k6', 'y_k7', 'y_k8', 'y_k9', 'y_k10', 'y_k11', 'y_k12']].values
+    kalman_gain_norm = df['K_k_norm'].values
     swing_phase = df['swing_phase'].values
 
     # Plot data
@@ -598,6 +615,21 @@ def plot_ekf_data(csv_file):
     plt.tight_layout()
     plt.savefig("data/estimator_tuning/CAEKF_RL_pos.png")
 
+    ######################
+    ## Kalman gain norm ##
+    ######################
+
+    kalman_gain_norm_plot = plt.figure(5, figsize=(12, 8))
+
+    plt.plot(time, kalman_gain_norm, color='r')
+    plt.title("Kalman gain norm")
+    plt.xlabel("Time (s)")
+    plt.ylabel("||K_k||")
+    plt.xlim(0, time[-1])
+
+    plt.tight_layout()
+    plt.savefig("data/estimator_tuning/CAEKF_Kalman_norm.png")
+
     plt.show()
 
 def plot_naive_kf_data(csv_file):
@@ -610,6 +642,7 @@ def plot_naive_kf_data(csv_file):
     root_acc_meas = df[['z_k1', 'z_k2', 'z_k3']].values
     root_acc_pred = df[['Hx_k1', 'Hx_k2', 'Hx_k3']].values
     root_acc_res_post_fit = df[['y_k1', 'y_k2', 'y_k3']].values
+    kalman_gain_norm = df['K_k_norm'].values
     swing_phase = df['swing_phase'].values
 
     # Plot data
@@ -655,6 +688,21 @@ def plot_naive_kf_data(csv_file):
 
     plt.tight_layout()
     plt.savefig("data/estimator_tuning/NKF_root_acc.png")
+
+    ######################
+    ## Kalman gain norm ##
+    ######################
+
+    kalman_gain_norm_plot = plt.figure(2, figsize=(12, 8))
+
+    plt.plot(time, kalman_gain_norm, color='r')
+    plt.title("Kalman gain norm")
+    plt.xlabel("Time (s)")
+    plt.ylabel("||K_k||")
+    plt.xlim(0, time[-1])
+
+    plt.tight_layout()
+    plt.savefig("data/estimator_tuning/NKF_Kalman_norm.png")
 
     plt.show()
 

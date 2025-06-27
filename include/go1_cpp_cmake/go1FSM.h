@@ -32,7 +32,8 @@ class go1FSM {
         Eigen::VectorXd getMeasurement() const { return estimator_->getMeasurement(); }
         Eigen::VectorXd getPrediction() const { return estimator_->getPrediction(); }
         Eigen::VectorXd getPostFitResidual() const { return estimator_->getPostFitResidual(); }
-        Eigen::VectorXd getPostFitPrediction() const {return estimator_->getPostFitPrediction(); }
+        Eigen::VectorXd getPostFitPrediction() const { return estimator_->getPostFitPrediction(); }
+        double getKalmanGainNorm() const { return estimator_->getKalmanGainNorm(); }
         void setDesiredTrajectory(const Eigen::Vector3d &lin_vel_cmd, double &yaw_cmd);
 
         void collectInitialState() {

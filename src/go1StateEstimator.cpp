@@ -475,7 +475,7 @@ ExtendedKF::ExtendedKF() {
     Q_k_man *= 0.01;
 
     R_k.setIdentity();
-    R_k *= 0.001;
+    R_k *= 0.001; // comment out to match Zijian's gain
 
     P_k_man.setIdentity();
     // P_k_man *= 0.01; // best position P_k gains
@@ -572,12 +572,13 @@ void ExtendedKF::estimateState(go1State& state) {
     Eigen::Matrix3d C_kT_plus = quat2RotM(x_k.segment<4>(6)).transpose(); // make note this rotation should be from x_k, not x_k1
     Eigen::Matrix3d C_k_minus = quat2RotM(x_k1.segment<4>(6)); // make note this rotation should be from x_k1, not x_k
 
-    // Update covariances based on foot contact (fix this later)
+    // Update covariances based on foot contact
     double trust;
     for (int i = 0; i < NUM_LEG; i++) {
         trust = state.contacts[i] ? 1.0 : 1e6;
         // Q_k_man.block<3, 3>(9 + i*3, 9 + i*3) = trust * DT_CTRL * 0.06 * eye3; // best position Q_k gains
         Q_k_man.block<3, 3>(9 + i*3, 9 + i*3) = trust * DT_CTRL * 2.0 * eye3; // best orientation Q_k gains
+        // Q_k_man.block<3, 3>(9 + i*3, 9 + i*3) = trust * eye3; // matching Zijian's gains
         // R_k.block<3, 3>(i*3, i*3) = trust * 0.002 * eye3; // best position R_k gains
         // R_k.block<3, 3>(i*3, i*3) = trust * 0.001 * eye3; // best orientation R_k gains
     }
@@ -624,6 +625,7 @@ void ExtendedKF::estimateState(go1State& state) {
 
     Eigen::Quaterniond q_k = Eigen::Quaterniond(x_k1(6), x_k1(7), x_k1(8), x_k1(9));
     Eigen::Quaterniond q_k1 = q_k * dq;
+    x_k1.segment<4>(6) << q_k1.w(), q_k1.x(), q_k1.y(), q_k1.z();
 
     // Send estimates to go1State object
     state.root_pos_est = x_k1.segment<3>(0);

@@ -293,7 +293,7 @@ void writeStateEstimatorCSVHeader(std::ostream &os) {
             os << "z_k1,z_k2,z_k3,"
                     "Hx_k1,Hx_k2,Hx_k3,"
                     "y_k1,y_k2,y_k3,"
-                    "swing_phase\n";
+                    "K_k_norm,swing_phase\n";
             break;
 
         case 1:
@@ -324,7 +324,7 @@ void writeStateEstimatorCSVHeader(std::ostream &os) {
                     "y_k19,y_k20,y_k21,"
                     "y_k22,y_k23,y_k24,"
                     "y_k25,y_k26,y_k27,y_k28,"
-                    "swing_phase\n";
+                    "K_k_norm,swing_phase\n";
             break;
 
         case 2:
@@ -355,7 +355,7 @@ void writeStateEstimatorCSVHeader(std::ostream &os) {
                     "y_k19,y_k20,y_k21,"
                     "y_k22,y_k23,y_k24,"
                     "y_k25,y_k26,y_k27,y_k28,"
-                    "swing_phase\n";
+                    "K_k_norm,swing_phase\n";
             break;
             
         case 3:
@@ -371,7 +371,7 @@ void writeStateEstimatorCSVHeader(std::ostream &os) {
                     "y_k4,y_k5,y_k6,"
                     "y_k7,y_k8,y_k9,"
                     "y_k10,y_k11,y_k12,"
-                    "swing_phase\n";
+                    "K_k_norm,swing_phase\n";
             break;
     }
 }
@@ -379,12 +379,13 @@ void writeStateEstimatorCSVHeader(std::ostream &os) {
 void storeStateEstResidualData(const go1State &state, const Eigen::VectorXd &z_k, 
                                                         const Eigen::VectorXd &Hx_k, 
                                                         const Eigen::VectorXd &y_k,
+                                                        const double &K_k_norm,
                                                         std::ostream &os) {
     // Store state estimation residual data
     write_vector(z_k, os); os << ",";
     write_vector(Hx_k, os); os << ",";
     write_vector(y_k, os); os << ",";
-    os << state.swing_phase << "\n";
+    os << K_k_norm << "," << state.swing_phase << "\n";
 }
 
 ////////////////////////////
@@ -582,7 +583,8 @@ int main(void) {
 
     storeStateEstResidualData(fsm.getState(), fsm.getMeasurement(), 
                                                 fsm.getPrediction(), 
-                                                fsm.getPostFitPrediction(), 
+                                                fsm.getPostFitPrediction(),
+                                                fsm.getKalmanGainNorm(), 
                                                 estimator_data_row);
     estimator_log.logLine(estimator_data_row.str());
 
@@ -608,6 +610,7 @@ int main(void) {
                                 storeStateEstResidualData(fsm.getState(), fsm.getMeasurement(), 
                                                                             fsm.getPrediction(), 
                                                                             fsm.getPostFitPrediction(), 
+                                                                            fsm.getKalmanGainNorm(),
                                                                             estimator_data_row);
                                 estimator_log.logLine(estimator_data_row.str());
                             });

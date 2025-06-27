@@ -27,6 +27,7 @@ class go1StateEstimator {
         virtual Eigen::VectorXd getPrediction() = 0;
         virtual Eigen::VectorXd getPostFitResidual() = 0;
         virtual Eigen::VectorXd getPostFitPrediction() = 0;
+        virtual double getKalmanGainNorm() = 0;
 };
 
 class NaiveKF : public go1StateEstimator {
@@ -38,6 +39,7 @@ class NaiveKF : public go1StateEstimator {
         Eigen::VectorXd getPrediction() override { return H_k*x_k1_getter; }
         Eigen::VectorXd getPostFitResidual() override { return z_k - H_k*x_k1; }
         Eigen::VectorXd getPostFitPrediction() override { return H_k*x_k; }
+        double getKalmanGainNorm() override { return K_k.norm(); }
 
     private:
         Eigen::Matrix<double, 9, 1> x_k, x_k1;
@@ -60,6 +62,7 @@ class KinematicKF : public go1StateEstimator {
         Eigen::VectorXd getPrediction() override { return H_k*x_k1_getter; }
         Eigen::VectorXd getPostFitResidual() override { return z_k - H_k*x_k1; }
         Eigen::VectorXd getPostFitPrediction() override { return H_k*x_k; }
+        double getKalmanGainNorm() override { return K_k.norm(); }
 
     private:
         Eigen::Matrix<double, 18, 1> x_k, x_k1;
@@ -84,6 +87,7 @@ class TwoStageKF : public go1StateEstimator {
         Eigen::VectorXd getPrediction() override { return H_k*x_k1_getter; }
         Eigen::VectorXd getPostFitResidual() override { return z_k - H_k*x_k1; }
         Eigen::VectorXd getPostFitPrediction() override { return H_k*x_k; }
+        double getKalmanGainNorm() override { return K_k.norm(); }
 
     private:
         // Estimator matrices
@@ -123,10 +127,10 @@ inline Eigen::Matrix<double, 22, 1> fState(const Eigen::Matrix<double, 22, 1>& x
     }
 
     // r_{k+1}
-    x_k1.segment<3>(0) = x_k.segment<3>(0) + DT_CTRL * x_k.segment<3>(3) + 0.5 * std::pow(DT_CTRL, 2) * (C_kT * f_meas + grav);
+    x_k1.segment<3>(0) = x_k.segment<3>(0) + DT_CTRL * x_k.segment<3>(3) + 0.5 * std::pow(DT_CTRL, 2) * (acc_world);
 
     // v_{k+1}
-    x_k1.segment<3>(3) = x_k.segment<3>(3) + DT_CTRL * (C_kT * f_meas + grav);
+    x_k1.segment<3>(3) = x_k.segment<3>(3) + DT_CTRL * (acc_world);
 
     // q_{k+1}
     Eigen::Quaterniond q(x_k(6), x_k(7), x_k(8), x_k(9));
@@ -176,6 +180,7 @@ class ExtendedKF : public go1StateEstimator {
         Eigen::VectorXd getPrediction() override { return hState(x_k1_getter); }
         Eigen::VectorXd getPostFitResidual() override { return z_k - hState(x_k1); }
         Eigen::VectorXd getPostFitPrediction() override { return hState(x_k); }
+        double getKalmanGainNorm() override { return K_k_man.norm(); }
     
     private:
         // Generic state variables and matrices
