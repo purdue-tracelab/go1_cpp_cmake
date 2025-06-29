@@ -39,7 +39,7 @@ constexpr double DT_CTRL = 0.002; // General control frequency (500 Hz)
 constexpr double WALK_HEIGHT = 0.27;
 
 constexpr int STATE_EST_SELECT = 3; // 0: naive KF, 1: MIT two-stage KF, 2: ETH Zurich EKF, 3: CMU EKF
-constexpr bool USE_EST_FOR_CONTROL = true; // true: yes, use estimated info (ALWAYS USE ESTIMATE FOR HARDWARE), false: no, use ground truth info, 
+constexpr bool USE_EST_FOR_CONTROL = false; // true: yes, use estimated info (ALWAYS USE ESTIMATE FOR HARDWARE), false: no, use ground truth info, 
 constexpr int USE_TERRAIN_ADAPT = false; // false: no terrain adaptation, true: use terrain adaptation (adjusts target foot height and base pitch)
 
 constexpr double MUJOCO_CONTACT_THRESH = 3.0;

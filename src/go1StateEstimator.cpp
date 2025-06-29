@@ -337,7 +337,6 @@ void ETHZ_EKF::collectInitialState(const go1State& state) {
             state.foot_pos_abs.col(3);
 }
 
-// Analytical EKF state estimation
 void ETHZ_EKF::estimateState(go1State& state) {
     // Predict next state
     x_k1 = fState_ETHZ(x_k, state.root_lin_acc_meas, state.root_ang_vel_meas);
@@ -375,7 +374,7 @@ void ETHZ_EKF::estimateState(go1State& state) {
     // Find measurement Jacobian analytically (w/o bias states)
     for (int i = 0; i < NUM_LEG; i++) {
         H_k.block<3, 3>(i*3, 0) = -C_k_minus;
-        H_k.block<3, 3>(i*3, 6) = -skew(C_k_minus * (x_k1.segment<3>(10 + i*3) - x_k1.segment<3>(0)));
+        H_k.block<3, 3>(i*3, 6) = skew(C_k_minus * (x_k1.segment<3>(10 + i*3) - x_k1.segment<3>(0)));
         H_k.block<3, 3>(i*3, 9 + i*3) = C_k_minus;
     }
 
@@ -457,7 +456,8 @@ CMU_EKF::CMU_EKF() {
     // Q_k.block<3, 3>(3, 3) *= 0.01;
 
     // Best orientation Q_k gains
-    Q_k *= 0.01;
+    // Q_k *= 0.01;
+    Q_k *= 1e10;
 
     R_k.setIdentity();
     R_k *= 0.001; // comment out to match Zijian's gain
@@ -477,7 +477,6 @@ void CMU_EKF::collectInitialState(const go1State& state) {
             state.foot_pos_abs.col(3);
 }
 
-// Analytical EKF state estimation
 void CMU_EKF::estimateState(go1State& state) {
     // Predict next state
     x_k1 = fState_CMU(x_k, state.root_lin_acc_meas, state.root_ang_vel_meas);
@@ -496,16 +495,16 @@ void CMU_EKF::estimateState(go1State& state) {
     Eigen::Matrix3d C_k_minus = quat2RotM(x_k1.segment<4>(6)); // make note this rotation should be from x_k1, not x_k
 
     // Update covariances based on foot contact
-    double trust;
-    for (int i = 0; i < NUM_LEG; i++) {
-        trust = state.contacts[i] ? 1.0 : 1e6;
-        Q_k.block<3, 3>(6 + i*3, 6 + i*3) = trust * DT_CTRL * 0.06 * eye3;
+    // double trust;
+    // for (int i = 0; i < NUM_LEG; i++) {
+    //     trust = state.contacts[i] ? 1.0 : 1e6;
+    //     Q_k.block<3, 3>(6 + i*3, 6 + i*3) = trust * DT_CTRL * 0.06 * eye3;
 
-        // New idea: why is R being affected by contact if FK for rigid body is accurate? So keep R constant?
-        R_k.block<3, 3>(i*3, i*3) = trust * 0.002 * eye3;
-        R_k.block<3, 3>(NUM_LEG*3 + i*3, NUM_LEG*3 + i*3) = trust * 0.5 * eye3; // trust * 2.0 * eye3;
-        R_k(NUM_LEG*3 + i*3 + 2, NUM_LEG*3 + i*3 + 2) = trust * 0.03; // z velocity tuning
-    }
+    //     // // New idea: why is R being affected by contact if FK for rigid body is accurate? So keep R constant?
+    //     // R_k.block<3, 3>(i*3, i*3) = trust * 0.002 * eye3;
+    //     // R_k.block<3, 3>(NUM_LEG*3 + i*3, NUM_LEG*3 + i*3) = trust * 0.5 * eye3; // trust * 2.0 * eye3;
+    //     // R_k(NUM_LEG*3 + i*3 + 2, NUM_LEG*3 + i*3 + 2) = trust * 0.03; // z velocity tuning
+    // }
 
     // Find model Jacobian analytically (w/o bias states)
     F_k.setIdentity();
@@ -521,6 +520,7 @@ void CMU_EKF::estimateState(go1State& state) {
         H_k.block<3, 3>(i*3, 0) = -C_k_minus;
         H_k.block<3, 3>(i*3, 6) = -skew(C_k_minus * (x_k1.segment<3>(10 + i*3) - x_k1.segment<3>(0)));
         H_k.block<3, 3>(i*3, 9 + i*3) = C_k_minus;
+        H_k.block<3, 3>(12 + i*3, 3) = C_k_minus;
     }
 
     // Check residual for calculating optimal Kalman gain

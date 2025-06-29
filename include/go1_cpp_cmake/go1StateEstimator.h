@@ -30,6 +30,8 @@ class go1StateEstimator {
         virtual double getKalmanGainNorm() = 0;
 };
 
+/////////////////////////////////////////////
+
 class NaiveKF : public go1StateEstimator {
     public:
         NaiveKF();
@@ -51,6 +53,8 @@ class NaiveKF : public go1StateEstimator {
         Eigen::Matrix3d R_k, S_k;
         Eigen::Matrix3d eye3;
 };
+
+/////////////////////////////////////////////
 
 class MIT_TwoStageKF : public go1StateEstimator {
     public:
@@ -84,6 +88,8 @@ class MIT_TwoStageKF : public go1StateEstimator {
         double sensor_noise_vimu_rel_foot = 0.1;
         double sensor_noise_zfoot = 0.001;
 };
+
+/////////////////////////////////////////////
 
 // Nonlinear state transition function for ETHZ_EKF
 inline Eigen::Matrix<double, 22, 1> fState_ETHZ(const Eigen::Matrix<double, 22, 1>& x_k, const Eigen::Vector3d& f_meas, const Eigen::Vector3d& omg_meas) {
@@ -173,6 +179,8 @@ class ETHZ_EKF : public go1StateEstimator {
         // Historical noise covariance calculation matrices (possible improvement)
 };
 
+/////////////////////////////////////////////
+
 // Nonlinear state transition function for CMU_EKF
 inline Eigen::Matrix<double, 22, 1> fState_CMU(const Eigen::Matrix<double, 22, 1>& x_k, const Eigen::Vector3d& f_meas, const Eigen::Vector3d& omg_meas) {
     Eigen::Matrix<double, 22, 1> x_k1 = x_k;
@@ -182,7 +190,7 @@ inline Eigen::Matrix<double, 22, 1> fState_CMU(const Eigen::Matrix<double, 22, 1
     auto acc_world = C_kT * f_meas + grav;
     if (!acc_world.allFinite()) {
         std::ostringstream oss;
-        oss << "NaN/Inf in fState_ETHZ acc_world: [" << acc_world.transpose() 
+        oss << "NaN/Inf in fState_CMU acc_world: [" << acc_world.transpose() 
             << "]\nf_meas: [" << f_meas.transpose() 
             << "]\nroot_quat: [" << x_k.segment<4>(6).transpose() << "]";
         throw std::runtime_error(oss.str());
