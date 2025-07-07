@@ -931,7 +931,7 @@ def plot_state_data(csv_file, absolute=False):
     plt.close(joint_vel_plot)
     plt.close(joint_vel_tracking_plot)
     # plt.close(joint_torque_plot)
-    plt.close(foot_contact_plot)
+    # plt.close(foot_contact_plot)
     plt.show()
 
 csv_file = "data/go1_hardware_data.csv"

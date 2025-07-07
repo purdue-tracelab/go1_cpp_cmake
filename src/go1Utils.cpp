@@ -147,19 +147,41 @@ Eigen::Matrix3d computeGamma0(const Eigen::Vector3d& gyro) {
     Computes the Gamma_0 matrix for the given angular velocity. Used in the
     Extended Kalman Filter (EKF) for orientation estimation.
 */
-    double phi = gyro.norm();
+    // /////////////////////////////////////////////////////////////
+    // // Old incorrect version (but provides better performance) //
+    // /////////////////////////////////////////////////////////////
 
-    if (phi < 1e-5) {
-        return Eigen::Matrix3d::Zero();
+    // double phi = gyro.norm();
+
+    // if (phi < 1e-5) {
+    //     return Eigen::Matrix3d::Zero();    
+    // }
+
+    // Eigen::Matrix3d gyroSkew = skew(gyro);
+    // double term1, term2;
+
+    // term1 = sin(phi) / phi;
+    // term2 = (1.0 - cos(phi)) / std::pow(phi, 2);
+
+    // return term1 * gyroSkew + term2 * gyroSkew * gyroSkew;
+
+    //////////////////////////////////////////////////////////
+    // New correct version (but provides worse performance) //
+    //////////////////////////////////////////////////////////
+
+    double phi = DT_CTRL * gyro.norm();
+
+    if (phi < 1e-8) {
+        return Eigen::Matrix3d::Identity();
     }
-
-    Eigen::Matrix3d gyroSkew = skew(gyro);
+    
+    Eigen::Matrix3d thetaHat = skew(gyro / gyro.norm());
     double term1, term2;
     
-    term1 = sin(phi) / phi;
-    term2 = (1.0 - cos(phi)) / std::pow(phi, 2);
-
-    return term1 * gyroSkew + term2 * gyroSkew * gyroSkew;
+    term1 = sin(DT_CTRL * gyro.norm());
+    term2 = (1.0 - cos(DT_CTRL * gyro.norm()));
+    
+    return Eigen::Matrix3d::Identity() + term1 * thetaHat + term2 * thetaHat * thetaHat;
 }
 
 double hipJointIK(double pFutY, double pFutZ, double hipLength) {

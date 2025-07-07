@@ -101,36 +101,17 @@ MIT_TwoStageKF::MIT_TwoStageKF() {
     S_k.setZero();
     K_k.setZero();
 
-    ////////////////////////////
-    // Initialize covariances //
-    /////////////////////////////
-
-    // My Q values
+    // Initialize covariances
     Q_k.setIdentity();
     Q_k.block<3, 3>(0, 0) = DT_CTRL * eye3 / 20.0;
     Q_k.block<3, 3>(3, 3) = DT_CTRL * 9.81 * eye3 / 20.0;
     Q_k.block<12, 12>(6, 6) = DT_CTRL * Eigen::Matrix<double, 12, 12>::Identity();
 
-    // // Muqun's Q values
-    // Q_0.setIdentity();
-    // Q_0.block<3, 3>(0, 0) = DT_CTRL / 20.0 * eye3;
-    // Q_0.block<3, 3>(3, 3) = DT_CTRL * 9.81 / 20.0 * eye3;
-    // Q_0.block<12, 12>(6, 6) = DT_CTRL * Eigen::Matrix<double, 12, 12>::Identity();
-
-    // My R values
     R_k.setIdentity();
     // R_k *= 0.001; // trying new idea of always trusting the measurements consistently
 
-    // // Muqun's R values
-    // R_0.setIdentity();
-
     P_k.setIdentity();
-
-    // My P values
     P_k *= 0.01;
-
-    // // Muqun's P values
-    // P_k *= 100.0;
 
     // Set up discrete-time dynamics and measurement models
     F_k.setIdentity();
@@ -146,14 +127,6 @@ MIT_TwoStageKF::MIT_TwoStageKF() {
         H_k.block<3, 3>(NUM_LEG*3 + i*3, 3) = -eye3;
         H_k(NUM_LEG*6 + i, 8 + i*3) = 1;
     }
-
-    // // Muqun's measurement model
-    // for (int i = 0; i < NUM_LEG; i++) {
-    //     H_k.block<3, 3>(i*3, 0) = eye3;
-    //     H_k.block<3, 3>(i*3, 6 + i*3) = -eye3;
-    //     H_k.block<3, 3>(NUM_LEG*3 + i*3, 3) = eye3;
-    //     H_k(NUM_LEG*6 +i, 8 + i*3) = 1;
-    // }
 }
 
 void MIT_TwoStageKF::collectInitialState(const go1State& state) {
@@ -185,23 +158,8 @@ void MIT_TwoStageKF::estimateState(go1State& state) {
     // Calculate input
     u_k = rootRotEst * state.root_lin_acc_meas + Eigen::Vector3d(0, 0, -9.81);
 
-    //////////////////////////////////////////////
-    // Update covariances based on foot contact //
-    //////////////////////////////////////////////
-
-    // // Muqun's default Q_k and R_k values
-    // Q_k.setIdentity();
-    // Q_k.block<3, 3>(0, 0) = process_noise_pimu * Q_0.block<3, 3>(0, 0);
-    // Q_k.block<3, 3>(3, 3) = process_noise_vimu * Q_0.block<3, 3>(3, 3);
-    // Q_k.block<12, 12>(6, 6) = process_noise_pfoot * Q_0.block<12, 12>(6, 6);
-
-    // R_k.setIdentity();
-    // R_k.block<12, 12>(0, 0) = sensor_noise_pimu_rel_foot * R_0.block<12, 12>(0, 0);
-    // R_k.block<12, 12>(12, 12) = sensor_noise_vimu_rel_foot * R_0.block<12, 12>(12, 12);
-    // R_k.block<4, 4>(24, 24) = sensor_noise_zfoot * R_0.block<4, 4>(24, 24);
-
+    // Update covariances based on foot contact
     double trust;
-    // My Q_k and R_k contact-based values
     for (int i = 0; i < NUM_LEG; i++) {
         trust = state.contacts[i] ? 1.0 : 1e6;
         Q_k.block<3, 3>(6 + i*3, 6 + i*3) = trust * DT_CTRL * 0.06 * eye3;
@@ -211,28 +169,14 @@ void MIT_TwoStageKF::estimateState(go1State& state) {
         R_k.block<3, 3>(NUM_LEG*3 + i*3, NUM_LEG*3 + i*3) = trust * 0.5 * eye3; // trust * 2.0 * eye3;
         R_k(NUM_LEG*3 + i*3 + 2, NUM_LEG*3 + i*3 + 2) = trust * 0.03; // z velocity tuning
         R_k(NUM_LEG*6 + i, NUM_LEG*6 + i) = trust * 0.01;
-    } 
-
-    // // Muqun's Q_k and R_k contact-based values
-    // for (int i = 0; i < NUM_LEG; i++) {
-    //     trust = state.contacts[i] ? 1.0 : 100.0;
-    //     Q_k.block<3, 3>(6 + i*3, 6 + i*3) = trust * Q_k.block<3, 3>(6 + i*3, 6 + i*3);
-    //     R_k.block<3, 3>(NUM_LEG*3 + i*3, NUM_LEG*3 + i*3) = trust * R_k.block<3, 3>(NUM_LEG*3 + i*3, NUM_LEG*3 + i*3);
-    //     R_k(NUM_LEG*6 + i, NUM_LEG*6 + i) = trust * R_k(NUM_LEG*6 + i, NUM_LEG*6 + i);
-    // }
-
-    //////////////////////////////////////////////
+    }
 
     // Predict next state
     x_k1 = F_k * x_k + B_k * u_k;
     x_k1_getter = x_k1; // Store x_k1 before the Kalman update
     P_k1 = F_k * P_k * F_k.transpose() + Q_k;
 
-    //////////////////////////////
-    // Find current measurement //
-    //////////////////////////////
-
-    // My measurement model
+    // Find current measurement
     for (int i = 0; i < NUM_LEG; i++) {
         z_k.block<3, 1>(i*3, 0) = state.foot_pos_world_rot.col(i);
         Eigen::Vector3d v_fut = rootRotEst * (state.foot_pos.col(i) - state.foot_pos_old.col(i)) / DT_CTRL 
@@ -241,29 +185,18 @@ void MIT_TwoStageKF::estimateState(go1State& state) {
         z_k(NUM_LEG*6 + i) = 0.02; // removes z-height offset for foot position
     }
 
-    // // Muqun's measurement model
-    // double trust_2;
-    // for (int i = 0; i < NUM_LEG; i++) {
-    //     trust_2 = state.contacts[i] ? 1.0 : 0.0;
-    //     z_k.block<3, 1>(i*3, 0) = -state.foot_pos_world_rot.col(i);
-    //     Eigen::Vector3d v_fut_rel = (state.foot_pos.col(i) - state.foot_pos_old.col(i)) / DT_CTRL;
-    //     Eigen::Vector3d v_fut = rootRotEst.transpose() * (skew(state.root_ang_vel_meas) * state.foot_pos.col(i) + v_fut_rel);
-    //     z_k.block<3, 1>(NUM_LEG*3 + i*3, 0) = (1.0 - trust_2) * state.root_lin_vel - trust_2 * v_fut;
-    //     z_k(NUM_LEG*6 + i) = (1.0 - trust_2) * (state.root_pos_est.z() + state.foot_pos.col(i).z());
-    // }
-
     // Check residual for calculating optimal Kalman gain
     y_res = z_k - H_k * x_k1;
     S_k = H_k * P_k1 * H_k.transpose() + R_k;
-    S_k = (S_k + S_k.transpose()) / 2.0;
+    S_k = (S_k + S_k.transpose()) / 2.0; // reinforces symmetry
     K_k = P_k1 * H_k.transpose() * S_k.inverse();
 
     // Update estimation and covariance
     x_k1 += K_k * y_res;
     P_k1 -= K_k * H_k * P_k1;
-    P_k1 = (P_k1 + P_k1.transpose()) / 2.0; // Muqun's P_k1 update
+    P_k1 = (P_k1 + P_k1.transpose()) / 2.0; // reinforces symmetry
 
-    // Optional adjustment, not sure why it's used
+    // Optional adjustment, not sure why it's used (prevent state covariance collapse?)
     if (P_k1.block<2, 2>(0, 0).determinant() > 1e-6) {
         P_k1.block<2, 16>(0, 2).setZero();
         P_k1.block<16, 2>(2, 0).setZero();
@@ -308,23 +241,47 @@ ETHZ_EKF::ETHZ_EKF() {
     P_k1.setZero();
     K_k.setZero();
 
-    // Initialize covariances
-    Q_k.setIdentity();
+    ////////////////////////////
+    // Initialize covariances //
+    ////////////////////////////
 
-    // // Best position Q_k gains
+    P_k.setIdentity();
+    P_k *= 100.0;
+
+    Q_k.setIdentity();
+    R_k.setIdentity();
+
+    // // Best position Q_k gains (hand-made)
     // Q_k.block<3, 3>(0, 0) = DT_CTRL * eye3 / 20.0;
     // Q_k.block<3, 3>(3, 3) = DT_CTRL * 9.81 * eye3 / 20.0;
     // Q_k.block<3, 3>(3, 3) *= 0.01;
+    // R_k *= 0.001; // comment out to match Zijian's gain
 
-    // Best orientation Q_k gains
-    Q_k *= 0.01;
+    // // Best orientation Q_k gains (hand-made)
+    // Q_k *= 0.01;
+    // R_k *= 0.001; // comment out to match Zijian's gain
 
-    R_k.setIdentity();
-    R_k *= 0.001; // comment out to match Zijian's gain
+    // Best overall gains so far (following paper structure & through MATLAB)
 
-    P_k.setIdentity();
-    // P_k *= 0.01; // best position P_k gains
-    P_k *= 100.0; // best orientation P_k gains
+    // // Using old Gamma_0 version
+    // q_f = 9.03581;
+    // q_w = 0.00834;
+    // q_p = 0.00061;
+    // r_meas = 0.00105;
+
+    // Using new Gamma_0 version
+    q_f = 5.47242;
+    q_w = 0.00048;
+    q_p = 0.00319;
+    r_meas = 0.01190;
+
+    Q_k.block<3, 3>(0, 0) = std::pow(DT_CTRL, 3) * q_f / 3.0 * eye3;
+    Q_k.block<3, 3>(0, 3) = std::pow(DT_CTRL, 2) * q_f / 2.0 * eye3;
+    Q_k.block<3, 3>(3, 0) = std::pow(DT_CTRL, 2) * q_f / 2.0 * eye3;
+    Q_k.block<3, 3>(3, 3) = DT_CTRL * q_f * eye3;
+    Q_k.block<3, 3>(6, 6) = DT_CTRL * q_w * eye3;
+    R_k *= r_meas;
+
 }
 
 void ETHZ_EKF::collectInitialState(const go1State& state) {
@@ -355,11 +312,17 @@ void ETHZ_EKF::estimateState(go1State& state) {
     double trust;
     for (int i = 0; i < NUM_LEG; i++) {
         trust = state.contacts[i] ? 1.0 : 1e6;
-        // Q_k.block<3, 3>(9 + i*3, 9 + i*3) = trust * DT_CTRL * 0.06 * eye3; // best position Q_k gains
-        Q_k.block<3, 3>(9 + i*3, 9 + i*3) = trust * DT_CTRL * 2.0 * eye3; // best orientation Q_k gains
-        // Q_k.block<3, 3>(9 + i*3, 9 + i*3) = trust * eye3; // matching Zijian's gains
-        // R_k.block<3, 3>(i*3, i*3) = trust * 0.002 * eye3; // best position R_k gains
+        // // Best position gains (hand-made)
+        // Q_k.block<3, 3>(9 + i*3, 9 + i*3) = trust * DT_CTRL * 0.06 * eye3;
+        // R_k.block<3, 3>(i*3, i*3) = trust * 0.002 * eye3;
+
+        // // Best orientation gains (hand-made)
+        // Q_k.block<3, 3>(9 + i*3, 9 + i*3) = trust * DT_CTRL * 2.0 * eye3;
         // R_k.block<3, 3>(i*3, i*3) = trust * 0.001 * eye3; // best orientation R_k gains
+        // Q_k.block<3, 3>(9 + i*3, 9 + i*3) = trust * eye3; // matching Zijian's gains
+        
+        // Best overall gains so far (following paper structure & through MATLAB)
+        Q_k.block<3, 3>(9 + i*3, 9 + i*3) = DT_CTRL * C_kT_plus * q_p * eye3 * C_kT_plus.transpose();        
     }
 
     // Find model Jacobian analytically (w/o bias states)

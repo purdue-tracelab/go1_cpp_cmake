@@ -177,6 +177,12 @@ class ETHZ_EKF : public go1StateEstimator {
         Eigen::Matrix<double, 12, 21> H_k;
 
         // Historical noise covariance calculation matrices (possible improvement)
+
+        // Optimized gains for estimation from MATLAB script
+        double q_f;
+        double q_w;
+        double q_p;
+        double r_meas;
 };
 
 /////////////////////////////////////////////
