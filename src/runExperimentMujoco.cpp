@@ -348,7 +348,7 @@ int main(int argc, char** argv) {
     data_src->pullSensorData(mujoco_go1_state);
     estimator->collectInitialState(mujoco_go1_state);
 
-    if (STATE_EST_SELECT == 1 || STATE_EST_SELECT == 2) {
+    if (STATE_EST_SELECT == 1) {
         for (int i = 0; i < NUM_LEG; i++) {
             if (USE_EST_FOR_CONTROL) {
                 estimator->setFootHeightResidual(1.02);

@@ -93,11 +93,11 @@ class MIT_TwoStageKF : public go1StateEstimator {
 
 // Nonlinear state transition function for ETHZ_EKF
 inline Eigen::Matrix<double, 22, 1> fState_ETHZ(const Eigen::Matrix<double, 22, 1>& x_k, const Eigen::Vector3d& f_meas, const Eigen::Vector3d& omg_meas) {
-    Eigen::Matrix<double, 22, 1> x_k1 = x_k;
+    Eigen::Matrix<double, 22, 1> x_k1 = x_k; // implicitly passes foot positions through
     Eigen::Vector3d grav (0, 0, -9.81);
-    Eigen::Matrix3d C_kT = quat2RotM(x_k.segment<4>(6)).transpose();
+    Eigen::Matrix3d C_k = quat2RotM(x_k.segment<4>(6));
 
-    auto acc_world = C_kT * f_meas + grav;
+    auto acc_world = C_k * f_meas + grav;
     if (!acc_world.allFinite()) {
         std::ostringstream oss;
         oss << "NaN/Inf in fState_ETHZ acc_world: [" << acc_world.transpose() 
@@ -121,14 +121,12 @@ inline Eigen::Matrix<double, 22, 1> fState_ETHZ(const Eigen::Matrix<double, 22, 
     if (std::abs(q.norm() - 1) > 1e-6) q.normalize();
 
     Eigen::Vector3d deltaRPY = DT_CTRL * omg_meas;
-    double angle = deltaRPY.norm();
-    Eigen::Quaterniond dq;
     
-    if (angle < 1e-8) {
-        dq = Eigen::Quaterniond(1.0, 0.5 * deltaRPY.x(), 0.5 * deltaRPY.y(), 0.5 * deltaRPY.z());
-    } else {
-        dq = Eigen::Quaterniond(Eigen::AngleAxisd(angle, deltaRPY / angle));
-    }
+    Eigen::AngleAxisd rollAngle(deltaRPY(0), Eigen::Vector3d::UnitX());
+    Eigen::AngleAxisd pitchAngle(deltaRPY(1), Eigen::Vector3d::UnitY());
+    Eigen::AngleAxisd yawAngle(deltaRPY(2), Eigen::Vector3d::UnitZ());
+
+    Eigen::Quaterniond dq = yawAngle * pitchAngle * rollAngle;
 
     Eigen::Quaterniond q_k1 = q * dq;
     q_k1.normalize();
@@ -141,19 +139,19 @@ inline Eigen::Matrix<double, 22, 1> fState_ETHZ(const Eigen::Matrix<double, 22, 
 // Nonlinear measurement model function for ETHZ_EKF
 inline Eigen::Matrix<double, 12, 1> hState_ETHZ(const Eigen::Matrix<double, 22, 1>& x_k1) {
     Eigen::Matrix<double, 12, 1> z_k1;
-    Eigen::Matrix3d C_k = quat2RotM(x_k1.segment<4>(6));
+    Eigen::Matrix3d C_kT = quat2RotM(x_k1.segment<4>(6)).transpose();
 
-    z_k1.segment<3>(0) = C_k * (x_k1.segment<3>(10) - x_k1.segment<3>(0));
-    z_k1.segment<3>(3) = C_k * (x_k1.segment<3>(13) - x_k1.segment<3>(0));
-    z_k1.segment<3>(6) = C_k * (x_k1.segment<3>(16) - x_k1.segment<3>(0));
-    z_k1.segment<3>(9) = C_k * (x_k1.segment<3>(19) - x_k1.segment<3>(0));
+    z_k1.segment<3>(0) = C_kT * (x_k1.segment<3>(10) - x_k1.segment<3>(0));
+    z_k1.segment<3>(3) = C_kT * (x_k1.segment<3>(13) - x_k1.segment<3>(0));
+    z_k1.segment<3>(6) = C_kT * (x_k1.segment<3>(16) - x_k1.segment<3>(0));
+    z_k1.segment<3>(9) = C_kT * (x_k1.segment<3>(19) - x_k1.segment<3>(0));
 
     return z_k1;
 }
 
-class ETHZ_EKF : public go1StateEstimator {
+class ETHZ_EKF_man : public go1StateEstimator {
     public:
-        ETHZ_EKF();
+        ETHZ_EKF_man();
         void collectInitialState(const go1State& state) override;
         void estimateState(go1State& state) override;
         Eigen::VectorXd getMeasurement() override { return z_k; }
@@ -176,8 +174,6 @@ class ETHZ_EKF : public go1StateEstimator {
         Eigen::Matrix<double, 21, 12> K_k;
         Eigen::Matrix<double, 12, 21> H_k;
 
-        // Historical noise covariance calculation matrices (possible improvement)
-
         // Optimized gains for estimation from MATLAB script
         double q_f;
         double q_w;
@@ -187,7 +183,46 @@ class ETHZ_EKF : public go1StateEstimator {
 
 /////////////////////////////////////////////
 
-// Nonlinear state transition function for CMU_EKF
+class ETHZ_EKF_num : public go1StateEstimator {
+    public:
+        ETHZ_EKF_num();
+        void collectInitialState(const go1State& state) override;
+        void estimateState(go1State& state) override;
+        Eigen::VectorXd getMeasurement() override { return z_k; }
+        Eigen::VectorXd getPrediction() override { return hState_ETHZ(x_k1_getter); }
+        Eigen::VectorXd getPostFitResidual() override { return z_k - hState_ETHZ(x_k1); }
+        Eigen::VectorXd getPostFitPrediction() override { return hState_ETHZ(x_k); }
+        double getKalmanGainNorm() override { return K_k.norm(); }
+    
+    private:
+        // Generic state variables and matrices
+        Eigen::Matrix<double, 22, 1> x_k, x_k1;
+        Eigen::Matrix<double, 22, 1> x_k1_getter; // stores x_k1 from BEFORE the Kalman update
+        Eigen::Matrix<double, 12, 1> z_k, y_res;
+        Eigen::Matrix<double, 12, 12> R_k, S_k;
+        Eigen::Matrix3d eye3;
+        
+        // Numerical Jacobian-related matrices
+        Eigen::Matrix<double, 22, 22> F_k, Q_k, P_k, P_k1;
+        Eigen::Matrix<double, 22, 12> K_k;
+        Eigen::Matrix<double, 12, 22> H_k, H_P_trans, K_k_trans;
+};
+
+// virtual interface pointer function to create designated estimator object
+inline std::unique_ptr<go1StateEstimator> makeEstimator() {
+    switch (STATE_EST_SELECT) {
+        case 0: return std::make_unique<NaiveKF>();
+        case 1: return std::make_unique<MIT_TwoStageKF>();
+        case 2: return std::make_unique<ETHZ_EKF_man>();
+        case 3: return std::make_unique<ETHZ_EKF_num>();
+        default: throw std::runtime_error("Invalid STATE_EST_SELECT");
+    }
+}
+
+#endif // GO1_STATE_EST_H
+
+/*
+// Retired nonlinear state transition function for CMU_EKF
 inline Eigen::Matrix<double, 22, 1> fState_CMU(const Eigen::Matrix<double, 22, 1>& x_k, const Eigen::Vector3d& f_meas, const Eigen::Vector3d& omg_meas) {
     Eigen::Matrix<double, 22, 1> x_k1 = x_k;
     Eigen::Vector3d grav (0, 0, -9.81);
@@ -234,7 +269,7 @@ inline Eigen::Matrix<double, 22, 1> fState_CMU(const Eigen::Matrix<double, 22, 1
     return x_k1;
 }
 
-// Nonlinear measurement model function for CMU_EKF
+// Retired nonlinear measurement model function for CMU_EKF
 inline Eigen::Matrix<double, 24, 1> hState_CMU(const Eigen::Matrix<double, 22, 1>& x_k1) {
     Eigen::Matrix<double, 24, 1> z_k1;
     Eigen::Matrix3d C_k = quat2RotM(x_k1.segment<4>(6));
@@ -246,42 +281,4 @@ inline Eigen::Matrix<double, 24, 1> hState_CMU(const Eigen::Matrix<double, 22, 1
 
     return z_k1;
 }
-
-class CMU_EKF : public go1StateEstimator {
-    public:
-        CMU_EKF();
-        void collectInitialState(const go1State& state) override;
-        void estimateState(go1State& state) override;
-        Eigen::VectorXd getMeasurement() override { return z_k; }
-        Eigen::VectorXd getPrediction() override { return hState_CMU(x_k1_getter); }
-        Eigen::VectorXd getPostFitResidual() override { return z_k - hState_CMU(x_k1); }
-        Eigen::VectorXd getPostFitPrediction() override { return hState_CMU(x_k); }
-        double getKalmanGainNorm() override { return K_k.norm(); }
-    
-    private:
-        // Generic state variables and matrices
-        Eigen::Matrix<double, 22, 1> x_k, x_k1;
-        Eigen::Matrix<double, 22, 1> x_k1_getter; // stores x_k1 from BEFORE the Kalman update
-        Eigen::Matrix<double, 24, 1> z_k, y_res;
-        Eigen::Matrix<double, 24, 24> R_k, S_k;
-        Eigen::Matrix3d eye3;
-        
-        // Analytical Jacobian-related matrices
-        Eigen::Matrix<double, 21, 1> delta_x_k1;
-        Eigen::Matrix<double, 21, 21> F_k, Q_k, P_k, P_k1;
-        Eigen::Matrix<double, 21, 24> K_k;
-        Eigen::Matrix<double, 24, 21> H_k;
-};
-
-// virtual interface pointer function to create designated estimator object
-inline std::unique_ptr<go1StateEstimator> makeEstimator() {
-    switch (STATE_EST_SELECT) {
-        case 0: return std::make_unique<NaiveKF>();
-        case 1: return std::make_unique<MIT_TwoStageKF>();
-        case 2: return std::make_unique<ETHZ_EKF>();
-        case 3: return std::make_unique<CMU_EKF>();
-        default: throw std::runtime_error("Invalid STATE_EST_SELECT");
-    }
-}
-
-#endif // GO1_STATE_EST_H
+*/

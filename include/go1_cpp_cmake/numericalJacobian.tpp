@@ -25,7 +25,7 @@ Eigen::MatrixXd numericalJacobian(F&& f, const Eigen::VectorXd& x, double eps, b
             x_eps[i] = x[i] + delta;
             f1 = wrapped(x_eps);
 
-            x_eps[2] = x[i] - delta;
+            x_eps[i] = x[i] - delta;
             f2 = wrapped(x_eps);
 
             numJac.col(i) = (f1 - f2) / (2.0 * delta);

@@ -213,6 +213,10 @@ void go1State::updateLocomotionPlan() {
         if (!init) {
             swing_phase++;
         }
+    } else {
+        for (int i = 0; i < NUM_LEG; i++) {
+            est_contacts[i] = thresh + 100;
+        }
     }
 
 }

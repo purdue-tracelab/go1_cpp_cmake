@@ -706,6 +706,7 @@ def plot_ETHZ_ekf_data(csv_file):
 
     plt.show()
 
+# Retired CMU EKF residual analysis
 def plot_CMU_ekf_data(csv_file):
     # Load data
     df = pd.read_csv(csv_file, on_bad_lines='skip', engine='python', encoding='utf-8', encoding_errors='ignore')
@@ -1113,6 +1114,6 @@ match state_est_select:
     case '2':
         plot_ETHZ_ekf_data(csv_file)
     case '3':
-        plot_CMU_ekf_data(csv_file)
+        plot_ETHZ_ekf_data(csv_file)
     case _:
         print("Invalid state estimator selection. Double check STATE_EST_SELECT in go1Params.h")

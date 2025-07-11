@@ -252,6 +252,7 @@
         <joint name="platform_slide" type="slide" axis="0 1 0" damping="1000"/>
         <joint name="platform_pitch" type="hinge" axis="0 1 0" damping="1000"/>
         <geom name="platform.geom" type="box" size="1.15 0.6 0.025" rgba="0.6 0.3 0.3 1"/>
+         <!-- <geom name='platform.geom' type='box' size='2 1 0.025' rgba='0.6 0.3 0.3 1'/> -->
     </body>
   </worldbody>
 

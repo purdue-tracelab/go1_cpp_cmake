@@ -215,9 +215,9 @@ void MIT_TwoStageKF::estimateState(go1State& state) {
 
 /////////////////////////////////////////////
 
-ETHZ_EKF::ETHZ_EKF() {
+ETHZ_EKF_man::ETHZ_EKF_man() {
 /*
-    ETHZ_EKF executes the extended Kalman filter by linearizing the
+    ETHZ_EKF_man executes the extended Kalman filter by linearizing the
     nonlinear dynamics and relationship between position and orientation by
     finding the Jacobian of the continuous state dynamics at each
     state according to fState_ETHZ & hState_ETHZ in the header file. Should be
@@ -284,7 +284,7 @@ ETHZ_EKF::ETHZ_EKF() {
 
 }
 
-void ETHZ_EKF::collectInitialState(const go1State& state) {
+void ETHZ_EKF_man::collectInitialState(const go1State& state) {
     x_k << state.root_pos,
             state.root_lin_vel,
             state.root_quat.w(), state.root_quat.x(), state.root_quat.y(), state.root_quat.z(),
@@ -294,7 +294,7 @@ void ETHZ_EKF::collectInitialState(const go1State& state) {
             state.foot_pos_abs.col(3);
 }
 
-void ETHZ_EKF::estimateState(go1State& state) {
+void ETHZ_EKF_man::estimateState(go1State& state) {
     // Predict next state
     x_k1 = fState_ETHZ(x_k, state.root_lin_acc_meas, state.root_ang_vel_meas);
     x_k1_getter = x_k1; // Store x_k1 before the Kalman update
@@ -384,7 +384,7 @@ void ETHZ_EKF::estimateState(go1State& state) {
 
 /////////////////////////////////////////////
 
-CMU_EKF::CMU_EKF() {
+ETHZ_EKF_num::ETHZ_EKF_num() {
 /*
     ETHZ_EKF executes the extended Kalman filter by linearizing the
     nonlinear dynamics and relationship between position and orientation by
@@ -401,36 +401,28 @@ CMU_EKF::CMU_EKF() {
 
     // Clear internal variables
     x_k.setZero();
-    x_k1.setZero(); delta_x_k1.setZero(); x_k1_getter.setZero();
+    x_k1.setZero(); x_k1_getter.setZero();
     z_k.setZero();
     y_res.setZero();
     S_k.setZero();
     F_k.setZero();
-    H_k.setZero();
+    H_k.setZero(); H_P_trans.setZero(); K_k_trans.setZero();
     P_k1.setZero();
     K_k.setZero();
 
     // Initialize covariances
     Q_k.setIdentity();
+    Q_k *= 0.01;
 
-    // // Best position Q_k gains
-    // Q_k.block<3, 3>(0, 0) = DT_CTRL * eye3 / 20.0;
-    // Q_k.block<3, 3>(3, 3) = DT_CTRL * 9.81 * eye3 / 20.0;
-    // Q_k.block<3, 3>(3, 3) *= 0.01;
-
-    // Best orientation Q_k gains
-    // Q_k *= 0.01;
-    Q_k *= 1e10;
-
-    R_k.setIdentity();
-    R_k *= 0.001; // comment out to match Zijian's gain
+    Eigen::Matrix<double, 12, 1> r_diag;
+    r_diag << 10, 7, 7, 10, 7, 7, 10, 7, 7, 10, 7, 7;
+    R_k = r_diag.asDiagonal();
 
     P_k.setIdentity();
-    // P_k *= 0.01; // best position P_k gains
-    P_k *= 100.0; // best orientation P_k gains
+    P_k *= 100.0;
 }
 
-void CMU_EKF::collectInitialState(const go1State& state) {
+void ETHZ_EKF_num::collectInitialState(const go1State& state) {
     x_k << state.root_pos,
             state.root_lin_vel,
             state.root_quat.w(), state.root_quat.x(), state.root_quat.y(), state.root_quat.z(),
@@ -440,85 +432,49 @@ void CMU_EKF::collectInitialState(const go1State& state) {
             state.foot_pos_abs.col(3);
 }
 
-void CMU_EKF::estimateState(go1State& state) {
+void ETHZ_EKF_num::estimateState(go1State& state) {
     // Predict next state
-    x_k1 = fState_CMU(x_k, state.root_lin_acc_meas, state.root_ang_vel_meas);
+    x_k1 = fState_ETHZ(x_k, state.root_lin_acc_meas, state.root_ang_vel_meas);
     x_k1_getter = x_k1; // Store x_k1 before the Kalman update
     
-    // Pull out measurement and useful rotation variables
-    Eigen::Matrix3d rootRot = rotZ(state.root_rpy_est(2))*rotY(state.root_rpy_est(1))*rotX(state.root_rpy_est(0));
+    // Pull out measurement
     for (int i = 0; i < NUM_LEG; i++) {
-        z_k.block<3, 1>(i*3, 0) = state.foot_pos_world_rot.col(i);
-        Eigen::Vector3d v_fut = rootRot * (state.foot_pos.col(i) - state.foot_pos_old.col(i)) / DT_CTRL 
-                                + rootRot * skew(state.root_ang_vel_meas) * state.foot_pos.col(i);
-        z_k.block<3, 1>(NUM_LEG*3 + i*3, 0) = v_fut;
+        z_k.block<3, 1>(i*3, 0) = state.foot_pos.col(i);
     }
-
-    Eigen::Matrix3d C_kT_plus = quat2RotM(x_k.segment<4>(6)).transpose(); // make note this rotation should be from x_k, not x_k1
-    Eigen::Matrix3d C_k_minus = quat2RotM(x_k1.segment<4>(6)); // make note this rotation should be from x_k1, not x_k
 
     // Update covariances based on foot contact
-    // double trust;
-    // for (int i = 0; i < NUM_LEG; i++) {
-    //     trust = state.contacts[i] ? 1.0 : 1e6;
-    //     Q_k.block<3, 3>(6 + i*3, 6 + i*3) = trust * DT_CTRL * 0.06 * eye3;
-
-    //     // // New idea: why is R being affected by contact if FK for rigid body is accurate? So keep R constant?
-    //     // R_k.block<3, 3>(i*3, i*3) = trust * 0.002 * eye3;
-    //     // R_k.block<3, 3>(NUM_LEG*3 + i*3, NUM_LEG*3 + i*3) = trust * 0.5 * eye3; // trust * 2.0 * eye3;
-    //     // R_k(NUM_LEG*3 + i*3 + 2, NUM_LEG*3 + i*3 + 2) = trust * 0.03; // z velocity tuning
-    // }
-
-    // Find model Jacobian analytically (w/o bias states)
-    F_k.setIdentity();
-    F_k.block<3, 3>(0, 3) = DT_CTRL * eye3;
-    Eigen::Matrix3d skew_acc = skew(state.root_lin_acc_meas);
-    Eigen::Matrix3d C_kT_plus_f = -DT_CTRL * C_kT_plus * skew_acc;
-    F_k.block<3, 3>(0, 6) = 0.5 * DT_CTRL * C_kT_plus_f;
-    F_k.block<3, 3>(3, 6) = C_kT_plus_f;
-    F_k.block<3, 3>(6, 6) = computeGamma0(state.root_ang_vel_meas).transpose();
-
-    // Find measurement Jacobian analytically (w/o bias states)
+    double trust;
     for (int i = 0; i < NUM_LEG; i++) {
-        H_k.block<3, 3>(i*3, 0) = -C_k_minus;
-        H_k.block<3, 3>(i*3, 6) = -skew(C_k_minus * (x_k1.segment<3>(10 + i*3) - x_k1.segment<3>(0)));
-        H_k.block<3, 3>(i*3, 9 + i*3) = C_k_minus;
-        H_k.block<3, 3>(12 + i*3, 3) = C_k_minus;
+        trust = (state.est_contacts[i] > state.thresh) ? 0.01 : 1e10;
+        Q_k.block<3, 3>(10 + i*3, 10 + i*3) = trust * eye3;
     }
+
+    // Find process and measurement Jacobians numerically (w/o bias states)
+    F_k = numericalJacobianFixedSize<22, 22>(fState_ETHZ, x_k, 1e-6, false, state.root_lin_acc_meas, state.root_ang_vel_meas);
+    H_k = numericalJacobianFixedSize<12, 22>(hState_ETHZ, x_k1, 1e-6, false);
 
     // Check residual for calculating optimal Kalman gain
     P_k1 = F_k * P_k * F_k.transpose() + Q_k;
-    y_res = z_k - hState_CMU(x_k1);
+    y_res = z_k - hState_ETHZ(x_k1);
     S_k = H_k * P_k1 * H_k.transpose() + R_k;
     S_k = (S_k + S_k.transpose()) / 2.0;
-    K_k = P_k1 * H_k.transpose() * S_k.inverse();
+    
+    // K_k = P_k1 * H_k.transpose() * S_k.inverse();
+    H_P_trans = H_k * P_k1.transpose();
+    K_k_trans = S_k.ldlt().solve(H_P_trans);
+    K_k = K_k_trans.transpose();
 
     // Update estimation and covariance
+    x_k1 += K_k * y_res;
+    Eigen::Quaterniond new_quat = Eigen::Quaterniond(x_k1(6), x_k1(7), x_k1(8), x_k1(9));
+    new_quat.normalize();
     P_k1 -= K_k * H_k * P_k1;
-    delta_x_k1 = K_k * y_res;
-    
-    // Bring back to full-sized state vector after update (rpy -> quat)
-    x_k1.segment<3>(0) += delta_x_k1.segment<3>(0);
-    x_k1.segment<3>(3) += delta_x_k1.segment<3>(3);
-    x_k1.segment<12>(10) += delta_x_k1.segment<12>(9);
-
-    Eigen::Quaterniond dq;
-    double delta_phi = delta_x_k1.segment<3>(6).norm();
-    if (delta_phi < 1e-8) {
-        dq = Eigen::Quaterniond(1, 0.5*delta_x_k1(6), 0.5*delta_x_k1(7), 0.5*delta_x_k1(8));
-    } else {
-        dq = Eigen::Quaterniond(Eigen::AngleAxisd(delta_phi, delta_x_k1.segment<3>(6).normalized()));
-    }
-
-    Eigen::Quaterniond q_k = Eigen::Quaterniond(x_k1(6), x_k1(7), x_k1(8), x_k1(9));
-    Eigen::Quaterniond q_k1 = q_k * dq;
-    x_k1.segment<4>(6) << q_k1.w(), q_k1.x(), q_k1.y(), q_k1.z();
 
     // Send estimates to go1State object
     state.root_pos_est = x_k1.segment<3>(0);
     state.root_lin_vel_est = x_k1.segment<3>(3);
     state.root_lin_acc_est = state.root_lin_acc_meas;
-    state.root_quat_est = q_k1.normalized();
+    state.root_quat_est = new_quat;
     state.root_rpy_est = quat2Euler(state.root_quat_est);
     state.root_ang_vel_est = state.root_ang_vel_meas;
 
