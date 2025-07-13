@@ -415,7 +415,10 @@ ETHZ_EKF_num::ETHZ_EKF_num() {
     Q_k *= 0.01;
 
     Eigen::Matrix<double, 12, 1> r_diag;
-    r_diag << 10, 7, 7, 10, 7, 7, 10, 7, 7, 10, 7, 7;
+    double r_x = 10;
+    double r_y = 5;
+    double r_z = 1.75;
+    r_diag << r_x, r_y, r_z, r_x, r_y, r_z, r_x, r_y, r_z;
     R_k = r_diag.asDiagonal();
 
     P_k.setIdentity();

@@ -322,7 +322,7 @@ int main(int argc, char** argv) {
     double renderInterval = 1.0/60.0;
 
     // Desired initial state
-    if (USE_EST_FOR_CONTROL) {
+    if (USE_EST_FOR_CONTROL && STATE_EST_SELECT == 1) {
         // mujoco_go1_state.root_pos_d << 0, 0, WALK_HEIGHT;
         mujoco_go1_state.root_pos_d << go1_pos_shift, 0, WALK_HEIGHT; // shifted forward
     } else {
