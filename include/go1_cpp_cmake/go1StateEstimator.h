@@ -92,10 +92,9 @@ class MIT_TwoStageKF : public go1StateEstimator {
 /////////////////////////////////////////////
 
 // Nonlinear state transition function for ETHZ_EKF
-inline Eigen::Matrix<double, 22, 1> fState_ETHZ(const Eigen::Matrix<double, 22, 1>& x_k, const Eigen::Vector3d& f_meas, const Eigen::Vector3d& omg_meas) {
+inline Eigen::Matrix<double, 22, 1> fState_ETHZ(const Eigen::Matrix<double, 22, 1>& x_k, const Eigen::Vector3d& f_meas, const Eigen::Vector3d& omg_meas, const Eigen::Matrix3d& C_k) {
     Eigen::Matrix<double, 22, 1> x_k1 = x_k; // implicitly passes foot positions through
     Eigen::Vector3d grav (0, 0, -9.81);
-    Eigen::Matrix3d C_k = quat2RotM(x_k.segment<4>(6));
 
     auto acc_world = C_k * f_meas + grav;
     if (!acc_world.allFinite()) {
@@ -137,9 +136,9 @@ inline Eigen::Matrix<double, 22, 1> fState_ETHZ(const Eigen::Matrix<double, 22, 
 }
 
 // Nonlinear measurement model function for ETHZ_EKF
-inline Eigen::Matrix<double, 12, 1> hState_ETHZ(const Eigen::Matrix<double, 22, 1>& x_k1) {
+inline Eigen::Matrix<double, 12, 1> hState_ETHZ(const Eigen::Matrix<double, 22, 1>& x_k1, const Eigen::Matrix3d& C_k) {
     Eigen::Matrix<double, 12, 1> z_k1;
-    Eigen::Matrix3d C_kT = quat2RotM(x_k1.segment<4>(6)).transpose();
+    Eigen::Matrix3d C_kT = C_k.transpose();
 
     z_k1.segment<3>(0) = C_kT * (x_k1.segment<3>(10) - x_k1.segment<3>(0));
     z_k1.segment<3>(3) = C_kT * (x_k1.segment<3>(13) - x_k1.segment<3>(0));
@@ -155,9 +154,9 @@ class ETHZ_EKF_man : public go1StateEstimator {
         void collectInitialState(const go1State& state) override;
         void estimateState(go1State& state) override;
         Eigen::VectorXd getMeasurement() override { return z_k; }
-        Eigen::VectorXd getPrediction() override { return hState_ETHZ(x_k1_getter); }
-        Eigen::VectorXd getPostFitResidual() override { return z_k - hState_ETHZ(x_k1); }
-        Eigen::VectorXd getPostFitPrediction() override { return hState_ETHZ(x_k); }
+        Eigen::VectorXd getPrediction() override { return hState_ETHZ(x_k1_getter, C_k); }
+        Eigen::VectorXd getPostFitResidual() override { return z_k - hState_ETHZ(x_k1, C_k); }
+        Eigen::VectorXd getPostFitPrediction() override { return hState_ETHZ(x_k, C_k); }
         double getKalmanGainNorm() override { return K_k.norm(); }
     
     private:
@@ -166,7 +165,7 @@ class ETHZ_EKF_man : public go1StateEstimator {
         Eigen::Matrix<double, 22, 1> x_k1_getter; // stores x_k1 from BEFORE the Kalman update
         Eigen::Matrix<double, 12, 1> z_k, y_res;
         Eigen::Matrix<double, 12, 12> R_k, S_k;
-        Eigen::Matrix3d eye3;
+        Eigen::Matrix3d eye3, C_k;
         
         // Analytical Jacobian-related matrices
         Eigen::Matrix<double, 21, 1> delta_x_k1;
@@ -189,9 +188,9 @@ class ETHZ_EKF_num : public go1StateEstimator {
         void collectInitialState(const go1State& state) override;
         void estimateState(go1State& state) override;
         Eigen::VectorXd getMeasurement() override { return z_k; }
-        Eigen::VectorXd getPrediction() override { return hState_ETHZ(x_k1_getter); }
-        Eigen::VectorXd getPostFitResidual() override { return z_k - hState_ETHZ(x_k1); }
-        Eigen::VectorXd getPostFitPrediction() override { return hState_ETHZ(x_k); }
+        Eigen::VectorXd getPrediction() override { return hState_ETHZ(x_k1_getter, C_k); }
+        Eigen::VectorXd getPostFitResidual() override { return z_k - hState_ETHZ(x_k1, C_k); }
+        Eigen::VectorXd getPostFitPrediction() override { return hState_ETHZ(x_k, C_k); }
         double getKalmanGainNorm() override { return K_k.norm(); }
     
     private:
@@ -200,7 +199,7 @@ class ETHZ_EKF_num : public go1StateEstimator {
         Eigen::Matrix<double, 22, 1> x_k1_getter; // stores x_k1 from BEFORE the Kalman update
         Eigen::Matrix<double, 12, 1> z_k, y_res;
         Eigen::Matrix<double, 12, 12> R_k, S_k;
-        Eigen::Matrix3d eye3;
+        Eigen::Matrix3d eye3, C_k;
         
         // Numerical Jacobian-related matrices
         Eigen::Matrix<double, 22, 22> F_k, Q_k, P_k, P_k1;

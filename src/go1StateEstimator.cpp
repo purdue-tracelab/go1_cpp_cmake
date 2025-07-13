@@ -292,11 +292,14 @@ void ETHZ_EKF_man::collectInitialState(const go1State& state) {
             state.foot_pos_abs.col(1),
             state.foot_pos_abs.col(2),
             state.foot_pos_abs.col(3);
+
+    C_k = quat2RotM(x_k.segment<4>(6));
 }
 
 void ETHZ_EKF_man::estimateState(go1State& state) {
     // Predict next state
-    x_k1 = fState_ETHZ(x_k, state.root_lin_acc_meas, state.root_ang_vel_meas);
+    C_k = quat2RotM(x_k.segment<4>(6));
+    x_k1 = fState_ETHZ(x_k, state.root_lin_acc_meas, state.root_ang_vel_meas, C_k);
     x_k1_getter = x_k1; // Store x_k1 before the Kalman update
     
     // Pull out measurement and useful rotation variables
@@ -305,7 +308,7 @@ void ETHZ_EKF_man::estimateState(go1State& state) {
             state.foot_pos.col(2), 
             state.foot_pos.col(3);
 
-    Eigen::Matrix3d C_kT_plus = quat2RotM(x_k.segment<4>(6)).transpose(); // make note this rotation should be from x_k, not x_k1
+    Eigen::Matrix3d C_kT_plus = C_k.transpose(); // make note this rotation should be from x_k, not x_k1
     Eigen::Matrix3d C_k_minus = quat2RotM(x_k1.segment<4>(6)); // make note this rotation should be from x_k1, not x_k
 
     // Update covariances based on foot contact
@@ -343,7 +346,7 @@ void ETHZ_EKF_man::estimateState(go1State& state) {
 
     // Check residual for calculating optimal Kalman gain
     P_k1 = F_k * P_k * F_k.transpose() + Q_k;
-    y_res = z_k - hState_ETHZ(x_k1);
+    y_res = z_k - hState_ETHZ(x_k1, C_k);
     S_k = H_k * P_k1 * H_k.transpose() + R_k;
     S_k = (S_k + S_k.transpose()) / 2.0;
     K_k = P_k1 * H_k.transpose() * S_k.inverse();
@@ -417,7 +420,7 @@ ETHZ_EKF_num::ETHZ_EKF_num() {
     Eigen::Matrix<double, 12, 1> r_diag;
     double r_x = 10;
     double r_y = 5;
-    double r_z = 1.75;
+    double r_z = 0.55;
     r_diag << r_x, r_y, r_z, r_x, r_y, r_z, r_x, r_y, r_z;
     R_k = r_diag.asDiagonal();
 
@@ -433,11 +436,14 @@ void ETHZ_EKF_num::collectInitialState(const go1State& state) {
             state.foot_pos_abs.col(1),
             state.foot_pos_abs.col(2),
             state.foot_pos_abs.col(3);
+
+    C_k = quat2RotM(x_k.segment<4>(6));
 }
 
 void ETHZ_EKF_num::estimateState(go1State& state) {
     // Predict next state
-    x_k1 = fState_ETHZ(x_k, state.root_lin_acc_meas, state.root_ang_vel_meas);
+    C_k = quat2RotM(x_k.segment<4>(6));
+    x_k1 = fState_ETHZ(x_k, state.root_lin_acc_meas, state.root_ang_vel_meas, C_k);
     x_k1_getter = x_k1; // Store x_k1 before the Kalman update
     
     // Pull out measurement
@@ -453,12 +459,12 @@ void ETHZ_EKF_num::estimateState(go1State& state) {
     }
 
     // Find process and measurement Jacobians numerically (w/o bias states)
-    F_k = numericalJacobianFixedSize<22, 22>(fState_ETHZ, x_k, 1e-6, false, state.root_lin_acc_meas, state.root_ang_vel_meas);
-    H_k = numericalJacobianFixedSize<12, 22>(hState_ETHZ, x_k1, 1e-6, false);
+    F_k = numericalJacobianFixedSize<22, 22>(fState_ETHZ, x_k, 1e-6, false, state.root_lin_acc_meas, state.root_ang_vel_meas, C_k);
+    H_k = numericalJacobianFixedSize<12, 22>(hState_ETHZ, x_k1, 1e-6, false, C_k);
 
     // Check residual for calculating optimal Kalman gain
     P_k1 = F_k * P_k * F_k.transpose() + Q_k;
-    y_res = z_k - hState_ETHZ(x_k1);
+    y_res = z_k - hState_ETHZ(x_k1, C_k);
     S_k = H_k * P_k1 * H_k.transpose() + R_k;
     S_k = (S_k + S_k.transpose()) / 2.0;
     

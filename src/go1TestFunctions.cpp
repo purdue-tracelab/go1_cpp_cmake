@@ -842,14 +842,14 @@ int go1TestFunctions::testNumericJacobian() {
     Eigen::Vector3d f_meas(0, 0, 9.8);
     Eigen::Vector3d omg_meas(1, 0, 0.5);
 
-    Eigen::MatrixXd jacobian = numericalJacobian(fState_ETHZ, x, 1e-6, true, f_meas, omg_meas);
+    Eigen::MatrixXd jacobian = numericalJacobian(fState_ETHZ, x, 1e-6, true, f_meas, omg_meas, Eigen::Matrix3d::Identity());
 
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> duration = end - start;
     std::cout << "Numerical Jacobian df/dx:\n" << jacobian;
     std::cout << "\nCalculation time: " << duration.count() << " ms" << std::endl;
 
-    Eigen::MatrixXd h_jac = numericalJacobian(hState_ETHZ, x);
+    Eigen::MatrixXd h_jac = numericalJacobian(hState_ETHZ, x, 1e-6, true, Eigen::Matrix3d::Identity());
 
     auto end2 = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> duration2 = end2 - end;
