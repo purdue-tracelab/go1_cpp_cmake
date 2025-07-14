@@ -153,7 +153,7 @@ class go1State {
         double x_footprint_offset, y_footprint_offset;
         Eigen::Vector2d StanceFeetSumXY;
         Eigen::Vector2d StanceFeetMP, StanceFeetMP_prev;
-        Eigen::Vector2d rel_error_pos;
+        Eigen::Vector2d pos_ref_rem;
         Eigen::Vector2d rel_error_vel;
         Eigen::Vector2d u_ref;
         Eigen::Matrix2d Phi_rem; // state transisiton matrix for the nominal remaining time in swing phase

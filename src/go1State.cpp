@@ -451,8 +451,7 @@ void go1State::amirHLIP() {
     HT-LIP footstep planning algorithm, which uses the SRBM's CoM's
     positional offset from the weighted sum of the xy foot positions
     to determine the optimal gains to adjust foot_deltaX and foot_deltaY
-    based on a QP formulation of HT-LIP dynamics. Need to ask I-Chia if
-    correct or incorrect, may take a while to debug if incorrect.
+    based on a QP formulation of HT-LIP dynamics. 
 */
     // rootRotMatZ and lin_vel_rel assumes small roll + pitch only (should I keep this assumption?)
     Eigen::Matrix3d rootRotMatZ = rotZ(USE_EST_FOR_CONTROL ? root_rpy_est(2) : root_rpy(2));
@@ -485,37 +484,36 @@ void go1State::amirHLIP() {
         StanceFeetMP = StanceFeetMP_prev;
     }
 
-    rel_error_pos = root_lin_vel_d.segment<2>(0) * DT_CTRL * (1.0 - swingProg)/2.0 - StanceFeetSumXY; // double check the (1 - swingProg) expression
-    rel_error_vel = lin_vel_rel.segment<2>(0) - root_lin_vel_d.segment<2>(0);
-    u_ref = root_lin_vel_d.segment<2>(0) * DT_CTRL * (SWING_PHASE_MAX + 1) / 2;
+    u_ref = root_lin_vel_d.segment<2>(0) * DT_CTRL * (SWING_PHASE_MAX + 1) / 2.0;
 
     // Finds the effective LIP frequency and adjusts it based on the vertical acceleration
-    double a_ver_plus_g = root_lin_acc_meas(2) - 9.81; // isn't used anywhere else, what's the point of this? only comparison?
+    Eigen::Matrix3d rootRotMat = rotZ(USE_EST_FOR_CONTROL ? root_rpy_est(2) : root_rpy(2)) 
+                                * rotY(USE_EST_FOR_CONTROL ? root_rpy_est(1) : root_rpy(1)) 
+                                * rotX(USE_EST_FOR_CONTROL ? root_rpy_est(0) : root_rpy(0));
+    Eigen::Vector3d world_acc = rootRotMat * root_lin_acc_meas;
     double f_M; // effective LIP frequency
 
-    if (root_lin_acc_meas(2) > 0){ // Amir uses world frame acc instead of body frame acc, maybe change?
-        // f_M = root_lin_acc(2) / root_pos_d(2);
-        f_M = root_lin_acc_meas(2) / WALK_HEIGHT; // either use hard-coded walk height or estimated height
-    } 
-    if(root_lin_acc_meas(2) > 15.0){
-        // f_M = 15.0 / root_pos_d(2);
+    if (world_acc(2) > 0) {
+        f_M = root_lin_acc_meas(2) / WALK_HEIGHT;
+    }
+    if (world_acc(2) > 15.0) {
         f_M = 15.0 / WALK_HEIGHT;
     }
-    if(root_lin_acc_meas(2) < 5.0){
+    if (world_acc(2) < 5.0) {
         f_M = 25.0;
     }
 
     // State transition matrix for entire swing duration
-    double a1 = cosh(DT_CTRL * (SWING_PHASE_MAX/2) * sqrt(f_M));
-    double a2 = sinh(DT_CTRL * (SWING_PHASE_MAX/2) * sqrt(f_M)) / sqrt(f_M);
-    double a3 = sinh(DT_CTRL * (SWING_PHASE_MAX/2) * sqrt(f_M)) * sqrt(f_M);
-    double a4 = cosh(DT_CTRL * (SWING_PHASE_MAX/2) * sqrt(f_M));
+    double a1 = cosh(DT_CTRL * (SWING_PHASE_MAX/2.0) * sqrt(f_M));
+    double a2 = sinh(DT_CTRL * (SWING_PHASE_MAX/2.0) * sqrt(f_M)) / sqrt(f_M);
+    double a3 = sinh(DT_CTRL * (SWING_PHASE_MAX/2.0) * sqrt(f_M)) * sqrt(f_M);
+    double a4 = cosh(DT_CTRL * (SWING_PHASE_MAX/2.0) * sqrt(f_M));
     
     // State transition matrix for remaining swing duration
-    double a1r = cosh((1.0 - 0.5*swingProg) * DT_CTRL * (SWING_PHASE_MAX/2) * sqrt(f_M)); // 0.5 because swing_progress_pram is averaged for the nominally 2 swinging legs
-    double a2r = sinh((1.0 - 0.5*swingProg) * DT_CTRL * (SWING_PHASE_MAX/2) * sqrt(f_M)) / sqrt(f_M);
-    double a3r = sinh((1.0 - 0.5*swingProg) * DT_CTRL * (SWING_PHASE_MAX/2) * sqrt(f_M)) * sqrt(f_M);
-    double a4r = cosh((1.0 - 0.5*swingProg) * DT_CTRL * (SWING_PHASE_MAX/2) * sqrt(f_M));
+    double a1r = cosh((1.0 - 0.5*swingProg) * DT_CTRL * (SWING_PHASE_MAX/2.0) * sqrt(f_M));
+    double a2r = sinh((1.0 - 0.5*swingProg) * DT_CTRL * (SWING_PHASE_MAX/2.0) * sqrt(f_M)) / sqrt(f_M);
+    double a3r = sinh((1.0 - 0.5*swingProg) * DT_CTRL * (SWING_PHASE_MAX/2.0) * sqrt(f_M)) * sqrt(f_M);
+    double a4r = cosh((1.0 - 0.5*swingProg) * DT_CTRL * (SWING_PHASE_MAX/2.0) * sqrt(f_M));
 
     Phi_rem << a1r, a2r, 
                 a3r, a4r; // state transition matrix for remainingTime in swing
@@ -525,8 +523,9 @@ void go1State::amirHLIP() {
     Y_hlip << -StanceFeetMP(1) - y_footprint_offset, lin_vel_rel(1);
 
     // Desired HLIP state at end of swing phase
-    X_hlip_ref_minus << root_lin_vel_d(0) * DT_CTRL * (SWING_PHASE_MAX/4), root_lin_vel_d(0);
-    Y_hlip_ref_minus << root_lin_vel_d(1) * DT_CTRL * (SWING_PHASE_MAX/4), root_lin_vel_d(1);
+    pos_ref_rem = root_lin_vel_d.segment<2>(0) * DT_CTRL * (SWING_PHASE_MAX/2) * (1.0 - swingProg/2.0) - StanceFeetMP;
+    X_hlip_ref_minus << pos_ref_rem(0), root_lin_vel_d(0);
+    Y_hlip_ref_minus << pos_ref_rem(1), root_lin_vel_d(1);
 
     // Predicted HLIP state at end of swing phase
     X_hlip_minus = Phi_rem*X_hlip;
@@ -541,7 +540,6 @@ void go1State::amirHLIP() {
     //////////////////////////
 
     // // HLIP Hessian, gradient, linear constraints, and bounds
-    // // e << root (<-- incomplete line, double check Amir's HLIP formulation)
     // for (int i = 0; i < 4; i++){
     //     hlip_dense_hessian(i,i) = 2.0 * (a1*a1 + a3*a3);
     //     hlip_dense_linearConst(i+2,i) = 1.0;

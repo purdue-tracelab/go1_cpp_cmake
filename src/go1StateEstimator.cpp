@@ -420,7 +420,7 @@ ETHZ_EKF_num::ETHZ_EKF_num() {
     Eigen::Matrix<double, 12, 1> r_diag;
     double r_x = 10;
     double r_y = 5;
-    double r_z = 0.55;
+    double r_z = 2.25; // 0.22 for HC1, HC2, HC4; 0.55 for HC3, HC5, 2.25 for flat ground
     r_diag << r_x, r_y, r_z, r_x, r_y, r_z, r_x, r_y, r_z;
     R_k = r_diag.asDiagonal();
 
