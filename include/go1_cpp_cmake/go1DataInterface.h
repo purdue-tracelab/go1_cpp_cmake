@@ -115,7 +115,12 @@ struct hardwareDataReader : lowLevelDataReader {
             // extUDP.GetRecv(extLowState); // comment out for fully ordered loop
             state.root_lin_acc_meas << extLowState.imu.accelerometer[0], extLowState.imu.accelerometer[1], extLowState.imu.accelerometer[2];
             state.root_ang_vel_meas << extLowState.imu.gyroscope[0], extLowState.imu.gyroscope[1], extLowState.imu.gyroscope[2];
-            state.est_contacts << extLowState.footForce[0], extLowState.footForce[1], extLowState.footForce[2], extLowState.footForce[3];
+
+            if (state.walking_mode) {
+                state.est_contacts << extLowState.footForce[0], extLowState.footForce[1], extLowState.footForce[2], extLowState.footForce[3];
+            } else {
+                state.est_contacts << state.thresh + 100, state.thresh + 100, state.thresh + 100, state.thresh + 100;
+            }
             
             for (int i = 0; i < 3*NUM_LEG; i++) {
                 state.joint_pos(i, 0) = extLowState.motorState[i].q;

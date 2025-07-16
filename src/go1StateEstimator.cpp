@@ -420,7 +420,9 @@ ETHZ_EKF_num::ETHZ_EKF_num() {
     Eigen::Matrix<double, 12, 1> r_diag;
     double r_x = 10;
     double r_y = 5;
-    double r_z = 2.25; // 0.22 for HC1, HC2, HC4; 0.55 for HC3, HC5, 2.25 for flat ground
+    // r_z values in sim are in range [0.22, 0.55] for walking around on flat ground or all hardware cases
+    // r_z values in hardware are in range [xx, yy] for walkign around on flat ground or all hardware cases
+    double r_z = 0.005; // HARDWARE VALUES: 
     r_diag << r_x, r_y, r_z, r_x, r_y, r_z, r_x, r_y, r_z;
     R_k = r_diag.asDiagonal();
 
@@ -456,6 +458,12 @@ void ETHZ_EKF_num::estimateState(go1State& state) {
     for (int i = 0; i < NUM_LEG; i++) {
         trust = (state.est_contacts[i] > state.thresh) ? 0.01 : 1e10;
         Q_k.block<3, 3>(10 + i*3, 10 + i*3) = trust * eye3;
+    }
+
+    // Reduce velocity estimate drift on hardware
+    double vel_est_cov = 0.2;
+    if (state.thresh == UNITREE_SDK_CONTACT_THRESH && Q_k(3, 3) != vel_est_cov) {
+        Q_k.block<3, 3>(3, 3) = vel_est_cov * eye3;
     }
 
     // Find process and measurement Jacobians numerically (w/o bias states)

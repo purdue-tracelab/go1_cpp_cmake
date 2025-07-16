@@ -19,13 +19,13 @@ def plot_calc_time(csv_file):
     calc_time_plot = plt.figure(figsize=(10, 6))
 
     plt.subplot(2, 2, 1)
-    plt.plot(time, state_update_times, label='State Update Time', color='blue')
+    plt.plot(time, state_update_times, label='Footstep Planning + State Update Time', color='blue')
     plt.xlabel('Simulation time (s)')
     plt.ylabel('Calculation time (ms)')
     plt.legend()
 
     plt.subplot(2, 2, 2)
-    plt.plot(time, state_estimation_times, label='KF State Estimation Time', color='green')
+    plt.plot(time, state_estimation_times, label='State Estimation Time', color='green')
     plt.xlabel('Simulation time (s)')
     plt.ylabel('Calculation time (ms)')
     plt.legend()

@@ -45,6 +45,7 @@ void go1State::resetState() {
     root_lin_acc << 0, 0, 9.81;
     root_lin_acc_meas.setZero();
     root_ang_vel_meas.setZero();
+    root_quat = Eigen::Quaterniond::Identity();
     root_rpy.setZero();
     root_rpy_d.setZero();
     root_ang_vel.setZero();
@@ -212,10 +213,6 @@ void go1State::updateLocomotionPlan() {
 
         if (!init) {
             swing_phase++;
-        }
-    } else {
-        for (int i = 0; i < NUM_LEG; i++) {
-            est_contacts[i] = thresh + 100;
         }
     }
 
