@@ -2,7 +2,7 @@
 # Overview
 `go1_cpp_cmake` is a CMake project created for preserving our lab's research done on footstep planning in noninertial environments surfaces using quadrupedal legged locomotion, and serves as a clear repo for comparing the effects of different footstep planners and state estimators on the stability of locomotion atop these dynamic rigid surfaces (DRS). The footstep planners used/implemented are the Raibert Heuristic (RH), the Capture Point augmentation of the Raibert Heuristic(RH+CP), and our lab's new Hybrid Time-varying Linear-Inverted Pendulum (HT-LIP) planner. The state estimators implemented are the contact-aided Kalman filter (CAKF) proposed by MIT, and the contact-aided extended Kalman filter proposed by ETH Zurich (CAEKF). For control, the stance leg controller uses model predictive control (MPC) using quadratic programming (QP) for optimzation, and the swing leg controller uses joint-level proportional-derivative (PD) control. The code constructs a full-dimensional torque-control framework for ensuring stable locomotion for quadrupedal robots in simulation and hardware. 
 
-[Framework Diagram](/models/assets/framework_diag.png?raw=true "Framework Diagram")
+![Framework Diagram](/models/assets/framework_diag.png?raw=true "Framework Diagram")
 
 For a simplified and detailed explanation of these modules, look at [this Overleaf link](https://www.overleaf.com/read/rswbkdgmngpz#2c8aa1) to know more, or take a look at my thesis [here](https://hammer.purdue.edu/articles/thesis/_b_Evaluation_and_Improvement_of_a_Hybrid_Time-Varying_Linear_Inverted_Pendulum_Model_Footstep_Planner_for_Quadrupedal_Locomotion_on_Dynamic_Rigid_Surfaces_b_/29895506?file=57137330) for a longer look!
 
@@ -80,7 +80,7 @@ cd /usr/local/mujoco/bin
 ./simulate ./../model/humanoid/humanoid.xml
 ```
 
-If a simulation window pops up and a human falls over, then you're able to run MuJoCo successfully! Note that 3.2.7 was the latest stable release at the time of making this repo, so if you want to use newer versions, double-check it won't clash with Python dependencies for your system. If it won't, ***please*** don't replace your Python installation. You will break your Linux terminal and OS, and have to factor the drive/VM, so ***please please please*** be careful about this (AJ and I did this like three times before realizing).
+If a simulation window pops up and a human falls over, then you're able to run MuJoCo successfully! Note that 3.2.7 was the latest stable release at the time of making this repo, so if you want to use newer versions, double-check it won't clash with Python dependencies for your system. If it will, ***please*** don't replace your Python installation. You will break your Linux terminal and OS, and have to factor the drive/VM, so ***please please please*** be careful about this (AJ and I did this like three times before realizing what the issue was, and had to reset our VMs).
 
 ## Step 2: Install Eigen3
 
@@ -234,7 +234,7 @@ make
 
 This way, you'll always catch pre-build issues on the spot. If those pass and you still get errors, you likely mishandled information inside the script instead of leaving syntax errors. Follow the existing formats, use ChatGPT, or ask me to make sure you understand how to make those changes, if you so desire. I'm going to move on to implementing a personal repo for legged and manipulator robots in general, since I'd like to explore reinforcement learning and other model-based techniques to improve my understanding and skills for the job.
 
-Finally, my code in here is not perfect. There are parts that aren't perfect (mostly the state estimator tunings) and parts that aren't finished (terrain adaptation, more robust MPC to use early contacts for stance control) that can be implemented and perfected by you! If there's anything I'd like you to learn from this, it's how to properly manage a repo with a ton of moving parts and make it clear to debug for yourself and others in the future. By all means, make code that looks and works better than this, so you can save everybody's time and energy in the future, including yours. Otherwise, thanks for reading! Big shoutout to Zijian, I-Chia, Zenan, Wenxi, Muqun, Falak, AJ, Katy, Annalise, Andy, Prof. Gu, and you.
+Finally, my code in here is not perfect. There are parts that aren't ideal (mostly the state estimator tunings) and parts that aren't finished (terrain adaptation, more robust MPC to use early contacts for stance control) that can be implemented and perfected by you! If there's anything I'd like you to learn from this, it's how to properly manage a repo with a ton of moving parts and make it clear to debug for yourself and others in the future. By all means, make code that looks and works better than this, so you can save everybody's time and energy in the future, including yours. Otherwise, thanks for reading! Big shoutout to Prof. Gu, Zijian, I-Chia, Zenan, Wenxi, Muqun, Falak, AJ, Katy, Leo, Annalise, Andy, and you.
 
 ## Troubleshooting
 
@@ -244,4 +244,4 @@ Finally, my code in here is not perfect. There are parts that aren't perfect (mo
 
 ---
 
-Feel free to contact me if you have any issues with the installation. It can be very finnicky, but once it's done, there's no more hassle. We may download more when working on the physical system, but that's a concern for later.
+Feel free to contact me if you have any issues with the installation, or if you wanna flex your code working.
