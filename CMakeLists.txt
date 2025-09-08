@@ -71,7 +71,7 @@ include_directories(
 # Add main Go1 control library
 add_library(go1_main_lib
   include/go1_cpp_cmake/go1Params.h
-  # include/go1_cpp_cmake/numericalJacobian.tpp # remove old numericalJacobian function
+  # include/go1_cpp_cmake/numericalJacobian.tpp # necessary? included in go1Utils.h
   include/go1_cpp_cmake/go1Utils.h
   src/go1Utils.cpp
   include/go1_cpp_cmake/go1FK.h
@@ -80,7 +80,7 @@ add_library(go1_main_lib
   src/go1State.cpp
   include/go1_cpp_cmake/go1StanceMPC.h
   src/go1StanceMPC.cpp
-  include/go1_cpp_cmake/go1StateEstimator.h # EKF needs more tuning + needs analytical for faster computation
+  include/go1_cpp_cmake/go1StateEstimator.h # EKF works decently well in simulation, but not on hardware yet
   src/go1StateEstimator.cpp
   include/go1_cpp_cmake/go1TestFunctions.h
   src/go1TestFunctions.cpp
@@ -92,7 +92,6 @@ target_link_libraries(go1_main_lib
   PUBLIC
     OsqpEigen::OsqpEigen
     ${MUJOCO_LIBRARY}
-    # "${CMAKE_CURRENT_SOURCE_DIR}/unitree_legged_sdk/lib/cpp/${ARCH}/libunitree_legged_sdk.a"
     Threads::Threads
     unitree_legged_sdk
 )

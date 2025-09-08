@@ -126,6 +126,10 @@ Eigen::MatrixXd go1WorldFrameContactJacobian(const Eigen::VectorXd& jointPos, co
 }
 
 Eigen::Matrix3d go1HipFrameLegJacobian(int leg_idx, const Eigen::VectorXd& jointPos) {
+/*
+    Find the Jacobian of the foot w.r.t the hip of the corresponding leg using leg_idx
+    and the joint positions jointPos of that leg.
+*/
     double l1 = HIP_LINK_LENGTH;
     double l2 = THIGH_LINK_LENGTH;
     double l3 = CALF_LINK_LENGTH;

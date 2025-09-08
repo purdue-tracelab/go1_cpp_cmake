@@ -1,16 +1,25 @@
 
+# Overview
+`go1_cpp_cmake` is a CMake project created for preserving our lab's research done on footstep planning in noninertial environments surfaces using quadrupedal legged locomotion, and serves as a clear repo for comparing the effects of different footstep planners and state estimators on the stability of locomotion atop these dynamic rigid surfaces (DRS). The footstep planners used/implemented are the Raibert Heuristic (RH), the Capture Point augmentation of the Raibert Heuristic(RH+CP), and our lab's new Hybrid Time-varying Linear-Inverted Pendulum (HT-LIP) planner. The state estimators implemented are the contact-aided Kalman filter (CAKF) proposed by MIT, and the contact-aided extended Kalman filter proposed by ETH Zurich (CAEKF). For control, the stance leg controller uses model predictive control (MPC) using quadratic programming (QP) for optimzation, and the swing leg controller uses joint-level proportional-derivative (PD) control. The code constructs a full-dimensional torque-control framework for ensuring stable locomotion for quadrupedal robots in simulation and hardware. 
+
+[Framework Diagram](/models/assets/framework_diag.png?raw=true "Framework Diagram")
+
+For a simplified and detailed explanation of these modules, look at [this Overleaf link](https://www.overleaf.com/read/rswbkdgmngpz#2c8aa1) to know more, or take a look at my thesis [here](https://hammer.purdue.edu/articles/thesis/_b_Evaluation_and_Improvement_of_a_Hybrid_Time-Varying_Linear_Inverted_Pendulum_Model_Footstep_Planner_for_Quadrupedal_Locomotion_on_Dynamic_Rigid_Surfaces_b_/29895506?file=57137330) for a longer look!
+
+
 # CMake Project Installation Guide
 
-This guide covers the installation of dependencies required for building and running the CMake project `go1_cpp_cmake`. The package is intended for use on Ubuntu 22.04 and integrates with MuJoCo 3.2.7 for simulation and OSQP for quadratic programming (QP) used in Model Predictive Control (MPC) formulations. Make sure you go to [this Overleaf link](https://www.overleaf.com/read/rswbkdgmngpz#2c8aa1) to take a look at the overall project formulation and associated goals.
-
-By the end of the installation, you should have these packages/libraries properly configured and installed:
+This guide covers the installation of dependencies required for building and running the CMake project `go1_cpp_cmake`. The package is intended for use on Ubuntu 22.04 and integrates with MuJoCo 3.2.7 for simulation, Eigen for efficient matrix representation, and OSQP for QP-MPC optimization. By the end of the installation, you should have these packages/libraries properly configured and installed:
 
 - **MuJoCo 3.2.7 (newest version at the moment)** (Simulation)
+- **Eigen3** (Header-only library for matrix representation and operations)
 - **OSQP v0.6.3** (QP Solver for GRF MPC)
 - **OsqpEigen v0.7.0** (C++ wrapper for OSQP w/ Eigen linear algebra library interface)
 
+Note that this is for installing these packages **system wide**, so if you need to make separate workspaces for this, consider Docker or a virtual machine to make sure dependencies don't clash across projects. Also, this is a C++ project; I did not implement a Python version, and I'm sure it's possible if you'd like for simulation purposes, but I can't guarantee that Python can run on your hardware as fast or efficiently as C++ can. Lastly, if you want to upgrade to Ubuntu 24 or newer or on another OS, you'll have to determine the dependencies yourself, as a lot of extra steps (installing Java 8/11, upgrading Python 3.6 to higher, installing LCM, etc.) were skipped or invalidated with Ubuntu 22, so general caution is advised.
+
 ## Pre-Installation Step: Add Self to Sudo Group
-Naturally, you can't really run any of these installation commands without being part of the administrator, or `sudo` group. Running any of the following terminal commands is going to fail since you're not automatically given `sudo` status when you create the Ubuntu 22 VM, so follow these steps.
+Naturally, you can't really install or change anything on your system without being part of the administrator, or `sudo` group. Running any of the following terminal commands is going to fail since you're not automatically given `sudo` status when you create the Ubuntu 22 system/workspace, so follow these steps if you're not yet part of the `sudo` group.
 
 To login as root, run:
 
@@ -40,9 +49,9 @@ exit  # run this twice for option 1, once for option 2
 # Close the terminal and open a new terminal
 sudo whoami  # should return "root"
 ```
-This should ensure that you can run all the commands with administrator access from now on. Note that you'll have to enter your VM password each time you use a `sudo` command in a new terminal for the first time.
+This should ensure that you can run all the commands with administrator access from now on. Note that you'll have to enter your user password each time you use a `sudo` command in a new terminal for the first time.
 
-## Step 1: Install MuJoCo (version 3.2.7, the latest version at the moment)
+## Step 1: Install MuJoCo 3.2.7
 
 1. Download MuJoCo 3.2.7 from the [official MuJoCo website](https://mujoco.org/) by hitting the **Download** tab.
 2. Create a file directory for MuJoCo and extract the tar ball contents into it
@@ -50,6 +59,7 @@ This should ensure that you can run all the commands with administrator access f
 ```bash
 mkdir -p ~/mujoco && cd ~/mujoco
 wget https://github.com/deepmind/mujoco/releases/latest/download/mujoco-3.2.7-linux-x86_64.tar.gz
+# Double-check the above link, may have changed due to updates by Google
 tar -xvzf mujoco-3.2.7-linux-x86_64.tar.gz
 sudo mv mujoco-3.2.7 /usr/local/mujoco
 export MUJOCO_PATH=/usr/local/mujoco
@@ -70,7 +80,7 @@ cd /usr/local/mujoco/bin
 ./simulate ./../model/humanoid/humanoid.xml
 ```
 
-If a simulation window pops up and a human falls over, then you're able to run MuJoCo successfully!
+If a simulation window pops up and a human falls over, then you're able to run MuJoCo successfully! Note that 3.2.7 was the latest stable release at the time of making this repo, so if you want to use newer versions, double-check it won't clash with Python dependencies for your system. If it won't, ***please*** don't replace your Python installation. You will break your Linux terminal and OS, and have to factor the drive/VM, so ***please please please*** be careful about this (AJ and I did this like three times before realizing).
 
 ## Step 2: Install Eigen3
 
@@ -125,6 +135,8 @@ make
 sudo make install
 ```
 
+Note that the versions of `OSQP` and `OsqpEigen` are specific to each other, so if you do want to upgrade this package or use it on a newer system, make sure your versions are compatible with each other and your system requirements.
+
 ## Step 5: Install the Package
 
 Once all dependencies are installed, clone the `go1_cpp_cmake` project onto your home directory, then build.
@@ -160,17 +172,24 @@ Once successfully built, you can run my simulation executables for the project:
 
 - `run_go1Tests` - checks if the calculation scripts are working properly
 - `run_go1InertiaCalc` - calculates the nominal inertia of Go1
-- `run_go1MujocoSim` - runs the walking Go1 MuJoCo sim
+- `run_go1MujocoSim` - runs the Go1 MuJoCo sim for walking
+- `run_go1FSMMujoco` - runs the FSM version of Go1 MuJoCo sim (only walks in place)
+- `run_go1FSMMujocoLoopFunc` - runs the above but with directional movement and with enforced 500 Hz loop time
+- `run_go1ExperimentMujocoSim` - runs the DRS experiment for Go1
 
-You can also run Unitree's example hardware executables:
+You can also run Unitree's example code and my hardware executables:
 
 - `example_position` - moves the FR foot of Go1 while printing the thigh's joint position and velocity
 - `example_velocity` - moves the FR foot of Go1 with a time-varying velocity
 - `example_torque` - applies a constant torque to the FR foot of Go1
 - `example_walk` - executes high-level walking example on Go1
 - `example_joystick` - prints out joystick information received by Go1
+- `test_go1ReadHardware` - tests reading Go1's low-level information
+- `test_go1TorqueHardware` - tests sending Go1 torque commands (careful with this one, change values if necessary)
+- `test_go1JointPDHardware` - tests the Startup/Shutdown sequences of Go1
+- `run_go1FSMHardware` - runs the FSM code from simulation onto Go1 hardware
 
-All of these scripts can be run by entering the build folder of the project, and typing `./` before any executable file. You will know what files are executable if you type `ls` in terminal and their names are highlighted in a different color from the rest of the files.
+All of these scripts can be run by entering the build folder of the project, and typing `./` before any executable file's name. You will know what files are executable if you type `ls` in terminal and their names are highlighted in a different color from the rest of the files.
 
 ```bash
 cd ~/go1_cpp_cmake
@@ -179,9 +198,25 @@ ls
 ./* # replace the asterisk with any executable listed above
 ```
 
-## Making Changes to the Project
+Lastly, after running any of the simulation or hardware executables, you can plot some of the internal data using the Python files from the `py_src` directory. 
 
-The goal of the CMake project is to enable physical control of the robot based on the code I've already written for simulation control. So, we can leverage the existing example code that Unitree has provided to create new example scripts. We need to extract the low-level information from the robot and send torque commands to the robot at all times, so we can use the format of the example files to achieve this. To add make these new files executable, make sure to edit the CMakeLists.txt file in `unitree_legged_sdk` instead of the top-level one (we'll experiment with that later). For now, all you have to do is add these three lines to the CMakeLists.txt when you make a new file:
+- `plotGo1CalcTime.py` - records the calculation time for each module you record, look in `runGo1Mujoco.cpp`
+- `plotGo1EstResidualData.py` - records the residuals for the filters, important for tuning state estimators
+- `plotGo1MujocoData.py` - plots the desired, actual, and estimated values of Go1 in simulation
+- `plotGo1HardwareData.py` - plots the internal desired and estimated values of Go1 on hardware
+
+I usually type:
+
+```bash
+cd ~/go1_cpp_cmake
+./py_src/plotGo1* # replace the asterisk with any Python executables above
+```
+
+when plotting anything from the CSV files saved from the simulations in the `data` directory. You can format this yourself as well, just make sure the CSV you generate and the file name matches what the Python function is looking for.
+
+## Changing/Improving the Project
+
+The goal of this code is to reimplement earlier research from our lab, but in a clearer and modular fashion for training newer lab mates. There's a lot to understand about robotics before even touching code, and it can be overwhelming, so I hope this can help you get past the initial hump faster and more gracefully than I did. If you want to adjust anything in the code (change FSM structure, controllers, planners, motion generators, etc.), then you should first understand how each file and function interacts with each other in the simulation executables, since the controllers for simulation are the exact same ones used for hardware. I recommend looking at `runGo1FSMMujoco.cpp` for the general control structure, `go1FSM.cpp` for the controller swapping behavior, and `go1Params.h` to see what settings are enabled, and then you can track the files through your IDE (I used VS Code and Ctrl+Click to jump between files) and see what is necessary, which is harder with ROS code unless you're familiar. To create new hardware code, you'll have to add these three lines to the CMakeLists.txt when you make a new file:
 
 ```bash
 add_executable(example_* example/example_*.cpp)
@@ -197,16 +232,9 @@ cmake ..
 make
 ```
 
-This way, you'll always catch pre-build issues on the spot. If those pass and you still get errors, you likely mishandled information inside the script instead of leaving syntax errors. Follow the existing formats, use ChatGPT, or ask me to make sure you understand how to make those changes, if you so desire.
+This way, you'll always catch pre-build issues on the spot. If those pass and you still get errors, you likely mishandled information inside the script instead of leaving syntax errors. Follow the existing formats, use ChatGPT, or ask me to make sure you understand how to make those changes, if you so desire. I'm going to move on to implementing a personal repo for legged and manipulator robots in general, since I'd like to explore reinforcement learning and other model-based techniques to improve my understanding and skills for the job.
 
-To push your changes to the GitHub repo:
-
-```bash
-cd ~/go1_cpp_cmake  # make sure you're here before pushing
-git add .
-git commit -m "Write your commit message here"
-git push -u origin main  # you'll have to enter your GitHub username and SSH key here
-```
+Finally, my code in here is not perfect. There are parts that aren't perfect (mostly the state estimator tunings) and parts that aren't finished (terrain adaptation, more robust MPC to use early contacts for stance control) that can be implemented and perfected by you! If there's anything I'd like you to learn from this, it's how to properly manage a repo with a ton of moving parts and make it clear to debug for yourself and others in the future. By all means, make code that looks and works better than this, so you can save everybody's time and energy in the future, including yours. Otherwise, thanks for reading! Big shoutout to Zijian, I-Chia, Zenan, Wenxi, Muqun, Falak, AJ, Katy, Annalise, Andy, Prof. Gu, and you.
 
 ## Troubleshooting
 

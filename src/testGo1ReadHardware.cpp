@@ -1,7 +1,3 @@
-/**********************************************************************
- Copyright (c) 2020-2023, Unitree Robotics.Co.Ltd. All rights reserved.
-***********************************************************************/
-
 #include "unitree_legged_sdk/unitree_legged_sdk.h"
 #include <math.h>
 #include <iostream>

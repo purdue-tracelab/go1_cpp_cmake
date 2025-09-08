@@ -1,7 +1,10 @@
 #ifndef GO1_DATA_INTERFACE_H
 #define GO1_DATA_INTERFACE_H
 
+// Standard libraries
 #include <chrono>
+
+// Package-specific header files
 #include "go1State.h"
 
 struct lowLevelDataReader {

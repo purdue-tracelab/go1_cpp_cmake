@@ -2,6 +2,27 @@
 
 #include "go1_cpp_cmake/go1FSM.h"
 
+/*
+    go1FSM.cpp implements a finite state machine (FSM) to manage the transitions between
+    all desired modes of operation for Go1 (Startup, Locomotion, Shutdown, Passive). These
+    states are triggered by user commands, but Locomotion is the only state in which velocity
+    commands are accepted. The FSM also executes the general loop used in the MuJoCo simulations
+    and the hardware experiments:
+    
+    1. pull sim/hardware robot info from data interface
+    2. estimate state
+    3. update locomotion plan
+    4. solve for stance leg MPC and swing leg PD torques
+    5. send torque commands through data interface back to sim/hardware robot
+
+    This is not the most memory-safe implementation, but the optimizations in the rest of the code
+    (e.g. go1StanceMPC, go1State, go1StateEstimator, go1FK, go1Utils) should ensure that the code
+    runs at a general 500 Hz loop, with the MPC running at 50 Hz. Changes to any piece of underlying
+    code may affect the loop rate, so be careful when modifying anything, especially if translating
+    this code from a simpler CMake project w/ executables to a ROS project with nodes and topics for
+    different pieces, like digit_ros2.
+*/
+
 // Constructor
 go1FSM::go1FSM(double state_hz, 
                 double mpc_hz,

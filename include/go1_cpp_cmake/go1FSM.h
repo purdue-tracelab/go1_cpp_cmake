@@ -1,11 +1,13 @@
 #ifndef GO1_FSM_H
 #define GO1_FSM_H
 
+// Standard libraries
 #include <thread>
 #include <atomic>
 #include <condition_variable>
 #include <memory>
 
+// Package-specific header files
 #include "go1State.h"
 #include "go1StanceMPC.h"
 #include "go1StateEstimator.h"

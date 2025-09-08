@@ -161,7 +161,8 @@ void MIT_TwoStageKF::estimateState(go1State& state) {
     // Update covariances based on foot contact
     double trust;
     for (int i = 0; i < NUM_LEG; i++) {
-        trust = state.contacts[i] ? 1.0 : 1e6;
+        // trust = state.contacts[i] ? 1.0 : 1e6;
+        trust = (state.est_contacts[i] > state.thresh) ? 1.0 : 1e6;
         Q_k.block<3, 3>(6 + i*3, 6 + i*3) = trust * DT_CTRL * 0.06 * eye3;
 
         // New idea: why is R being affected by contact if FK for rigid body is accurate? So keep R constant?
@@ -420,9 +421,9 @@ ETHZ_EKF_num::ETHZ_EKF_num() {
     Eigen::Matrix<double, 12, 1> r_diag;
     double r_x = 10;
     double r_y = 5;
-    // r_z values in sim are in range [0.22, 0.55] for walking around on flat ground or all hardware cases
-    // r_z values in hardware are in range [xx, yy] for walkign around on flat ground or all hardware cases
-    double r_z = 0.005; // HARDWARE VALUES: 
+    // r_z values in sim are in range [0.175, 0.55] for walking around on flat ground or all hardware cases
+    // r_z values in hardware are in range [xx, yy] for walking around on flat ground or all hardware cases
+    double r_z = 0.55; // HARDWARE VALUES: 0.005 is okay
     r_diag << r_x, r_y, r_z, r_x, r_y, r_z, r_x, r_y, r_z;
     R_k = r_diag.asDiagonal();
 
@@ -460,11 +461,11 @@ void ETHZ_EKF_num::estimateState(go1State& state) {
         Q_k.block<3, 3>(10 + i*3, 10 + i*3) = trust * eye3;
     }
 
-    // Reduce velocity estimate drift on hardware
-    double vel_est_cov = 0.2;
-    if (state.thresh == UNITREE_SDK_CONTACT_THRESH && Q_k(3, 3) != vel_est_cov) {
-        Q_k.block<3, 3>(3, 3) = vel_est_cov * eye3;
-    }
+    // // Reduce velocity estimate drift on hardware
+    // double vel_est_cov = 1.0;
+    // if (state.thresh == UNITREE_SDK_CONTACT_THRESH && Q_k(3, 3) != vel_est_cov) {
+    //     Q_k.block<3, 3>(3, 3) = vel_est_cov * eye3;
+    // }
 
     // Find process and measurement Jacobians numerically (w/o bias states)
     F_k = numericalJacobianFixedSize<22, 22>(fState_ETHZ, x_k, 1e-6, false, state.root_lin_acc_meas, state.root_ang_vel_meas, C_k);

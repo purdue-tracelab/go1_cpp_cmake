@@ -38,7 +38,7 @@ constexpr double SQUAT_JOINT_KD = 3;
 constexpr double DT_CTRL = 0.002; // General control frequency (500 Hz)
 constexpr double WALK_HEIGHT = 0.27;
 
-constexpr int STATE_EST_SELECT = 3; // 0: naive KF, 1: MIT two-stage KF, 2: ETH Zurich EKF (manual), 3: ETH Zurich EKF (numerical)
+constexpr int STATE_EST_SELECT = 1; // 0: naive KF, 1: MIT two-stage KF, 2: ETH Zurich EKF (manual), 3: ETH Zurich EKF (numerical)
 constexpr bool USE_EST_FOR_CONTROL = true; // true: yes, use estimated info (ALWAYS USE ESTIMATE FOR HARDWARE), false: no, use ground truth info
 constexpr int USE_TERRAIN_ADAPT = false; // false: no terrain adaptation, true: use terrain adaptation (calculation bugged/broken atm)
 
@@ -54,11 +54,11 @@ constexpr int SWING_PD_SELECT = 1; // 0: Cartesian PD, 1: Joint PD (Joint PD rec
 constexpr double SWING_TRAJ_SELECT = 0; // 0: Bezier, 1: Sinusoidal (sinusoidal bugged/broken atm)
 constexpr int SWING_PHASE_MAX = 199; // swap between 0-99 (0.2 s gait cycle) and 0-199 (0.4 s gait cycle) for DT_CTRL = 0.002
 
-// Cartesian space swing PD gains
+// Cartesian-space swing PD gains
 constexpr double SWING_KP_CART = 3000;
 constexpr double SWING_KD_CART = 40;
 
-// Joint space swing PD gains
+// Joint-space swing PD gains
 constexpr double SWING_KP_JOINT = 80;
 constexpr double SWING_KD_JOINT = 3;
 
@@ -157,7 +157,7 @@ constexpr double GO1_LUMPED_INERTIA_ZZ = 0.2887;
 // MPC weight sets //
 /////////////////////
 
-// current hardware default
+// current simulation & hardware default
 constexpr double q_weight_1 = 25;
 constexpr double q_weight_2 = 25;
 constexpr double q_weight_3 = 25;
@@ -172,7 +172,7 @@ constexpr double q_weight_11 = 0.5;
 constexpr double q_weight_12 = 0.5;
 constexpr double r_weight_val = 3e-5;
 
-// // MIT
+// // MIT Cheetah 3 Convex MPC
 // constexpr double q_weight_1 = 1;
 // constexpr double q_weight_2 = 1;
 // constexpr double q_weight_3 = 1;
@@ -187,7 +187,7 @@ constexpr double r_weight_val = 3e-5;
 // constexpr double q_weight_12 = 1;
 // constexpr double r_weight_val = 1e-6;
 
-// // current simulation default
+// // old MuJoCo simulation
 // constexpr double q_weight_1 = 500;
 // constexpr double q_weight_2 = 500;
 // constexpr double q_weight_3 = 500;
@@ -202,7 +202,7 @@ constexpr double r_weight_val = 3e-5;
 // constexpr double q_weight_12 = 10;
 // constexpr double r_weight_val = 1e-6;
 
-// // MATLAB
+// // old MATLAB simulation
 // constexpr double q_weight_1 = 100;
 // constexpr double q_weight_2 = 100;
 // constexpr double q_weight_3 = 100;
